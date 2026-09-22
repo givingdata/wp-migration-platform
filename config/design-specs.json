@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "site": "thecinderellaproject.com",
+  "site": "example.org",
   "breakpoints": [300, 600, 800, 1200],
   "image": {
     "formats": ["webp", "jpeg"],

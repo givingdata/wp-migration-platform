@@ -6,8 +6,8 @@
 # Safe to re-run: existing resources are reused. Settings can be given as env vars
 # to skip the prompts:
 #
-#   CLIENT_SLUG=cinderella SITE_NAME="The Cinderella Project" \
-#   SITE_DOMAIN=thecinderellaproject.com bash scripts/deploy.sh
+#   CLIENT_SLUG=acme SITE_NAME="Acme Arts" \
+#   SITE_DOMAIN=acmearts.org bash scripts/deploy.sh
 #
 # Creates: KV namespace, R2 bucket (+ public r2.dev URL), Worker (+ secrets),
 # Pages project for the site, Pages project for the staff form (deployed with its
@@ -65,14 +65,15 @@ node -e 'process.exit(+process.versions.node.split(".")[0] >= 22 ? 0 : 1)' || di
 (cd "$WORKER_DIR" && npm ci --no-fund --no-audit >/dev/null)
 wrangler whoami >/dev/null 2>&1 || die "Not logged in to Cloudflare. Run: cd worker && npx wrangler login"
 info "wrangler $(wrangler --version | tail -1), logged in"
+[ -n "$(git -C "$ROOT" remote get-url upstream 2>/dev/null)" ] || warn "No upstream remote: run this in a client repo made with scripts/new-client.sh, not the platform template"
 
 # ---- Settings ---------------------------------------------------------------
 
 bold "Client settings"
 default_repo="$(git -C "$ROOT" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
-ask CLIENT_SLUG "Short client id (lowercase, used in resource names)" "cinderella"
+ask CLIENT_SLUG "Short client id (lowercase, used in resource names, e.g. acme)"
 [[ "$CLIENT_SLUG" =~ ^[a-z0-9][a-z0-9-]{1,40}$ ]] || die "CLIENT_SLUG must be lowercase letters, digits and dashes"
-ask SITE_NAME "Site name" "The Cinderella Project"
+ask SITE_NAME "Site name (e.g. Acme Arts)"
 ask SITE_DOMAIN "Production domain for the site (blank to use *.pages.dev)" ""
 ask GITHUB_REPO "GitHub repo (owner/name)" "$default_repo"
 

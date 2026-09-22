@@ -2,7 +2,7 @@
 """Export WordPress content to Astro-ready JSON, mirroring media to Cloudflare R2.
 
 Usage:
-    python wordpress_export.py --wordpress-url https://thecinderellaproject.com --output content.json
+    python wordpress_export.py --wordpress-url https://example.org --output content.json
     python wordpress_export.py --wordpress-url https://site.com --output content.json --skip-media
     python wordpress_export.py --output content.json --media-only
 
@@ -396,7 +396,7 @@ def content_collections(data):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Export WordPress content to Astro-ready JSON with media mirrored to Cloudflare R2.")
-    parser.add_argument("--wordpress-url", help="Site root, e.g. https://thecinderellaproject.com")
+    parser.add_argument("--wordpress-url", help="Site root, e.g. https://example.org")
     parser.add_argument("--output", default="content.json", help="Output JSON path (default: content.json)")
     parser.add_argument(
         "--types",

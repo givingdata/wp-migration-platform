@@ -2,7 +2,7 @@ import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 
 // SITE_URL is the production origin (used for canonical URLs, sitemap, Open Graph).
-const site = process.env.SITE_URL || "https://thecinderellaproject.com";
+const site = process.env.SITE_URL || "https://example.org";
 
 export default defineConfig({
   site,

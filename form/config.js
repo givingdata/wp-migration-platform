@@ -3,7 +3,7 @@
 // NOTE: everything here is visible to anyone who can load the form. Protect the
 // form with Cloudflare Access (or similar) — see form/README.md.
 export default {
-  siteName: "The Cinderella Project",
+  siteName: "Your Organization",
 
   // Worker base URL, no trailing slash. For local testing use the mock:
   //   node form/mock-worker.mjs   →   http://localhost:8787

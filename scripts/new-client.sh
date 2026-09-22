@@ -3,7 +3,7 @@
 # back to the platform so fixes can be pulled in later with `git pull upstream main`.
 #
 #   bash scripts/new-client.sh <client-slug> [github-owner]
-#   e.g. bash scripts/new-client.sh cinderella givingdata
+#   e.g. bash scripts/new-client.sh acme givingdata
 #
 # Result: github.com/<owner>/<slug>-site and a local clone next to this folder
 # (../<slug>-site) with remotes:
