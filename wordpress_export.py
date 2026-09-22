@@ -26,6 +26,9 @@ import requests
 log = logging.getLogger("wordpress_export")
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".bmp", ".tif", ".tiff"}
+# Linked documents are mirrored too, so they keep working once WordPress is switched off.
+DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp"}
+MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | DOCUMENT_EXTENSIONS
 
 # Map WordPress post types to the collections Astro reads.
 COLLECTION_FOR_TYPE = {
@@ -43,6 +46,10 @@ SRCSET_RE = re.compile(
     re.IGNORECASE,
 )
 MARKDOWN_IMG_RE = re.compile(r"!\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+# Any absolute or protocol-relative URL, wherever it appears (plugin data-* attributes, JSON, text).
+ANY_URL_RE = re.compile(r"""(?:https?:)?//[^\s"'<>()\\]+""")
+# Root-relative uploads paths in any attribute: src="/wp-content/uploads/…"
+RELATIVE_UPLOAD_RE = re.compile(r"""(?<=["'(=\s])/wp-content/[^\s"'<>()\\]+""")
 CSS_URL_RE = re.compile(r"""url\(\s*(?P<q>["']?)(?P<url>[^)"']+)(?P=q)\s*\)""", re.IGNORECASE)
 TAG_RE = re.compile(r"<[^>]+>")
 
@@ -66,8 +73,11 @@ def strip_html(value):
 
 
 def is_image_url(url):
-    path = urlparse(url).path.lower()
-    return Path(path).suffix in IMAGE_EXTENSIONS
+    return Path(urlparse(url).path.lower()).suffix in IMAGE_EXTENSIONS
+
+
+def is_media_url(url):
+    return Path(urlparse(url).path.lower()).suffix in MEDIA_EXTENSIONS
 
 
 class R2Uploader:
@@ -275,7 +285,7 @@ class MediaMirror:
 
     def is_mirrorable(self, url):
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not is_image_url(url):
+        if parsed.scheme not in ("http", "https") or not is_media_url(url):
             return False
         host = parsed.netloc.lower()
         host = host.removeprefix("www.")
@@ -287,7 +297,8 @@ class MediaMirror:
         return self.include_external
 
     def find_urls(self, text):
-        """Every image URL in HTML/markdown: <img>, srcset, gallery data-*, markdown, CSS url()."""
+        """Every media URL in HTML/markdown: <img>, srcset, gallery data-*, markdown, CSS url(),
+        plus any other link to the site's images or documents, whatever attribute holds it."""
         if not text:
             return []
         found = [m.group("url") for m in IMG_ATTR_RE.finditer(text)]
@@ -295,9 +306,11 @@ class MediaMirror:
             found.extend(part.strip().split(" ")[0] for part in m.group("val").split(",") if part.strip())
         found.extend(m.group("url") for m in MARKDOWN_IMG_RE.finditer(text))
         found.extend(m.group("url") for m in CSS_URL_RE.finditer(text))
+        found.extend(m.group(0) for m in ANY_URL_RE.finditer(text))
+        found.extend(m.group(0) for m in RELATIVE_UPLOAD_RE.finditer(text))
         urls = []
         for raw in found:
-            url = self.normalise_url(raw)
+            url = self.normalise_url(raw.rstrip(".,;:"))
             if self.is_mirrorable(url) and url not in urls:
                 urls.append(url)
         return urls
@@ -331,8 +344,10 @@ class MediaMirror:
                 resp = self.session.get(url, timeout=self.timeout)
                 resp.raise_for_status()
                 content_type = resp.headers.get("Content-Type", "").split(";")[0] or mimetypes.guess_type(key)[0] or "application/octet-stream"
-                if not content_type.startswith("image/"):
+                if is_image_url(url) and not content_type.startswith("image/"):
                     raise ValueError(f"not an image (Content-Type {content_type})")
+                if content_type.startswith("text/html"):
+                    raise ValueError("got an HTML page instead of the file")
                 self.uploader.upload(key, resp.content, content_type)
                 log.info("Uploaded %s", key)
             else:
@@ -366,6 +381,36 @@ class MediaMirror:
         )
         text = MARKDOWN_IMG_RE.sub(lambda m: m.group(0).replace(m.group("url"), swap(m.group("url"))), text)
         text = CSS_URL_RE.sub(lambda m: m.group(0).replace(m.group("url"), swap(m.group("url"))), text)
+        return self._replace_everywhere(text)
+
+    def _variants(self, url):
+        """Spellings of one URL that may appear in content: http/https, with/without www,
+        protocol-relative, and root-relative."""
+        parsed = urlparse(url)
+        hosts = {parsed.netloc, parsed.netloc.removeprefix("www."), "www." + parsed.netloc.removeprefix("www.")}
+        rest = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+        out = {f"{scheme}//{h}{rest}" for h in hosts for scheme in ("https:", "http:", "")}
+        return out, rest
+
+    def _replace_everywhere(self, text):
+        """Swap every spelling of every mirrored URL, in any attribute or text, for its R2 URL."""
+        if not self.mapping:
+            return text
+        if getattr(self, "_swap_re_size", None) != len(self.mapping):
+            absolute, relative = {}, {}
+            for src, dst in self.mapping.items():
+                variants, rest = self._variants(src)
+                absolute.update(dict.fromkeys(variants, dst))
+                if rest.startswith("/wp-content/"):
+                    relative[rest] = dst
+            end = r"(?![\w\-/%]|\.\w)"  # don't match a prefix of a longer URL (a trailing full stop is fine)
+            alt = lambda keys: "|".join(re.escape(k) for k in sorted(keys, key=len, reverse=True))
+            self._abs_re = re.compile(f"(?:{alt(absolute)}){end}")
+            self._rel_re = re.compile(f"(?<=[\"'(=\\s])(?:{alt(relative)}){end}") if relative else None
+            self._abs, self._rel, self._swap_re_size = absolute, relative, len(self.mapping)
+        text = self._abs_re.sub(lambda m: self._abs[m.group(0)], text)
+        if self._rel_re:
+            text = self._rel_re.sub(lambda m: self._rel[m.group(0)], text)
         return text
 
     def process(self, data, collections):
