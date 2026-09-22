@@ -8,6 +8,7 @@ staff form (via a Cloudflare Worker + Claude) for ongoing content updates.
 | Extraction | `wordpress_export.py` | WordPress REST API → `content.json`, media mirrored to R2 |
 | Design specs | `config/design-specs.json` | Aspect ratios, breakpoints and fields per content type |
 | Worker | `worker/` | Form endpoint: auth, image optimization → R2, Claude structuring, KV, GitHub commit ([docs](worker/README.md)) |
+| Staff form | `form/` | Static form with image crop preview; signs and submits to the Worker ([docs](form/README.md)) |
 
 ## WordPress extraction
 
