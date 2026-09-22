@@ -12,6 +12,8 @@ on:
 
 jobs:
   deploy:
+    # Only in client repos (scripts/deploy.sh sets this variable); the template never deploys.
+    if: vars.CLOUDFLARE_PAGES_PROJECT != ''
     runs-on: ubuntu-latest
     environment: production
     concurrency:

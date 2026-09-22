@@ -1,5 +1,10 @@
 # WordPress → JAMstack Migration Platform
 
+**This repo is the platform template.** Clients don't deploy from it: each client gets its own
+private repo (`scripts/new-client.sh <slug>`) that holds that client's settings, secrets and
+`content.json`, with this repo as its `upstream` remote. The deploy workflows only run in repos
+where `scripts/deploy.sh` has set the `CLOUDFLARE_PAGES_PROJECT` variable.
+
 Moves a client's WordPress site to a static Astro site on Cloudflare Pages. Media lives in R2, and
 staff add content through a form → Cloudflare Worker (Claude tidies the text) → commit to
 `content.json` → GitHub Actions rebuild. See README.md for the architecture.
@@ -10,11 +15,12 @@ staff add content through a form → Cloudflare Worker (Claude tidies the text) 
 
 | When | Command | Does |
 |---|---|---|
-| New client | `bash scripts/deploy.sh` | Creates KV, R2, the Worker + secrets, Pages projects and the staff form; links the domain; writes IDs into `worker/wrangler.toml` (commit it) |
+| New client repo | `bash scripts/new-client.sh <slug>` (from the platform folder) | Private `<owner>/<slug>-site` repo + local `../<slug>-site` clone, `upstream` = platform |
+| New client resources | `bash scripts/deploy.sh` (in the client folder) | Creates KV, R2, the Worker + secrets, Pages projects and the staff form; links the domain; writes IDs into `worker/wrangler.toml` (commit it) |
 | Migrate WordPress | `python wordpress_export.py --wordpress-url https://<site> --output content.json` | Posts/pages/images → `content.json` + R2 (needs `R2_*` in `.env`) |
 | Publish | `git add content.json && git commit && git push` | GitHub builds and deploys the site |
 
-Follow `docs/DEPLOYMENT_CHECKLIST.md` for every new client. New client = new repo from this one via **Use this template**.
+Follow `docs/DEPLOYMENT_CHECKLIST.md` for every new client.
 
 ### Day to day: nothing to run
 
@@ -22,7 +28,9 @@ Staff submit the form → the Worker structures the text with Claude, resizes th
 
 ### Changing the platform
 
-Edit, then `git push`; the workflows redeploy whatever changed:
+Make generic fixes in the platform repo and push; then in each client folder run
+`git pull upstream main && git push` to roll them out. Client-only changes go straight in the client repo.
+In a client repo, pushing redeploys whatever changed:
 - `site/` → site (`deploy-site.yml`)
 - `worker/` → Worker (`deploy-worker.yml`)
 - `config/design-specs.json` → both (aspect ratios, breakpoints, form fields)

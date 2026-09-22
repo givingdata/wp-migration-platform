@@ -29,7 +29,9 @@ Staff form ──signed POST──▶ Worker ──▶ R2 (images) ─ Claude (s
 | `deploy-site.yml` | push touching `site/**`, design specs, root package files | Same, for code changes |
 | `deploy-worker.yml` | push touching `worker/**` or design specs, manual | Test, upload secrets, deploy Worker, health check |
 
-New client? Follow [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
+This repo is the **template**. Each client gets its own private repo created with
+`scripts/new-client.sh`, which keeps this repo as `upstream` for updates. New client? Follow
+[docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
 ## WordPress extraction
 

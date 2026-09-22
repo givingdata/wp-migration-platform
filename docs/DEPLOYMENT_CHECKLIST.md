@@ -13,8 +13,10 @@ and the first content export. Commands run from the repo root unless noted.
 
 ## 1. Create the client repo
 
-- [ ] GitHub → this repo → **Use this template** → `org/<client>-site` (private)
-- [ ] `git clone` it and `npm install` at the root
+- [ ] From the platform folder: `bash scripts/new-client.sh <client> [github-owner]`
+      → private repo `<owner>/<client>-site` and a local clone in `../<client>-site`
+      (its `upstream` remote is the platform, so `git pull upstream main` brings in platform fixes)
+- [ ] `cd ../<client>-site && npm install` — do **all remaining steps in the client folder**
 - [ ] Edit `config/design-specs.json` if the client's design needs different aspect ratios, breakpoints or fields
 
 ## 2. Cloudflare API token and login

@@ -11,6 +11,8 @@ on:
 
 jobs:
   site:
+    # Only in client repos (scripts/deploy.sh sets this variable); the template never deploys.
+    if: vars.CLOUDFLARE_PAGES_PROJECT != ''
     uses: ./.github/workflows/_site.yml
     with:
       reason: ${{ github.event_name == 'workflow_dispatch' && 'Manual rebuild' || 'Content updated' }}
