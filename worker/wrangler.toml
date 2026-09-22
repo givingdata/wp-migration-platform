@@ -1,4 +1,4 @@
-name = "wp-migration-worker"
+name = "cinderella-content-worker"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -12,9 +12,9 @@ GITHUB_REPO = "givingdata/wp-migration-platform"
 GITHUB_BRANCH = "main"
 CONTENT_PATH = "content.json"
 # Public base URL of the R2 bucket (custom domain or https://pub-xxxx.r2.dev)
-R2_PUBLIC_URL = ""
+R2_PUBLIC_URL = "https://pub-fcf64988c7de4bd0bf4f895ff15d29db.r2.dev"
 # Comma-separated origins allowed to call the Worker (the form's host)
-ALLOWED_ORIGINS = "http://localhost:8080"
+ALLOWED_ORIGINS = "https://cinderella-form.pages.dev"
 # CLAUDE_MODEL = "claude-opus-5"
 
 # Secrets (set with `wrangler secret put <NAME>`, locally in .dev.vars):
@@ -25,11 +25,11 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 
 [[kv_namespaces]]
 binding = "CONTENT"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"   # scripts/deploy.sh fills this in
+id = "893ae4546dca46609a5ffb4675cb9253"   # scripts/deploy.sh fills this in
 
 [[r2_buckets]]
 binding = "MEDIA"
-bucket_name = "wp-migration-media"    # scripts/deploy.sh fills this in
+bucket_name = "cinderella-media"    # scripts/deploy.sh fills this in
 
 [images]
 binding = "IMAGES"
