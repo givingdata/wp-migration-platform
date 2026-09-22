@@ -260,21 +260,23 @@ class WordPressExporter:
             items = [self.normalise(i, collection) for i in self.fetch_type(rest_base)]
             data.setdefault(collection, []).extend(items)
             log.info("%s: %d items", collection, len(items))
-        data["menu"] = self.fetch_menu()
+        data.update(self.fetch_homepage_info())
         return data
 
-    def fetch_menu(self):
-        """The site's main navigation, read from the homepage HTML (the REST API only exposes
-        menus to logged-in users). Returns [{title, url, children: [...]}], [] if none found."""
+    def fetch_homepage_info(self):
+        """Read what the REST API only shows logged-in users from the homepage HTML:
+        the main navigation ({"menu": [{title, url, children}]}) and, if the site uses a
+        static page as its homepage, that page's WordPress ID ({"frontPage": "123"})."""
         try:
             resp = self.session.get(self.base_url + "/", timeout=self.timeout)
             resp.raise_for_status()
         except requests.RequestException as e:
-            log.warning("Could not fetch homepage for the menu: %s", e)
-            return []
+            log.warning("Could not fetch the homepage (menu and front page not exported): %s", e)
+            return {"menu": [], "frontPage": None}
         menu = parse_menu(resp.text, self.base_url)
-        log.info("menu: %d top-level items", len(menu))
-        return menu
+        front = parse_front_page_id(resp.text)
+        log.info("menu: %d top-level items; front page: %s", len(menu), front or "latest posts")
+        return {"menu": menu, "frontPage": front}
 
 
 class MediaMirror:
@@ -450,7 +452,7 @@ class MediaMirror:
         return data
 
 
-NON_CONTENT_KEYS = {"media", "mediaErrors", "menu"}
+NON_CONTENT_KEYS = {"media", "mediaErrors", "menu"}  # lists that aren't content collections
 
 
 def content_collections(data):
@@ -496,6 +498,18 @@ class _MenuParser(HTMLParser):
     def handle_data(self, data):
         if self.link is not None:
             self.link["title"] = (self.link["title"] + " " + data).strip()
+
+
+def parse_front_page_id(page_html):
+    """ID of the static page WordPress shows as the homepage, or None if it lists posts.
+    WordPress marks it with body classes "home … page-id-<ID>"."""
+    body = re.search(r"<body\b[^>]*class=[\"']([^\"']*)", page_html)
+    classes = body.group(1).split() if body else []
+    if "home" in classes and "page" in classes:
+        for c in classes:
+            if c.startswith("page-id-") and c[8:].isdigit():
+                return c[8:]
+    return None
 
 
 def parse_menu(page_html, base_url):
@@ -566,8 +580,8 @@ def main(argv=None):
                     content = content.replace(r2_url, source)
                 entry["content"] = content
         site_url = args.wordpress_url or data.get("siteUrl")
-        if "menu" not in data and site_url:
-            data["menu"] = WordPressExporter(site_url, []).fetch_menu()
+        if ("menu" not in data or "frontPage" not in data) and site_url:
+            data.update(WordPressExporter(site_url, []).fetch_homepage_info())
     else:
         if not args.wordpress_url:
             parser.error("--wordpress-url is required unless --media-only is used")

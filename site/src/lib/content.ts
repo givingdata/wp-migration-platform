@@ -7,6 +7,8 @@ export type ContentType = "exhibition" | "event" | "post" | "page";
 
 export interface Entry {
   id: string;
+  /** Original WordPress ID (imported entries only). */
+  wpId?: number | string | null;
   slug: string;
   type: ContentType;
   title: string;
@@ -43,6 +45,8 @@ export interface SiteContent {
   pages: Entry[];
   /** Main navigation copied from WordPress (wordpress_export.py), if any. */
   menu: MenuItem[];
+  /** WordPress ID of the page used as the homepage, if the site had a static front page. */
+  frontPage: string | null;
   siteUrl?: string;
 }
 
@@ -80,6 +84,7 @@ function load() {
     posts: [],
     pages: [],
     menu: Array.isArray(raw.menu) ? raw.menu : [],
+    frontPage: raw.frontPage ? String(raw.frontPage) : null,
     siteUrl: raw.siteUrl,
   };
   for (const [collection, type] of Object.entries(COLLECTIONS)) {
@@ -96,6 +101,7 @@ function load() {
   const order: (keyof typeof COLLECTIONS)[] = ["pages", "exhibitions", "events", "posts"];
   for (const collection of order) {
     for (const entry of (content as any)[collection] as Entry[]) {
+      if (isFrontPage(entry, content)) continue; // published at "/" instead
       let p = entry.slug.replace(/^\/+|\/+$/g, "");
       if (taken.has(p)) p = `${entry.type}/${p}`;
       let n = 2;
@@ -109,6 +115,16 @@ function load() {
   return cache;
 }
 
+function isFrontPage(entry: Entry, content: SiteContent): boolean {
+  return !!content.frontPage && entry.type === "page" && (String(entry.wpId ?? "") === content.frontPage || entry.id === content.frontPage);
+}
+
+/** The page WordPress used as its homepage, if any. */
+export function getFrontPage(): Entry | null {
+  const content = getContent();
+  return content.pages.find((p) => isFrontPage(p, content)) ?? null;
+}
+
 export function getContent(): SiteContent {
   return load().content;
 }
@@ -118,6 +134,7 @@ export function getRoutedEntries(): RoutedEntry[] {
 }
 
 export function urlFor(entry: Entry): string {
+  if (isFrontPage(entry, getContent())) return "/";
   const match = getRoutedEntries().find((e) => e.id === entry.id && e.type === entry.type);
   return `/${match?.path ?? entry.slug}/`;
 }
@@ -163,6 +180,8 @@ export function resolveMenuUrl(url: string | null): string | null {
   if (!url || /^[a-z]+:/i.test(url)) return url;
   const slug = url.split(/[?#]/)[0].replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
   if (!slug) return "/";
+  const front = getFrontPage();
+  if (front && front.slug === slug) return "/";
   const entry = getRoutedEntries().find((e) => e.slug === slug);
   return entry ? `/${entry.path}/` : url;
 }
