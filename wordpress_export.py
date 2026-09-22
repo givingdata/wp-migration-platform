@@ -11,6 +11,7 @@ See README.md ("WordPress extraction") for the full workflow.
 import argparse
 import hashlib
 import html
+from html.parser import HTMLParser
 import json
 import logging
 import mimetypes
@@ -259,7 +260,21 @@ class WordPressExporter:
             items = [self.normalise(i, collection) for i in self.fetch_type(rest_base)]
             data.setdefault(collection, []).extend(items)
             log.info("%s: %d items", collection, len(items))
+        data["menu"] = self.fetch_menu()
         return data
+
+    def fetch_menu(self):
+        """The site's main navigation, read from the homepage HTML (the REST API only exposes
+        menus to logged-in users). Returns [{title, url, children: [...]}], [] if none found."""
+        try:
+            resp = self.session.get(self.base_url + "/", timeout=self.timeout)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            log.warning("Could not fetch homepage for the menu: %s", e)
+            return []
+        menu = parse_menu(resp.text, self.base_url)
+        log.info("menu: %d top-level items", len(menu))
+        return menu
 
 
 class MediaMirror:
@@ -435,8 +450,82 @@ class MediaMirror:
         return data
 
 
+NON_CONTENT_KEYS = {"media", "mediaErrors", "menu"}
+
+
 def content_collections(data):
-    return [k for k, v in data.items() if isinstance(v, list) and k != "media"]
+    return [k for k, v in data.items() if isinstance(v, list) and k not in NON_CONTENT_KEYS]
+
+
+class _MenuParser(HTMLParser):
+    """Builds a tree from nested <ul><li><a>…</a><ul class="sub-menu">…</ul></li></ul>."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.root = []
+        self.stack = []  # lists being filled, one per open <ul>
+        self.current = []  # open <li> items, innermost last
+        self.link = None  # item whose <a> text is being read
+        self.done = False
+
+    def handle_starttag(self, tag, attrs):
+        if self.done:
+            return
+        if tag == "ul":
+            target = self.root if not self.stack else self.current[-1]["children"] if self.current else self.stack[-1]
+            self.stack.append(target)
+        elif tag == "li" and self.stack:
+            item = {"title": "", "url": None, "children": []}
+            self.stack[-1].append(item)
+            self.current.append(item)
+        elif tag == "a" and self.current and self.current[-1]["url"] is None and not self.current[-1]["title"]:
+            self.current[-1]["url"] = dict(attrs).get("href") or None
+            self.link = self.current[-1]
+
+    def handle_endtag(self, tag):
+        if self.done:
+            return
+        if tag == "a":
+            self.link = None
+        elif tag == "li" and self.current:
+            self.current.pop()
+        elif tag == "ul" and self.stack:
+            self.stack.pop()
+            self.done = not self.stack
+
+    def handle_data(self, data):
+        if self.link is not None:
+            self.link["title"] = (self.link["title"] + " " + data).strip()
+
+
+def parse_menu(page_html, base_url):
+    """Find the primary navigation <ul> and return its items with site links made root-relative."""
+    starts = [m for m in re.finditer(r"<ul\b[^>]*>", page_html) if "sub-menu" not in m.group(0)]
+    ranked = [m for m in starts if re.search(r"primary", m.group(0), re.I)] or [
+        m for m in starts if re.search(r"(id|class)=[\"'][^\"']*\bmenu", m.group(0), re.I)
+    ]
+    if not ranked:
+        return []
+    parser = _MenuParser()
+    parser.feed(page_html[ranked[0].start():])
+    site = urlparse(base_url).netloc.lower().removeprefix("www.")
+
+    def clean(items):
+        out = []
+        for item in items:
+            url = item["url"]
+            if url and url.strip() not in ("#", ""):
+                parsed = urlparse(urljoin(base_url + "/", url))
+                if parsed.netloc.lower().removeprefix("www.") == site:
+                    url = parsed.path or "/"
+            else:
+                url = None
+            title = html.unescape(re.sub(r"\s+", " ", item["title"])).strip()
+            if title:
+                out.append({"title": title, "url": url, "children": clean(item["children"])})
+        return out
+
+    return clean(parser.root)
 
 
 def main(argv=None):
@@ -477,6 +566,8 @@ def main(argv=None):
                     content = content.replace(r2_url, source)
                 entry["content"] = content
         site_url = args.wordpress_url or data.get("siteUrl")
+        if "menu" not in data and site_url:
+            data["menu"] = WordPressExporter(site_url, []).fetch_menu()
     else:
         if not args.wordpress_url:
             parser.error("--wordpress-url is required unless --media-only is used")

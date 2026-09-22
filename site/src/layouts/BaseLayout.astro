@@ -1,7 +1,7 @@
 ---
 import "../styles/global.css";
 import { SITE } from "../lib/site";
-import { navPages, urlFor, getContent } from "../lib/content";
+import Nav from "../components/Nav.astro";
 import { buildImageSet } from "../lib/images";
 
 interface Props {
@@ -20,15 +20,6 @@ const { title, description = SITE.tagline, image, imageType = "post", ogType = "
 const fullTitle = title ? `${title} | ${SITE.name}` : SITE.name;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const shareImage = image ? new URL(buildImageSet(image, imageType).src, Astro.site).href : undefined;
-
-const content = getContent();
-const nav = [
-  ...(content.exhibitions.length ? [{ href: "/exhibitions/", label: "Exhibitions" }] : []),
-  ...(content.events.length ? [{ href: "/events/", label: "Events" }] : []),
-  ...(content.posts.length ? [{ href: "/news/", label: "News" }] : []),
-  ...navPages().map((p) => ({ href: urlFor(p), label: p.title })),
-];
-const current = Astro.url.pathname;
 
 const ld = [
   { "@context": "https://schema.org", "@type": "Organization", name: SITE.name, url: Astro.site?.href },
@@ -64,15 +55,7 @@ const ld = [
     <header class="site-header">
       <div class="wrap header-inner">
         <a class="brand" href="/">{SITE.name}</a>
-        <nav aria-label="Main">
-          <ul>
-            {nav.map((item) => (
-              <li>
-                <a href={item.href} aria-current={current.startsWith(item.href) ? "page" : undefined}>{item.label}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <Nav />
       </div>
     </header>
 

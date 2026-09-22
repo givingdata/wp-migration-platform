@@ -69,9 +69,27 @@ h3 { font-size: 1.25rem; }
 .site-header { border-bottom: 1px solid var(--border); background: var(--surface); }
 .header-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1.5rem; padding-block: 1rem; }
 .brand { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 600; color: var(--text); text-decoration: none; }
-.site-header ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
-.site-header nav a { color: var(--text); text-decoration: none; font-weight: 500; padding-block: 0.25rem; }
-.site-header nav a:hover, .site-header nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; }
+.site-header { position: relative; z-index: 5; }
+.main-nav > ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+.main-nav li { position: relative; display: flex; align-items: center; }
+.main-nav a, .main-nav .nav-label { color: var(--text); text-decoration: none; font-weight: 500; padding-block: 0.25rem; }
+.main-nav a:hover, .main-nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; }
+.sub-toggle { background: none; border: 0; color: inherit; font: inherit; padding: 0.25rem; margin-left: 0.1rem; cursor: pointer; line-height: 1; }
+.sub-menu {
+  display: none; position: absolute; top: 100%; left: 0; min-width: 14rem; list-style: none; margin: 0; padding: 0.5rem 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+.sub-menu li { display: block; }
+.sub-menu a, .sub-menu .nav-label { display: block; padding: 0.4rem 1rem; }
+.has-children:hover > .sub-menu, .has-children:focus-within > .sub-menu, .has-children.open > .sub-menu { display: block; }
+@media (max-width: 40rem) {
+  .main-nav > ul { flex-direction: column; gap: 0; }
+  .main-nav li { flex-wrap: wrap; }
+  .sub-menu { position: static; box-shadow: none; border: 0; padding: 0 0 0.5rem 1rem; min-width: 0; width: 100%; background: none; }
+  .has-children:hover > .sub-menu { display: none; }
+  .has-children.open > .sub-menu, .has-children:focus-within > .sub-menu { display: block; }
+}
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .site-footer { border-top: 1px solid var(--border); margin-top: 3rem; padding-block: 2rem; color: var(--muted); font-size: 0.9rem; }
 
 /* Home */
@@ -120,7 +138,12 @@ h3 { font-size: 1.25rem; }
 .prose iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; }
 .prose table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
 .prose th, .prose td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
-/* WordPress gallery blocks */
+/* WordPress gallery blocks. Plugin galleries (NextGEN slideshows etc.) carry inline heights meant
+   for their own scripts; drop those so every gallery becomes a plain grid of photos. */
+.prose [class*="ngg-"], .prose .gallery-item, .prose .wp-block-gallery figure { height: auto !important; max-height: none !important; max-width: none !important; }
+.prose [class*="ngg-"] img { max-height: none !important; }
+.prose .ngg-gallery-slideshow-image, .prose .ngg-gallery-thumbnail-box, .prose .gallery-item { margin: 0; }
+.prose .ngg-gallery-slideshow-image a, .prose .ngg-gallery-thumbnail-box a { display: block; }
 .prose .wp-block-gallery, .prose .gallery, .prose .ngg-galleryoverview {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.5rem; list-style: none; padding: 0;
 }

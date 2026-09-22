@@ -30,11 +30,19 @@ export interface Entry {
   link?: string | null;
 }
 
+export interface MenuItem {
+  title: string;
+  url: string | null;
+  children: MenuItem[];
+}
+
 export interface SiteContent {
   exhibitions: Entry[];
   events: Entry[];
   posts: Entry[];
   pages: Entry[];
+  /** Main navigation copied from WordPress (wordpress_export.py), if any. */
+  menu: MenuItem[];
   siteUrl?: string;
 }
 
@@ -66,7 +74,14 @@ function load() {
   }
 
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-  const content: SiteContent = { exhibitions: [], events: [], posts: [], pages: [], siteUrl: raw.siteUrl };
+  const content: SiteContent = {
+    exhibitions: [],
+    events: [],
+    posts: [],
+    pages: [],
+    menu: Array.isArray(raw.menu) ? raw.menu : [],
+    siteUrl: raw.siteUrl,
+  };
   for (const [collection, type] of Object.entries(COLLECTIONS)) {
     const items: Entry[] = Array.isArray(raw[collection]) ? raw[collection] : [];
     (content as any)[collection] = items
@@ -140,7 +155,19 @@ export function latestPosts(limit?: number): Entry[] {
   return limit ? posts.slice(0, limit) : posts;
 }
 
-/** Top-level pages for the main navigation. */
+/**
+ * Resolve a WordPress menu link to this site's URL for the same entry (slugs are kept,
+ * but colliding ones may have moved). External and unknown links are returned unchanged.
+ */
+export function resolveMenuUrl(url: string | null): string | null {
+  if (!url || /^[a-z]+:/i.test(url)) return url;
+  const slug = url.split(/[?#]/)[0].replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
+  if (!slug) return "/";
+  const entry = getRoutedEntries().find((e) => e.slug === slug);
+  return entry ? `/${entry.path}/` : url;
+}
+
+/** Top-level pages for the main navigation (used when no WordPress menu was exported). */
 export function navPages(limit = 6): Entry[] {
   return getContent()
     .pages.filter((p) => !p.parent)

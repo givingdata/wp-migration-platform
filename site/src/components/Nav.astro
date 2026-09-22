@@ -1,0 +1,87 @@
+---
+// Main navigation. Uses the menu copied from WordPress when there is one (with
+// dropdowns); otherwise section listings plus top-level pages.
+import { getContent, navPages, urlFor, resolveMenuUrl, type MenuItem } from "../lib/content";
+
+interface NavItem {
+  label: string;
+  href: string | null;
+  children: NavItem[];
+}
+
+const content = getContent();
+const fromMenu = (items: MenuItem[]): NavItem[] =>
+  items.map((i) => ({ label: i.title, href: resolveMenuUrl(i.url), children: fromMenu(i.children ?? []) }));
+
+const items: NavItem[] = content.menu.length
+  ? fromMenu(content.menu)
+  : [
+      ...(content.exhibitions.length ? [{ label: "Exhibitions", href: "/exhibitions/", children: [] }] : []),
+      ...(content.events.length ? [{ label: "Events", href: "/events/", children: [] }] : []),
+      ...(content.posts.length ? [{ label: "News", href: "/news/", children: [] }] : []),
+      ...navPages().map((p) => ({ label: p.title, href: urlFor(p), children: [] })),
+    ];
+
+const current = Astro.url.pathname;
+const isCurrent = (href: string | null) => !!href && href !== "/" && current.startsWith(href);
+---
+
+<nav aria-label="Main" class="main-nav">
+  <ul>
+    {items.map((item, i) => (
+      <li class:list={[item.children.length && "has-children"]}>
+        {item.href ? (
+          <a href={item.href} aria-current={isCurrent(item.href) ? "page" : undefined}>{item.label}</a>
+        ) : (
+          <span class="nav-label">{item.label}</span>
+        )}
+        {item.children.length > 0 && (
+          <>
+            <button type="button" class="sub-toggle" aria-expanded="false" aria-controls={`sub-${i}`}>
+              <span class="visually-hidden">{item.label} submenu</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <ul class="sub-menu" id={`sub-${i}`}>
+              {item.children.map((child) => (
+                <li>
+                  {child.href ? (
+                    <a href={child.href} aria-current={isCurrent(child.href) ? "page" : undefined}>{child.label}</a>
+                  ) : (
+                    <span class="nav-label">{child.label}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<script>
+  // Tap/click toggles a submenu (hover and keyboard focus open it via CSS);
+  // Escape or clicking elsewhere closes it.
+  const nav = document.querySelector(".main-nav");
+  const closeAll = (except?: Element) =>
+    nav?.querySelectorAll(".has-children.open").forEach((li) => {
+      if (li !== except) {
+        li.classList.remove("open");
+        li.querySelector(".sub-toggle")?.setAttribute("aria-expanded", "false");
+      }
+    });
+  nav?.querySelectorAll<HTMLButtonElement>(".sub-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const li = btn.closest("li")!;
+      closeAll(li);
+      const open = li.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+    });
+  });
+  document.addEventListener("click", (e) => {
+    if (!nav?.contains(e.target as Node)) closeAll();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAll();
+  });
+</script>
