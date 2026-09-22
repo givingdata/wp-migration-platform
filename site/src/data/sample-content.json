@@ -1,0 +1,102 @@
+{
+  "siteUrl": "https://example.org",
+  "exhibitions": [
+    {
+      "id": "sample-exh-1",
+      "slug": "dressed-for-the-future",
+      "type": "exhibition",
+      "title": "Dressed for the Future",
+      "description": "Portraits and stories from ten years of graduates who found their grad outfit at the Boutique.",
+      "content": "<p>Ten years, thousands of graduates. This exhibition brings together portraits and first-person stories from students who found their grad outfit at the Boutique.</p><h2>About the exhibition</h2><p>Curated with former volunteers, the show pairs each portrait with a short reflection on what the day meant.</p><ul><li>Free admission</li><li>Wheelchair accessible</li></ul>",
+      "image": "/sample/exhibition.svg",
+      "imageAlt": "Placeholder artwork for the exhibition",
+      "date": "2026-09-01",
+      "endDate": "2027-01-31",
+      "time": "Tue–Sun, 10 am – 5 pm",
+      "location": "Main Gallery"
+    },
+    {
+      "id": "sample-exh-2",
+      "slug": "threads-archive",
+      "type": "exhibition",
+      "title": "Threads: An Archive",
+      "description": "A look back at the organization's founding through donated garments and photographs.",
+      "content": "<p>A look back at the organization's founding through donated garments and photographs.</p>",
+      "image": "/sample/exhibition.svg",
+      "imageAlt": "Placeholder artwork",
+      "date": "2025-02-01",
+      "endDate": "2025-05-30",
+      "location": "Upper Gallery"
+    }
+  ],
+  "events": [
+    {
+      "id": "sample-evt-1",
+      "slug": "spring-boutique-day",
+      "type": "event",
+      "title": "Spring Boutique Day",
+      "description": "Grade 12 students choose a free dress or suit, shoes and accessories for graduation.",
+      "content": "<p>Grade 12 students referred by their school counsellor can choose a free dress or suit, shoes and accessories.</p><p><strong>Bring:</strong> your referral letter and student ID.</p>",
+      "image": "/sample/event.svg",
+      "imageAlt": "Placeholder image for the event",
+      "date": "2027-03-14",
+      "time": "10 am – 3 pm",
+      "location": "Community Hall, Vancouver"
+    },
+    {
+      "id": "sample-evt-2",
+      "slug": "volunteer-orientation",
+      "type": "event",
+      "title": "Volunteer Orientation",
+      "description": "Learn how Boutique Day works and sign up for a shift.",
+      "content": "<p>Learn how Boutique Day works and sign up for a shift.</p>",
+      "date": "2027-02-20",
+      "time": "6 – 7:30 pm",
+      "location": "Online"
+    }
+  ],
+  "posts": [
+    {
+      "id": "sample-post-1",
+      "slug": "boutique-day-recap",
+      "type": "post",
+      "title": "Boutique Day Recap",
+      "description": "Over 200 students found their graduation outfits this year. Thank you to every volunteer and donor.",
+      "content": "<p>Over 200 students found their graduation outfits this year. Thank you to every volunteer and donor who made it happen.</p><figure class=\"wp-block-image\"><img src=\"/sample/post.svg\" alt=\"Placeholder photo\"><figcaption>Volunteers setting up the racks.</figcaption></figure><p>We'll share dates for next year's event soon.</p>",
+      "image": "/sample/post.svg",
+      "imageAlt": "Placeholder photo",
+      "date": "2026-05-02",
+      "author": "The Team",
+      "tags": ["boutique day", "volunteers"]
+    },
+    {
+      "id": "sample-post-2",
+      "slug": "donation-drop-offs",
+      "type": "post",
+      "title": "Donation Drop-offs",
+      "description": "Where and when to drop off gently used formal wear.",
+      "content": "<p>Where and when to drop off gently used formal wear.</p>",
+      "date": "2026-01-15"
+    }
+  ],
+  "pages": [
+    {
+      "id": "sample-page-about",
+      "slug": "about",
+      "type": "page",
+      "title": "About",
+      "description": "Who we are and what we do.",
+      "content": "<p>We help graduating students celebrate in style by providing free formal wear.</p>",
+      "menuOrder": 1
+    },
+    {
+      "id": "sample-page-donate",
+      "slug": "donate",
+      "type": "page",
+      "title": "Donate",
+      "description": "Support the program.",
+      "content": "<p>Your donation helps a student feel their best on grad day.</p>",
+      "menuOrder": 2
+    }
+  ]
+}

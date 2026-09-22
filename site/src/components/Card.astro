@@ -1,0 +1,24 @@
+---
+import Image from "./Image.astro";
+import { urlFor, formatDate, formatRange, excerpt, type Entry } from "../lib/content";
+
+interface Props {
+  entry: Entry;
+  headingLevel?: 2 | 3;
+}
+
+const { entry, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as "h2" | "h3";
+const when = entry.type === "post" ? formatDate(entry.date) : formatRange(entry.date, entry.endDate);
+---
+
+<article class="card">
+  {entry.image && (
+    <Image src={entry.image} alt={entry.imageAlt || ""} type={entry.type} variants={entry.imageVariants} sizes="(min-width: 60rem) 22rem, (min-width: 40rem) 45vw, 100vw" />
+  )}
+  <div class="card-body">
+    {when && <p class="meta"><time datetime={entry.date ?? undefined}>{when}</time>{entry.time && ` · ${entry.time}`}</p>}
+    <Heading class="card-title"><a href={urlFor(entry)}>{entry.title}</a></Heading>
+    <p>{excerpt(entry, 140)}</p>
+  </div>
+</article>

@@ -1,0 +1,16 @@
+---
+// One static page per exhibition, event, post and page in content.json.
+// Rest param because colliding slugs are namespaced (e.g. /event/open-house/).
+import Exhibition from "../layouts/Exhibition.astro";
+import Event from "../layouts/Event.astro";
+import Post from "../layouts/Post.astro";
+import { getRoutedEntries } from "../lib/content";
+
+export function getStaticPaths() {
+  return getRoutedEntries().map((entry) => ({ params: { slug: entry.path }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+---
+
+{entry.type === "exhibition" ? <Exhibition entry={entry} /> : entry.type === "event" ? <Event entry={entry} /> : <Post entry={entry} />}

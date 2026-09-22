@@ -1,0 +1,45 @@
+---
+// Responsive, aspect-ratio-locked image. Uses Worker-generated variants when
+// available, otherwise Cloudflare Image Resizing URLs, otherwise the R2 original.
+import { buildImageSet, aspectRatioCss } from "../lib/images";
+
+interface Props {
+  src: string;
+  alt: string;
+  /** Content type whose aspect ratio to use (exhibition, event, post). */
+  type: string;
+  variants?: Record<string, string>;
+  /** `sizes` attribute; defaults to full-width up to the content column. */
+  sizes?: string;
+  /** Above-the-fold images: load eagerly with high priority. */
+  priority?: boolean;
+  class?: string;
+}
+
+const { src, alt, type, variants, sizes = "(min-width: 72rem) 68rem, 100vw", priority = false, class: className } = Astro.props;
+const set = buildImageSet(src, type, variants);
+---
+
+<img
+  src={set.src}
+  srcset={set.srcset}
+  sizes={set.srcset ? sizes : undefined}
+  width={set.width}
+  height={set.height}
+  alt={alt}
+  loading={priority ? "eager" : "lazy"}
+  decoding="async"
+  fetchpriority={priority ? "high" : undefined}
+  class:list={["ratio-img", className]}
+  style={`aspect-ratio: ${aspectRatioCss(type)}`}
+/>
+
+<style>
+  .ratio-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    background: var(--surface-2);
+  }
+</style>

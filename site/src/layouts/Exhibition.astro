@@ -1,0 +1,46 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import Image from "../components/Image.astro";
+import { formatRange, excerpt, type Entry } from "../lib/content";
+
+interface Props {
+  entry: Entry;
+}
+
+const { entry } = Astro.props;
+const dates = formatRange(entry.date, entry.endDate);
+const url = new URL(Astro.url.pathname, Astro.site).href;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "ExhibitionEvent",
+  name: entry.title,
+  description: excerpt(entry, 300),
+  startDate: entry.date,
+  ...(entry.endDate ? { endDate: entry.endDate } : {}),
+  ...(entry.image ? { image: entry.image } : {}),
+  ...(entry.location ? { location: { "@type": "Place", name: entry.location, address: entry.location } } : {}),
+  eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+  url,
+};
+---
+
+<BaseLayout title={entry.title} description={excerpt(entry)} image={entry.image} imageType="exhibition" ogType="article" structuredData={structuredData}>
+  <article class="entry entry-exhibition">
+    {entry.image && (
+      <div class="hero">
+        <Image src={entry.image} alt={entry.imageAlt || ""} type="exhibition" variants={entry.imageVariants} priority sizes="100vw" />
+      </div>
+    )}
+    <div class="wrap narrow">
+      <p class="eyebrow">Exhibition</p>
+      <h1>{entry.title}</h1>
+      <dl class="facts">
+        {dates && <div><dt>Dates</dt><dd><time datetime={entry.date ?? undefined}>{dates}</time></dd></div>}
+        {entry.time && <div><dt>Hours</dt><dd>{entry.time}</dd></div>}
+        {entry.location && <div><dt>Location</dt><dd>{entry.location}</dd></div>}
+      </dl>
+      <div class="prose" set:html={entry.content || `<p>${entry.description ?? ""}</p>`} />
+    </div>
+  </article>
+</BaseLayout>

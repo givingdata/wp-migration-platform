@@ -1,0 +1,34 @@
+---
+import Card from "./Card.astro";
+import type { Entry } from "../lib/content";
+
+interface Props {
+  title: string;
+  intro?: string;
+  current: Entry[];
+  currentLabel?: string;
+  past?: Entry[];
+  pastLabel?: string;
+  empty: string;
+}
+
+const { title, intro, current, currentLabel, past = [], pastLabel = "Past", empty } = Astro.props;
+---
+
+<div class="wrap section">
+  <h1>{title}</h1>
+  {intro && <p class="lede">{intro}</p>}
+  {current.length === 0 && past.length === 0 && <p>{empty}</p>}
+  {current.length > 0 && (
+    <section aria-label={currentLabel ?? title}>
+      {currentLabel && <h2>{currentLabel}</h2>}
+      <div class="grid">{current.map((e) => <Card entry={e} headingLevel={currentLabel ? 3 : 2} />)}</div>
+    </section>
+  )}
+  {past.length > 0 && (
+    <section class="section" aria-label={pastLabel}>
+      <h2>{pastLabel}</h2>
+      <div class="grid">{past.map((e) => <Card entry={e} />)}</div>
+    </section>
+  )}
+</div>

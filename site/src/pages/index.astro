@@ -1,0 +1,55 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Card from "../components/Card.astro";
+import Image from "../components/Image.astro";
+import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt } from "../lib/content";
+import { SITE } from "../lib/site";
+
+const exhibitions = currentExhibitions();
+const events = upcomingEvents().slice(0, 6);
+const posts = latestPosts(6);
+const featured = exhibitions[0];
+const rest = exhibitions.slice(1, 4);
+---
+
+<BaseLayout description={SITE.tagline}>
+  {featured ? (
+    <section class="feature" aria-labelledby="featured-title">
+      {featured.image && (
+        <Image src={featured.image} alt={featured.imageAlt || ""} type="exhibition" variants={featured.imageVariants} priority sizes="100vw" />
+      )}
+      <div class="wrap feature-text">
+        <p class="eyebrow">Now showing</p>
+        <h1 id="featured-title"><a href={urlFor(featured)}>{featured.title}</a></h1>
+        <p class="meta">{formatRange(featured.date, featured.endDate)}</p>
+        <p>{excerpt(featured, 220)}</p>
+      </div>
+    </section>
+  ) : (
+    <section class="intro wrap">
+      <h1>{SITE.name}</h1>
+      <p class="lede">{SITE.tagline}</p>
+    </section>
+  )}
+
+  {rest.length > 0 && (
+    <section class="wrap section" aria-labelledby="exh-h">
+      <div class="section-head"><h2 id="exh-h">Exhibitions</h2><a href="/exhibitions/">All exhibitions</a></div>
+      <div class="grid">{rest.map((e) => <Card entry={e} />)}</div>
+    </section>
+  )}
+
+  {events.length > 0 && (
+    <section class="wrap section" aria-labelledby="ev-h">
+      <div class="section-head"><h2 id="ev-h">Upcoming events</h2><a href="/events/">All events</a></div>
+      <div class="grid">{events.map((e) => <Card entry={e} />)}</div>
+    </section>
+  )}
+
+  {posts.length > 0 && (
+    <section class="wrap section" aria-labelledby="news-h">
+      <div class="section-head"><h2 id="news-h">Latest news</h2><a href="/news/">All news</a></div>
+      <div class="grid">{posts.map((e) => <Card entry={e} />)}</div>
+    </section>
+  )}
+</BaseLayout>

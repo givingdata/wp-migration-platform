@@ -1,0 +1,89 @@
+---
+import "../styles/global.css";
+import { SITE } from "../lib/site";
+import { navPages, urlFor, getContent } from "../lib/content";
+import { buildImageSet } from "../lib/images";
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Social share image (absolute or site-relative URL). */
+  image?: string | null;
+  imageType?: string;
+  ogType?: "website" | "article";
+  /** JSON-LD object(s) for this page. */
+  structuredData?: object | object[];
+  noindex?: boolean;
+}
+
+const { title, description = SITE.tagline, image, imageType = "post", ogType = "website", structuredData, noindex = false } = Astro.props;
+const fullTitle = title ? `${title} | ${SITE.name}` : SITE.name;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const shareImage = image ? new URL(buildImageSet(image, imageType).src, Astro.site).href : undefined;
+
+const content = getContent();
+const nav = [
+  ...(content.exhibitions.length ? [{ href: "/exhibitions/", label: "Exhibitions" }] : []),
+  ...(content.events.length ? [{ href: "/events/", label: "Events" }] : []),
+  ...(content.posts.length ? [{ href: "/news/", label: "News" }] : []),
+  ...navPages().map((p) => ({ href: urlFor(p), label: p.title })),
+];
+const current = Astro.url.pathname;
+
+const ld = [
+  { "@context": "https://schema.org", "@type": "Organization", name: SITE.name, url: Astro.site?.href },
+  ...(Array.isArray(structuredData) ? structuredData : structuredData ? [structuredData] : []),
+];
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta name="color-scheme" content="light dark" />
+
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:locale" content={SITE.locale} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={title ?? SITE.name} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    {shareImage && <meta property="og:image" content={shareImage} />}
+    <meta name="twitter:card" content={shareImage ? "summary_large_image" : "summary"} />
+
+    {ld.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="/">{SITE.name}</a>
+        <nav aria-label="Main">
+          <ul>
+            {nav.map((item) => (
+              <li>
+                <a href={item.href} aria-current={current.startsWith(item.href) ? "page" : undefined}>{item.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>© {new Date().getFullYear()} {SITE.name}</p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "wp-migration-platform",
+  "private": true,
+  "workspaces": [
+    "site"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace site",
+    "dev": "npm run dev --workspace site"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

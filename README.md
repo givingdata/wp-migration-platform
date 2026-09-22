@@ -9,6 +9,7 @@ staff form (via a Cloudflare Worker + Claude) for ongoing content updates.
 | Design specs | `config/design-specs.json` | Aspect ratios, breakpoints and fields per content type |
 | Worker | `worker/` | Form endpoint: auth, image optimization → R2, Claude structuring, KV, GitHub commit ([docs](worker/README.md)) |
 | Staff form | `form/` | Static form with image crop preview; signs and submits to the Worker ([docs](form/README.md)) |
+| Site | `site/` | Astro static site built from `content.json` for Cloudflare Pages ([docs](site/README.md)) |
 
 ## WordPress extraction
 

@@ -1,0 +1,54 @@
+---
+// Blog posts and static pages (pages omit the date/author line).
+import BaseLayout from "./BaseLayout.astro";
+import Image from "../components/Image.astro";
+import { formatDate, excerpt, type Entry } from "../lib/content";
+import { SITE } from "../lib/site";
+
+interface Props {
+  entry: Entry;
+}
+
+const { entry } = Astro.props;
+const isPage = entry.type === "page";
+const url = new URL(Astro.url.pathname, Astro.site).href;
+
+const structuredData = isPage
+  ? { "@context": "https://schema.org", "@type": "WebPage", name: entry.title, description: excerpt(entry, 300), url }
+  : {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: entry.title,
+      description: excerpt(entry, 300),
+      datePublished: entry.dateTime || entry.date,
+      ...(entry.modified ? { dateModified: entry.modified } : {}),
+      ...(entry.image ? { image: entry.image } : {}),
+      author: { "@type": entry.author ? "Person" : "Organization", name: entry.author || SITE.name },
+      publisher: { "@type": "Organization", name: SITE.name },
+      mainEntityOfPage: url,
+    };
+---
+
+<BaseLayout title={entry.title} description={excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData}>
+  <article class:list={["entry", isPage ? "entry-page" : "entry-post"]}>
+    <div class="wrap narrow">
+      {!isPage && <p class="eyebrow">News</p>}
+      <h1>{entry.title}</h1>
+      {!isPage && (
+        <p class="meta">
+          <time datetime={entry.date ?? undefined}>{formatDate(entry.date)}</time>
+          {entry.author && <> · {entry.author}</>}
+        </p>
+      )}
+      {entry.image && (
+        <figure class="featured">
+          <Image src={entry.image} alt={entry.imageAlt || ""} type="post" variants={entry.imageVariants} priority sizes="(min-width: 46rem) 44rem, 100vw" />
+        </figure>
+      )}
+      <div class="prose" set:html={entry.content || `<p>${entry.description ?? ""}</p>`} />
+      {!isPage && entry.tags && entry.tags.length > 0 && (
+        <ul class="tags" aria-label="Tags">{entry.tags.map((t) => <li>{t}</li>)}</ul>
+      )}
+    </div>
+  </article>
+</BaseLayout>
