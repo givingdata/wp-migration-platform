@@ -1,0 +1,35 @@
+name = "wp-migration-worker"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+SITE_NAME = "The Cinderella Project"
+GITHUB_REPO = "givingdata/wp-migration-platform"
+GITHUB_BRANCH = "main"
+CONTENT_PATH = "content.json"
+# Public base URL of the R2 bucket (custom domain or https://pub-xxxx.r2.dev)
+R2_PUBLIC_URL = ""
+# Comma-separated origins allowed to call the Worker (the form's host)
+ALLOWED_ORIGINS = "http://localhost:8080"
+# CLAUDE_MODEL = "claude-opus-5"
+
+# Secrets (set with `wrangler secret put <NAME>`, locally in .dev.vars):
+#   API_KEY            shared with the form (Bearer token)
+#   HMAC_SECRET        optional; defaults to API_KEY
+#   ANTHROPIC_API_KEY  (or CLAUDE_API_KEY)
+#   GITHUB_TOKEN       fine-grained token, Contents: read & write on GITHUB_REPO
+
+[[kv_namespaces]]
+binding = "CONTENT"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"   # scripts/deploy.sh fills this in
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "wp-migration-media"    # scripts/deploy.sh fills this in
+
+[images]
+binding = "IMAGES"
