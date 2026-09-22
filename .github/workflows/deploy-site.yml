@@ -1,0 +1,21 @@
+# Redeploy the site when its code, styles or design specs change.
+name: Deploy Site
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - config/design-specs.json
+      - package.json
+      - package-lock.json
+      - .github/workflows/deploy-site.yml
+      - .github/workflows/_site.yml
+
+jobs:
+  site:
+    uses: ./.github/workflows/_site.yml
+    with:
+      reason: Site code updated
+    secrets: inherit

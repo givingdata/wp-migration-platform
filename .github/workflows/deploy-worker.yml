@@ -1,0 +1,77 @@
+# Test and deploy the form Worker when its code or the design specs change.
+name: Deploy Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - worker/**
+      - config/design-specs.json
+      - .github/workflows/deploy-worker.yml
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: worker-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      # wrangler.toml (filled in by scripts/deploy.sh) is the source of truth;
+      # these secrets, when set, override its KV namespace and bucket.
+      - name: Resolve resource IDs
+        env:
+          KV_ID: ${{ secrets.CLOUDFLARE_KV_NAMESPACE_ID }}
+          BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+        run: |
+          if [ -n "$KV_ID" ]; then sed -i -E "s|^id = \"[^\"]*\"|id = \"$KV_ID\"|" wrangler.toml; fi
+          if [ -n "$BUCKET" ]; then sed -i -E "s|^bucket_name = \"[^\"]*\"|bucket_name = \"$BUCKET\"|" wrangler.toml; fi
+          if grep -q REPLACE_WITH wrangler.toml; then
+            echo "::error::worker/wrangler.toml still has placeholder IDs — run scripts/deploy.sh or set CLOUDFLARE_KV_NAMESPACE_ID"; exit 1
+          fi
+          grep -E '^(id|bucket_name|R2_PUBLIC_URL|ALLOWED_ORIGINS) =' wrangler.toml
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        env:
+          API_KEY: ${{ secrets.FORM_API_KEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.CONTENT_REPO_TOKEN }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          # Uploads these env values as Worker secrets before deploying.
+          secrets: |
+            API_KEY
+            CLAUDE_API_KEY
+            GITHUB_TOKEN
+          command: deploy --var GITHUB_REPO:${{ github.repository }}
+
+      - name: Smoke test
+        run: |
+          url="${{ vars.WORKER_URL }}"
+          if [ -z "$url" ]; then echo "WORKER_URL variable not set; skipping"; exit 0; fi
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$url/health"; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "::error::$url/health did not respond"; exit 1

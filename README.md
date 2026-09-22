@@ -10,6 +10,26 @@ staff form (via a Cloudflare Worker + Claude) for ongoing content updates.
 | Worker | `worker/` | Form endpoint: auth, image optimization → R2, Claude structuring, KV, GitHub commit ([docs](worker/README.md)) |
 | Staff form | `form/` | Static form with image crop preview; signs and submits to the Worker ([docs](form/README.md)) |
 | Site | `site/` | Astro static site built from `content.json` for Cloudflare Pages ([docs](site/README.md)) |
+| CI/CD | `.github/workflows/` | Rebuild on `content.json` changes, deploy site/Worker on code changes |
+| Setup | `scripts/deploy.sh` | One-time Cloudflare setup for a new client ([checklist](docs/DEPLOYMENT_CHECKLIST.md)) |
+
+## How it fits together
+
+```
+WordPress ──wordpress_export.py──▶ content.json + media in R2
+                                        │
+Staff form ──signed POST──▶ Worker ──▶ R2 (images) ─ Claude (structure) ─ KV (record)
+                                        │
+                                        └─ commits content.json ──▶ GitHub Actions ──▶ Astro build ──▶ Cloudflare Pages
+```
+
+| Workflow | Trigger | Does |
+| --- | --- | --- |
+| `rebuild.yml` | push touching `content.json`, manual | Build site, deploy to Pages |
+| `deploy-site.yml` | push touching `site/**`, design specs, root package files | Same, for code changes |
+| `deploy-worker.yml` | push touching `worker/**` or design specs, manual | Test, upload secrets, deploy Worker, health check |
+
+New client? Follow [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
 ## WordPress extraction
 

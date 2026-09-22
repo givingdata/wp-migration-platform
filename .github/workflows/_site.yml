@@ -1,0 +1,59 @@
+# Reusable: build the Astro site and deploy it to Cloudflare Pages.
+# Called by rebuild.yml (content changes) and deploy-site.yml (code changes).
+name: Build & deploy site
+
+on:
+  workflow_call:
+    inputs:
+      reason:
+        type: string
+        default: ""
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    # One deploy at a time; a newer commit supersedes a queued older one.
+    concurrency:
+      group: pages-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate content.json
+        run: |
+          test -f content.json || { echo "::error::content.json is missing — run wordpress_export.py and commit it"; exit 1; }
+          node -e '
+            const c = JSON.parse(require("fs").readFileSync("content.json", "utf8"));
+            const counts = ["exhibitions","events","posts","pages"].map(k => `${k}=${(c[k]||[]).length}`);
+            console.log("content.json:", counts.join(" "));
+          '
+
+      - name: Build Astro site
+        run: npm run build --workspace site
+        env:
+          CI: "true"
+          SITE_URL: ${{ vars.SITE_URL }}
+          PUBLIC_SITE_NAME: ${{ vars.SITE_NAME }}
+          PUBLIC_SITE_TAGLINE: ${{ vars.SITE_TAGLINE }}
+          PUBLIC_IMAGE_RESIZING: ${{ vars.IMAGE_RESIZING }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy site/dist
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+            --branch=main
+            --commit-hash=${{ github.sha }}
+            --commit-message="${{ inputs.reason || 'Deploy' }}"

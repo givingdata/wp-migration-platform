@@ -1,0 +1,17 @@
+# Rebuild the site when content changes. The Worker commits content.json after
+# each form submission (using a PAT, so the push triggers this workflow).
+name: Rebuild Site on Content Change
+
+on:
+  workflow_dispatch: # manual trigger for testing
+  push:
+    branches: [main]
+    paths:
+      - content.json
+
+jobs:
+  site:
+    uses: ./.github/workflows/_site.yml
+    with:
+      reason: ${{ github.event_name == 'workflow_dispatch' && 'Manual rebuild' || 'Content updated' }}
+    secrets: inherit
