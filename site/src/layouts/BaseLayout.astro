@@ -3,6 +3,7 @@ import "../styles/global.css";
 import { SITE } from "../lib/site";
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
+import { siteSettings } from "../lib/sections";
 import { buildImageSet } from "../lib/images";
 import { THEME, themeCss, googleFontsHref, warnOnce } from "../lib/theme";
 
@@ -16,9 +17,12 @@ interface Props {
   /** JSON-LD object(s) for this page. */
   structuredData?: object | object[];
   noindex?: boolean;
+  /** The page is built from sections (full-width bands, no top padding). */
+  sectioned?: boolean;
 }
 
-const { title, description = SITE.tagline, image, imageType = "post", ogType = "website", structuredData, noindex = false } = Astro.props;
+const { title, description = SITE.tagline, image, imageType = "post", ogType = "website", structuredData, noindex = false, sectioned = false } = Astro.props;
+const header = siteSettings().header ?? {};
 const fullTitle = title ? `${title} | ${SITE.name}` : SITE.name;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const shareImage = image ? new URL(buildImageSet(image, imageType).src, Astro.site).href : undefined;
@@ -61,7 +65,7 @@ const logo = THEME.logo;
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
+    <header class:list={["site-header", header.style === "band" && "header-band"]}>
       <div class="wrap header-inner">
         <a class="brand" href="/">
           {logo && (
@@ -73,10 +77,11 @@ const logo = THEME.logo;
           {(!logo || logo.showName) && <span>{SITE.name}</span>}
         </a>
         <Nav />
+        {header.button && <a class="btn btn-primary header-button" href={header.button.href}>{header.button.label}</a>}
       </div>
     </header>
 
-    <main id="main">
+    <main id="main" class:list={[sectioned && "main-sectioned"]}>
       <slot />
     </main>
 

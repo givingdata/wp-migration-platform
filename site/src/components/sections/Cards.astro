@@ -1,0 +1,27 @@
+---
+import type { Cards } from "../../lib/sections";
+import Heading from "./Heading.astro";
+interface Props { s: Cards }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+  <div class="wrap">
+    <div class="s-cards-head">
+      <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
+      {s.intro && <p class="s-intro">{s.intro}</p>}
+    </div>
+    <ul class:list={["s-cards", `n-${Math.min(s.items.length, 4)}`]}>
+      {s.items.map((c, i) => (
+        <li class:list={["s-card", `c-${i % 3}`]}>
+          {c.icon && <span class="s-card-icon" aria-hidden="true">{c.icon}</span>}
+          <h3>{c.href ? <a href={c.href}>{c.title}</a> : c.title}</h3>
+          <p>{c.text}</p>
+          {c.href && c.linkLabel && <p class="s-card-link" aria-hidden="true">{c.linkLabel} →</p>}
+        </li>
+      ))}
+    </ul>
+    {s.contacts && s.contacts.length > 0 && (
+      <p class="s-contacts">{s.contacts.map((ct) => <span>{ct.label}: <a href={`mailto:${ct.email}`}>{ct.email}</a></span>)}</p>
+    )}
+  </div>
+</section>

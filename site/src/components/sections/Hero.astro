@@ -1,0 +1,23 @@
+---
+import type { Hero } from "../../lib/sections";
+import Buttons from "./Buttons.astro";
+interface Props { s: Hero; first?: boolean }
+const { s, first = false } = Astro.props;
+---
+<section class="s-hero" id={s.id}>
+  {s.image && <img class="s-hero-img" src={s.image.src} alt={s.image.alt ?? ""} loading={first ? "eager" : "lazy"} fetchpriority={first ? "high" : undefined} decoding="async" />}
+  <div class="s-hero-shade"></div>
+  <div class="wrap s-hero-inner">
+    <div class="s-hero-main">
+      {s.eyebrow && <p class="s-eyebrow">{s.eyebrow}</p>}
+      {first ? <h1 class="s-hero-title">{s.title}{s.accent && <> <em>{s.accent}</em></>}</h1> : <h2 class="s-hero-title">{s.title}{s.accent && <> <em>{s.accent}</em></>}</h2>}
+      {s.text && <p class="s-lede">{s.text}</p>}
+      <Buttons buttons={s.buttons} />
+    </div>
+    {s.stats && s.stats.length > 0 && (
+      <dl class="s-hero-stats">
+        {s.stats.map((st) => <div><dt>{st.label}</dt><dd>{st.value}</dd></div>)}
+      </dl>
+    )}
+  </div>
+</section>

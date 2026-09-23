@@ -1,0 +1,13 @@
+---
+import type { Quote } from "../../lib/sections";
+interface Props { s: Quote }
+const { s } = Astro.props;
+---
+<section class:list={["s-quote", !s.image && "tone-band"]} id={s.id}>
+  {s.image && <img src={s.image.src} alt={s.image.alt ?? ""} loading="lazy" decoding="async" />}
+  <div class="s-quote-shade"></div>
+  <blockquote class="wrap">
+    <p>“{s.text}”</p>
+    {s.by && <cite>{s.by}</cite>}
+  </blockquote>
+</section>

@@ -1,0 +1,10 @@
+---
+import type { Button } from "../../lib/sections";
+interface Props { buttons?: Button[] }
+const { buttons = [] } = Astro.props;
+---
+{buttons.length > 0 && (
+  <div class="s-buttons">
+    {buttons.map((b, i) => <a class:list={["btn", (b.style ?? (i ? "secondary" : "primary")) === "primary" ? "btn-primary" : "btn-secondary"]} href={b.href}>{b.label}</a>)}
+  </div>
+)}

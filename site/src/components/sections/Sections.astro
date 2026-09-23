@@ -1,0 +1,23 @@
+---
+// Renders a page's sections from sections.json (see lib/sections.ts).
+import type { Section } from "../../lib/sections";
+import Hero from "./Hero.astro";
+import Stats from "./Stats.astro";
+import Split from "./Split.astro";
+import Cards from "./Cards.astro";
+import Quote from "./Quote.astro";
+import Stories from "./Stories.astro";
+import Text from "./Text.astro";
+import Posts from "./Posts.astro";
+interface Props { sections: Section[] }
+const { sections } = Astro.props;
+---
+{sections.map((s, i) =>
+  s.type === "hero" ? <Hero s={s} first={i === 0} />
+  : s.type === "stats" ? <Stats s={s} />
+  : s.type === "split" ? <Split s={s} />
+  : s.type === "cards" ? <Cards s={s} />
+  : s.type === "quote" ? <Quote s={s} />
+  : s.type === "stories" ? <Stories s={s} />
+  : s.type === "text" ? <Text s={s} />
+  : <Posts s={s} />)}

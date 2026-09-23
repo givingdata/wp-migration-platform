@@ -1,0 +1,17 @@
+---
+import type { Posts } from "../../lib/sections";
+import Heading from "./Heading.astro";
+import Card from "../Card.astro";
+import { latestPosts } from "../../lib/content";
+interface Props { s: Posts }
+const { s } = Astro.props;
+const posts = latestPosts(s.count ?? 3);
+---
+{posts.length > 0 && (
+  <section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+    <div class="wrap">
+      <div class="section-head"><Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />{s.link && <a href={s.link.href}>{s.link.label}</a>}</div>
+      <div class="grid">{posts.map((e) => <Card entry={e} />)}</div>
+    </div>
+  </section>
+)}

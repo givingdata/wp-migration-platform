@@ -1,0 +1,21 @@
+---
+import type { Stats } from "../../lib/sections";
+import Heading from "./Heading.astro";
+interface Props { s: Stats }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "alt"}`]} id={s.id}>
+  <div class="wrap">
+    <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />
+    {s.intro && <p class="s-intro s-center">{s.intro}</p>}
+    <dl class="s-stats">
+      {s.items.map((it) => <div class="s-stat"><dt>{it.label}</dt><dd>{it.value}</dd></div>)}
+    </dl>
+    {s.highlight && (
+      <div class="s-highlight">
+        <p class="s-highlight-value">{s.highlight.value}</p>
+        <div><p class="s-highlight-label">{s.highlight.label}</p>{s.highlight.text && <p class="s-small">{s.highlight.text}</p>}</div>
+      </div>
+    )}
+  </div>
+</section>

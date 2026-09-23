@@ -4,6 +4,8 @@ import Card from "../components/Card.astro";
 import Image from "../components/Image.astro";
 import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt, getFrontPage, fixContentLinks } from "../lib/content";
 import { SITE } from "../lib/site";
+import { pageSections } from "../lib/sections";
+import Sections from "../components/sections/Sections.astro";
 
 // A site migrated with a static WordPress homepage keeps that page as its homepage.
 const frontPage = getFrontPage();
@@ -12,11 +14,21 @@ const exhibitions = currentExhibitions();
 const events = upcomingEvents().slice(0, 6);
 const posts = latestPosts(6);
 const featured = exhibitions[0];
+// sections.json can build the homepage from sections instead (optionally with the migrated content).
+const built = pageSections("/");
+const firstIsHero = built?.sections[0]?.type === "hero";
 const rest = exhibitions.slice(1, 4);
 ---
 
-<BaseLayout description={frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline}>
-  {frontPage ? (
+<BaseLayout description={frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline} sectioned={!!built}>
+  {built ? (
+    <>
+      {!firstIsHero && <h1 class="visually-hidden">{SITE.name}</h1>}
+      {built.content === "before" && frontPage && <div class="wrap narrow section"><div class="prose" set:html={fixContentLinks(frontPage.content || "")} /></div>}
+      <Sections sections={built.sections} />
+      {built.content === "after" && frontPage && <div class="wrap narrow section"><div class="prose" set:html={fixContentLinks(frontPage.content || "")} /></div>}
+    </>
+  ) : frontPage ? (
     <article class="entry entry-page entry-home">
       <div class="wrap narrow">
         <h1 class="visually-hidden">{SITE.name}</h1>
@@ -42,21 +54,21 @@ const rest = exhibitions.slice(1, 4);
     </section>
   )}
 
-  {!frontPage && rest.length > 0 && (
+  {!built && !frontPage && rest.length > 0 && (
     <section class="wrap section" aria-labelledby="exh-h">
       <div class="section-head"><h2 id="exh-h">Exhibitions</h2><a href="/exhibitions/">All exhibitions</a></div>
       <div class="grid">{rest.map((e) => <Card entry={e} />)}</div>
     </section>
   )}
 
-  {!frontPage && events.length > 0 && (
+  {!built && !frontPage && events.length > 0 && (
     <section class="wrap section" aria-labelledby="ev-h">
       <div class="section-head"><h2 id="ev-h">Upcoming events</h2><a href="/events/">All events</a></div>
       <div class="grid">{events.map((e) => <Card entry={e} />)}</div>
     </section>
   )}
 
-  {!frontPage && posts.length > 0 && (
+  {!built && !frontPage && posts.length > 0 && (
     <section class="wrap section" aria-labelledby="news-h">
       <div class="section-head"><h2 id="news-h">Latest news</h2><a href="/news/">All news</a></div>
       <div class="grid">{posts.map((e) => <Card entry={e} />)}</div>
