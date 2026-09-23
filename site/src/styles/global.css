@@ -236,6 +236,17 @@ h3 { font-size: 1.25rem; }
 .tone-band .s-card.c-2 p { color: var(--muted) !important; }
 .tone-band .s-card.c-2 .s-card-link { color: var(--accent) !important; }
 .tone-band .s-card.c-0 .s-card-link { color: var(--band-accent) !important; }
+.tone-band .s-card.c-0 h3 { color: var(--band-text) !important; }
+.tone-band .s-card.c-0 p { color: var(--band-muted) !important; }
+.s-card h3 a { color: inherit !important; }
+/* Even rows: 4 across for 4 items, 3 across for 3, 5 or 6 */
+@media (min-width: 60rem) {
+  .s-cards.n-4, .s-stats.n-4 { grid-template-columns: repeat(4, 1fr); }
+  .s-cards.n-3, .s-cards.n-5, .s-cards.n-6, .s-stats.n-3, .s-stats.n-5, .s-stats.n-6 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 36rem) and (max-width: 59.99rem) {
+  .s-cards, .s-stats { grid-template-columns: repeat(2, 1fr); }
+}
 .s-contacts { margin: 2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; font-size: 0.95rem; }
 
 /* Quote banner */

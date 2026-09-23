@@ -8,7 +8,7 @@ const { s } = Astro.props;
   <div class="wrap">
     <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />
     {s.intro && <p class="s-intro s-center">{s.intro}</p>}
-    <dl class="s-stats">
+    <dl class:list={["s-stats", `n-${s.items.length}`]}>
       {s.items.map((it) => <div class="s-stat"><dt>{it.label}</dt><dd>{it.value}</dd></div>)}
     </dl>
     {s.highlight && (

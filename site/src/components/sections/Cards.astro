@@ -10,7 +10,7 @@ const { s } = Astro.props;
       <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
       {s.intro && <p class="s-intro">{s.intro}</p>}
     </div>
-    <ul class:list={["s-cards", `n-${Math.min(s.items.length, 4)}`]}>
+    <ul class:list={["s-cards", `n-${s.items.length}`]}>
       {s.items.map((c, i) => (
         <li class:list={["s-card", `c-${i % 3}`]}>
           {c.icon && <span class="s-card-icon" aria-hidden="true">{c.icon}</span>}
