@@ -2,7 +2,7 @@
 // Blog posts and static pages (pages omit the date/author line).
 import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
-import { formatDate, excerpt, type Entry } from "../lib/content";
+import { formatDate, fixContentLinks, excerpt, type Entry } from "../lib/content";
 import { SITE } from "../lib/site";
 
 interface Props {
@@ -45,7 +45,7 @@ const structuredData = isPage
           <Image src={entry.image} alt={entry.imageAlt || ""} type="post" variants={entry.imageVariants} priority sizes="(min-width: 46rem) 44rem, 100vw" />
         </figure>
       )}
-      <div class="prose" set:html={entry.content || `<p>${entry.description ?? ""}</p>`} />
+      <div class="prose" set:html={fixContentLinks(entry.content || `<p>${entry.description ?? ""}</p>`)} />
       {!isPage && entry.tags && entry.tags.length > 0 && (
         <ul class="tags" aria-label="Tags">{entry.tags.map((t) => <li>{t}</li>)}</ul>
       )}

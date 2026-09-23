@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
-import { formatRange, excerpt, type Entry } from "../lib/content";
+import { formatRange, fixContentLinks, excerpt, type Entry } from "../lib/content";
 
 interface Props {
   entry: Entry;
@@ -40,7 +40,7 @@ const structuredData = {
         {entry.time && <div><dt>Hours</dt><dd>{entry.time}</dd></div>}
         {entry.location && <div><dt>Location</dt><dd>{entry.location}</dd></div>}
       </dl>
-      <div class="prose" set:html={entry.content || `<p>${entry.description ?? ""}</p>`} />
+      <div class="prose" set:html={fixContentLinks(entry.content || `<p>${entry.description ?? ""}</p>`)} />
     </div>
   </article>
 </BaseLayout>

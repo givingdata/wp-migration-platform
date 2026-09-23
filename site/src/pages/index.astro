@@ -2,7 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Card from "../components/Card.astro";
 import Image from "../components/Image.astro";
-import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt, getFrontPage } from "../lib/content";
+import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt, getFrontPage, fixContentLinks } from "../lib/content";
 import { SITE } from "../lib/site";
 
 // A site migrated with a static WordPress homepage keeps that page as its homepage.
@@ -20,7 +20,7 @@ const rest = exhibitions.slice(1, 4);
     <article class="entry entry-page entry-home">
       <div class="wrap narrow">
         <h1 class="visually-hidden">{SITE.name}</h1>
-        <div class="prose" set:html={frontPage.content || ""} />
+        <div class="prose" set:html={fixContentLinks(frontPage.content || "")} />
       </div>
     </article>
   ) : featured ? (

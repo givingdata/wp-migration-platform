@@ -201,6 +201,42 @@ export function resolveMenuUrl(url: string | null): string | null {
   return entry ? `/${entry.path}/` : url;
 }
 
+const EMAIL = /^[^\s:/@]+@[^\s:/@]+\.[a-z]{2,}$/i;
+// WordPress system paths stay on the old site (e.g. files that weren't mirrored to R2).
+const WP_SYSTEM = /^\/(wp-content|wp-admin|wp-includes|wp-json|feed)(\/|$)/;
+
+/**
+ * Tidy links in migrated WordPress HTML: links to the old site's pages become links to
+ * the same page here (/donate/ instead of https://old-site/donate/), and bare email
+ * addresses used as links get the mailto: they were missing. Other links are unchanged.
+ */
+export function fixContentLinks(html: string): string {
+  if (!html) return html;
+  const siteUrl = getContent().siteUrl;
+  let host: string | null = null;
+  try {
+    host = siteUrl ? new URL(siteUrl).hostname.toLowerCase().replace(/^www\./, "") : null;
+  } catch {}
+
+  return html.replace(/(<a\b[^>]*?\bhref=)(["'])(.*?)\2/gi, (whole, start: string, q: string, href: string) => {
+    const value = href.trim();
+    if (EMAIL.test(value)) return `${start}${q}mailto:${value}${q}`;
+    if (!host || !/^https?:\/\//i.test(value)) return whole;
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      return whole;
+    }
+    if (url.hostname.toLowerCase().replace(/^www\./, "") !== host || WP_SYSTEM.test(url.pathname) || url.search) return whole;
+    const local = resolveMenuUrl(url.pathname);
+    // Only rewrite links to pages this site actually has; anything else keeps pointing at WordPress.
+    const known = local === "/" || getRoutedEntries().some((e) => `/${e.path}/` === local);
+    if (!known) return whole;
+    return `${start}${q}${local}${url.hash}${q}`;
+  });
+}
+
 /** Top-level pages for the main navigation (used when no WordPress menu was exported). */
 export function navPages(limit = 6): Entry[] {
   return getContent()
