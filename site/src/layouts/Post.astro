@@ -4,7 +4,7 @@ import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
 import { formatDate, fixContentLinks, excerpt, type Entry } from "../lib/content";
 import { SITE } from "../lib/site";
-import { pageSections } from "../lib/sections";
+import { pageSections, sectionsDescription } from "../lib/sections";
 import Sections from "../components/sections/Sections.astro";
 
 interface Props {
@@ -35,7 +35,7 @@ const structuredData = isPage
     };
 ---
 
-<BaseLayout title={entry.title} description={excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData} sectioned={!!built}>
+<BaseLayout title={entry.title} description={(built && sectionsDescription(built.sections)) || excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData} sectioned={!!built}>
   {built ? (
     <>
       {!firstIsHero && <h1 class="visually-hidden">{entry.title}</h1>}

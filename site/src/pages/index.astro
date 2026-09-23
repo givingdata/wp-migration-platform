@@ -4,7 +4,7 @@ import Card from "../components/Card.astro";
 import Image from "../components/Image.astro";
 import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt, getFrontPage, fixContentLinks } from "../lib/content";
 import { SITE } from "../lib/site";
-import { pageSections } from "../lib/sections";
+import { pageSections, sectionsDescription } from "../lib/sections";
 import Sections from "../components/sections/Sections.astro";
 
 // A site migrated with a static WordPress homepage keeps that page as its homepage.
@@ -20,7 +20,7 @@ const firstIsHero = built?.sections[0]?.type === "hero";
 const rest = exhibitions.slice(1, 4);
 ---
 
-<BaseLayout description={frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline} sectioned={!!built}>
+<BaseLayout description={(built && sectionsDescription(built.sections)) || (frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline)} sectioned={!!built}>
   {built ? (
     <>
       {!firstIsHero && <h1 class="visually-hidden">{SITE.name}</h1>}

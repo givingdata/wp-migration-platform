@@ -64,3 +64,12 @@ export function pageSections(pagePath: string): PageSections | null {
 export function siteSettings(): SiteSettings {
   return load().site ?? {};
 }
+
+/** Meta description for a sections page: the hero's text, else the first section's text. */
+export function sectionsDescription(sections: Section[], max = 160): string | null {
+  for (const s of sections) {
+    const t = (s as { text?: string }).text || (s as { intro?: string }).intro || (s as { paragraphs?: string[] }).paragraphs?.[0];
+    if (t) return t.length > max ? `${t.slice(0, max - 1).replace(/\s+\S*$/, "")}…` : t;
+  }
+  return null;
+}
