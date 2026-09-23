@@ -15,13 +15,13 @@ staff add content through a form → Cloudflare Worker (Claude tidies the text) 
 
 | When | Command | Does |
 |---|---|---|
-| New client repo | `bash scripts/new-client.sh <slug>` (from the platform folder) | Private `<owner>/<slug>-site` repo + local `../<slug>-site` clone, `upstream` = platform |
+| New client repo | `bash scripts/new-client.sh <slug>` (from the platform folder) | Private `<owner>/<slug>-site` repo + local `../clients/<slug>-site` clone (or `../<slug>-site` if there's no `clients/` folder), `upstream` = platform |
 | New client resources | `bash scripts/deploy.sh` (in the client folder) | Creates KV, R2, the Worker + secrets, Pages projects and the staff form; links the domain; writes IDs into `worker/wrangler.toml` (commit it) |
 | Migrate WordPress | `python wordpress_export.py --wordpress-url https://<site> --output content.json` | Posts/pages/images → `content.json` + R2 (needs `R2_*` in `.env`) |
 | Publish | `git add content.json && git commit && git push` | GitHub builds and deploys the site |
 
 Follow `docs/DEPLOYMENT_CHECKLIST.md` for every new client. On the Mac mini the same steps run from a
-settings file with `~/Documents/1wp-ops/provision.mjs` (or the dashboard's **Set up clients** page); see
+settings file with `~/Documents/1WP/ops/provision.mjs` (or the dashboard's **Set up clients** page); see
 `docs/ROADMAP.md` for where setup and the admin are heading.
 
 ### Day to day: nothing to run

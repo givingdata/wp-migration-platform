@@ -5,8 +5,9 @@
 #   bash scripts/new-client.sh <client-slug> [github-owner]
 #   e.g. bash scripts/new-client.sh acme givingdata
 #
-# Result: github.com/<owner>/<slug>-site and a local clone next to this folder
-# (../<slug>-site) with remotes:
+# Result: github.com/<owner>/<slug>-site and a local clone in $CLIENTS_DIR/<slug>-site.
+# CLIENTS_DIR defaults to ../clients if that folder exists, otherwise the folder next to
+# this one (..). Remotes:
 #   origin   → the client repo (deploys, content, client settings)
 #   upstream → the platform template (code updates)
 set -euo pipefail
@@ -18,7 +19,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 platform_url="$(git -C "$ROOT" remote get-url origin)"
 owner="${2:-$(gh api user --jq .login)}"
 repo="$owner/$slug-site"
-dest="$(dirname "$ROOT")/$slug-site"
+parent="$(dirname "$ROOT")"
+[ -d "$parent/clients" ] && default_clients="$parent/clients" || default_clients="$parent"
+dest="${CLIENTS_DIR:-$default_clients}/$slug-site"
 
 command -v gh >/dev/null && gh auth status >/dev/null 2>&1 || { echo "Log in first: gh auth login" >&2; exit 1; }
 [ -e "$dest" ] && { echo "$dest already exists" >&2; exit 1; }

@@ -13,8 +13,8 @@ the steps for growing without rebuilding what exists.
 
 ## Phase 1: setup on the Mac mini (in progress)
 
-- Each client has a settings file (`~/Documents/1wp-ops/clients/<slug>.json`).
-- `1wp-ops/provision.mjs` runs `scripts/new-client.sh` and `scripts/deploy.sh` from it,
+- Each client has a settings file (`~/Documents/1WP/ops/clients/<slug>.json`).
+- `ops/provision.mjs` runs `scripts/new-client.sh` and `scripts/deploy.sh` from it,
   step by step, and is safe to re-run. The dashboard's **Set up clients** page runs it
   (operator only, over Tailscale).
 - Manual steps for now: adding the repo to the content GitHub token, and the Cloudflare
@@ -22,7 +22,7 @@ the steps for growing without rebuilding what exists.
 
 ## Phase 2: setup in a private ops repo
 
-- `1wp-ops` becomes a private GitHub repo; a workflow runs `provision.mjs` with the setup
+- `ops` becomes a private GitHub repo; a workflow runs `provision.mjs` with the setup
   keys stored as that repo's secrets, behind a required approval.
 - The dashboard (or the central admin) can only *request* a new client.
 - Deploys move to the ops repo too, so client repos no longer hold the account-wide
