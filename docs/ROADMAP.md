@@ -52,6 +52,23 @@ the steps for growing without rebuilding what exists.
 3. **Cloudflare account limits.** Each client uses a Worker, a KV namespace, an R2 bucket
    and two Pages projects; the Pages project limit (about 100 per account unless raised)
    is reached first. The central admin removes one Pages project and the Worker per client.
+4. **Generic content types (planned).** The staff form, the Worker's Claude prompt and the
+   site still offer the three types from the first client (an art gallery): Exhibition,
+   Event and Post. Most clients don't have exhibitions (Cinderella Project has none), and
+   staff need other kinds of update. Plan:
+   - Define each client's types in `config/design-specs.json` (label, fields, image shape,
+     listing page, whether it shows on the homepage), so the form, the Worker and the site
+     all read the same list and a client can add or hide types without code changes.
+   - Ship a generic default set, for example **News**, **Event** and **Announcement**
+     (short notice, optional homepage banner), with **Exhibition** as an opt-in type for
+     arts clients. Other candidates: photo gallery, team member, job posting, sponsor.
+   - Allow **updating an existing page**, not only adding new entries. This uses the Edit
+     module (see "Claude edits the site" below).
+   - Keep existing `content.json` entries working: types that exist today keep their
+     paths, so no client's links change.
+   Touches: `config/design-specs.json`, `form/` (labels and fields), `worker/src/claude.js`
+   (prompt per type), `worker/src/github.js`, `site/src/lib/content.ts`, the
+   `exhibitions`/`events` pages and layouts, and the export's type mapping.
 
 ## Future option: Claude edits the site
 
