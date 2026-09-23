@@ -265,18 +265,22 @@ class WordPressExporter:
 
     def fetch_homepage_info(self):
         """Read what the REST API only shows logged-in users from the homepage HTML:
-        the main navigation ({"menu": [{title, url, children}]}) and, if the site uses a
-        static page as its homepage, that page's WordPress ID ({"frontPage": "123"})."""
+        the main navigation ({"menu": [{title, url, children}]}), the footer ({"footer":
+        {text, menu, social}}) and, if the site uses a static page as its homepage, that
+        page's WordPress ID ({"frontPage": "123"})."""
         try:
             resp = self.session.get(self.base_url + "/", timeout=self.timeout)
             resp.raise_for_status()
         except requests.RequestException as e:
-            log.warning("Could not fetch the homepage (menu and front page not exported): %s", e)
-            return {"menu": [], "frontPage": None}
+            log.warning("Could not fetch the homepage (menu, footer and front page not exported): %s", e)
+            return {"menu": [], "footer": parse_footer("", self.base_url), "frontPage": None}
         menu = parse_menu(resp.text, self.base_url)
+        footer = parse_footer(resp.text, self.base_url)
         front = parse_front_page_id(resp.text)
         log.info("menu: %d top-level items; front page: %s", len(menu), front or "latest posts")
-        return {"menu": menu, "frontPage": front}
+        log.info("footer: %d text blocks, %d links, social: %s", len(footer["text"]), len(footer["menu"]),
+                 ", ".join(s["network"] for s in footer["social"]) or "none")
+        return {"menu": menu, "footer": footer, "frontPage": front}
 
 
 class MediaMirror:
@@ -512,16 +516,10 @@ def parse_front_page_id(page_html):
     return None
 
 
-def parse_menu(page_html, base_url):
-    """Find the primary navigation <ul> and return its items with site links made root-relative."""
-    starts = [m for m in re.finditer(r"<ul\b[^>]*>", page_html) if "sub-menu" not in m.group(0)]
-    ranked = [m for m in starts if re.search(r"primary", m.group(0), re.I)] or [
-        m for m in starts if re.search(r"(id|class)=[\"'][^\"']*\bmenu", m.group(0), re.I)
-    ]
-    if not ranked:
-        return []
+def _menu_from(page_html, start, base_url):
+    """Parse the <ul> menu that starts at `start`; site links are made root-relative."""
     parser = _MenuParser()
-    parser.feed(page_html[ranked[0].start():])
+    parser.feed(page_html[start:])
     site = urlparse(base_url).netloc.lower().removeprefix("www.")
 
     def clean(items):
@@ -542,6 +540,67 @@ def parse_menu(page_html, base_url):
     return clean(parser.root)
 
 
+def parse_menu(page_html, base_url):
+    """Find the primary navigation <ul> and return its items with site links made root-relative."""
+    starts = [m for m in re.finditer(r"<ul\b[^>]*>", page_html) if "sub-menu" not in m.group(0)]
+    ranked = [m for m in starts if re.search(r"primary", m.group(0), re.I)] or [
+        m for m in starts if re.search(r"(id|class)=[\"'][^\"']*\bmenu", m.group(0), re.I)
+    ]
+    if not ranked:
+        return []
+    return _menu_from(page_html, ranked[0].start(), base_url)
+
+
+# Hostname (without www./m.) → network name used by the site's footer icons.
+SOCIAL_HOSTS = {
+    "facebook.com": "facebook", "fb.com": "facebook", "instagram.com": "instagram",
+    "twitter.com": "x", "x.com": "x", "linkedin.com": "linkedin", "youtube.com": "youtube",
+    "youtu.be": "youtube", "tiktok.com": "tiktok", "pinterest.com": "pinterest",
+    "threads.net": "threads", "bsky.app": "bluesky", "mastodon.social": "mastodon", "vimeo.com": "vimeo",
+}
+# Footer lines the new site replaces with its own (copyright, theme credits).
+FOOTER_SKIP = re.compile(r"^(©|&copy;|copyright\b)|powered by|wordpress|theme by|designed by", re.I)
+
+
+def parse_footer(page_html, base_url):
+    """The site footer: text paragraphs, the footer menu and social links.
+    Returns {"text": [str], "menu": [{title, url, children}], "social": [{network, url}]}."""
+    footer = {"text": [], "menu": [], "social": []}
+    tags = list(re.finditer(r"<footer\b[^>]*>", page_html, re.I))
+    if not tags:
+        return footer
+    # The site footer, not the <footer> inside each article.
+    tag = next((t for t in tags if re.search(r"site-footer|colophon|site-info|page-footer", t.group(0), re.I)), tags[-1])
+    end = page_html.rfind("</footer>")
+    chunk = page_html[tag.start(): end if end > tag.start() else len(page_html)]
+    chunk = re.sub(r"<(script|style|svg)\b[^>]*>.*?</\1>", "", chunk, flags=re.S | re.I)
+
+    seen = set()
+    for href in re.findall(r"<a\b[^>]*href=[\"']([^\"']+)", chunk, re.I):
+        host = urlparse(href).netloc.lower().removeprefix("www.").removeprefix("m.")
+        network = SOCIAL_HOSTS.get(host)
+        if network and network not in seen:
+            seen.add(network)
+            footer["social"].append({"network": network, "url": href})
+
+    for m in re.finditer(r"<ul\b[^>]*>", chunk):
+        if "sub-menu" in m.group(0) or "social" in m.group(0).lower():
+            continue
+        if not re.search(r"(id|class)=[\"'][^\"']*\bmenu", m.group(0), re.I):
+            continue
+        items = [i for i in _menu_from(chunk, m.start(), base_url)
+                 if not SOCIAL_HOSTS.get(urlparse(i["url"] or "").netloc.lower().removeprefix("www."))]
+        if items:
+            footer["menu"] = items
+            break
+
+    for p in re.findall(r"<p\b[^>]*>(.*?)</p>", chunk, re.S | re.I):
+        text = html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", p))).strip()
+        if text and not FOOTER_SKIP.search(text) and text not in footer["text"]:
+            footer["text"].append(text)
+    return footer
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Export WordPress content to Astro-ready JSON with media mirrored to Cloudflare R2.")
     parser.add_argument("--wordpress-url", help="Site root, e.g. https://example.org")
@@ -554,6 +613,7 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--skip-media", action="store_true", help="Export content only; keep original WordPress image URLs")
     mode.add_argument("--media-only", action="store_true", help="Re-mirror media for an existing --output file without re-fetching content")
+    mode.add_argument("--site-info-only", action="store_true", help="Refresh only the menu, footer and homepage setting in an existing --output file")
     parser.add_argument("--force", action="store_true", help="Re-upload media even if the object already exists in R2")
     parser.add_argument("--include-external", action="store_true", help="Also mirror images hosted on other domains")
     parser.add_argument("--limit", type=int, help="Max items per post type (handy for test runs)")
@@ -564,6 +624,18 @@ def main(argv=None):
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s")
     load_env(args.env_file)
     output = Path(args.output)
+
+    if args.site_info_only:
+        if not output.exists():
+            parser.error(f"--site-info-only needs an existing export at {output}")
+        data = json.loads(output.read_text(encoding="utf-8"))
+        site_url = args.wordpress_url or data.get("siteUrl")
+        if not site_url:
+            parser.error("--wordpress-url is required (the export has no siteUrl)")
+        data.update(WordPressExporter(site_url, []).fetch_homepage_info())
+        output.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"\n✓ Updated menu, footer and homepage setting in {output}")
+        return 0
 
     if args.media_only:
         if not output.exists():
@@ -580,7 +652,7 @@ def main(argv=None):
                     content = content.replace(r2_url, source)
                 entry["content"] = content
         site_url = args.wordpress_url or data.get("siteUrl")
-        if ("menu" not in data or "frontPage" not in data) and site_url:
+        if ("menu" not in data or "footer" not in data or "frontPage" not in data) and site_url:
             data.update(WordPressExporter(site_url, []).fetch_homepage_info())
     else:
         if not args.wordpress_url:

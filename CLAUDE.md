@@ -46,6 +46,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 |---|---|
 | Bad change | `git revert <commit> && git push`, or **Rollback** in Pages/Workers → Deployments (`cd worker && npx wrangler rollback`) |
 | Remove/fix a published entry | Edit `content.json`, commit, push |
+| Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push |
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |

@@ -38,6 +38,14 @@ export interface MenuItem {
   children: MenuItem[];
 }
 
+export interface SiteFooter {
+  /** Footer paragraphs from WordPress (plain text), e.g. a land acknowledgement. */
+  text: string[];
+  /** Footer menu links. */
+  menu: MenuItem[];
+  social: { network: string; url: string }[];
+}
+
 export interface SiteContent {
   exhibitions: Entry[];
   events: Entry[];
@@ -45,6 +53,8 @@ export interface SiteContent {
   pages: Entry[];
   /** Main navigation copied from WordPress (wordpress_export.py), if any. */
   menu: MenuItem[];
+  /** Footer copied from WordPress (wordpress_export.py), if any. */
+  footer: SiteFooter;
   /** WordPress ID of the page used as the homepage, if the site had a static front page. */
   frontPage: string | null;
   siteUrl?: string;
@@ -84,6 +94,11 @@ function load() {
     posts: [],
     pages: [],
     menu: Array.isArray(raw.menu) ? raw.menu : [],
+    footer: {
+      text: Array.isArray(raw.footer?.text) ? raw.footer.text.filter((t: unknown) => typeof t === "string" && t.trim()) : [],
+      menu: Array.isArray(raw.footer?.menu) ? raw.footer.menu : [],
+      social: Array.isArray(raw.footer?.social) ? raw.footer.social.filter((s: any) => s && typeof s.url === "string" && /^https?:/i.test(s.url)) : [],
+    },
     frontPage: raw.frontPage ? String(raw.frontPage) : null,
     siteUrl: raw.siteUrl,
   };

@@ -1,0 +1,48 @@
+---
+// Site footer: text, links and social icons copied from WordPress (content.json "footer").
+import * as icons from "simple-icons";
+import { SITE } from "../lib/site";
+import { getContent, resolveMenuUrl } from "../lib/content";
+
+const { text, menu, social } = getContent().footer;
+const links = menu.map((i) => ({ label: i.title, href: resolveMenuUrl(i.url) })).filter((l) => l.href);
+
+const NAMES: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", x: "X", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
+  pinterest: "Pinterest", threads: "Threads", bluesky: "Bluesky", mastodon: "Mastodon", vimeo: "Vimeo",
+};
+const socials = social.map((s) => {
+  const name = NAMES[s.network] ?? s.network;
+  const icon = (icons as Record<string, { path: string } | undefined>)[`si${s.network[0].toUpperCase()}${s.network.slice(1)}`];
+  return { name, url: s.url, path: icon?.path ?? null };
+});
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    {text.map((t) => <p class="footer-text">{t}</p>)}
+    <div class="footer-bottom">
+      <p>© {new Date().getFullYear()} {SITE.name}</p>
+      {links.length > 0 && (
+        <nav aria-label="Footer">
+          <ul class="footer-links">
+            {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+          </ul>
+        </nav>
+      )}
+      {socials.length > 0 && (
+        <ul class="social-links">
+          {socials.map((s) => (
+            <li>
+              <a href={s.url} rel="noopener me" target="_blank" aria-label={s.path ? s.name : undefined}>
+                {s.path ? (
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d={s.path} fill="currentColor" /></svg>
+                ) : s.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+</footer>

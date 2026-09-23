@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import { SITE } from "../lib/site";
 import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
 import { buildImageSet } from "../lib/images";
 import { THEME, themeCss, googleFontsHref, warnOnce } from "../lib/theme";
 
@@ -79,10 +80,6 @@ const logo = THEME.logo;
       <slot />
     </main>
 
-    <footer class="site-footer">
-      <div class="wrap">
-        <p>© {new Date().getFullYear()} {SITE.name}</p>
-      </div>
-    </footer>
+    <Footer />
   </body>
 </html>
