@@ -103,9 +103,19 @@ as Worker secrets on every deploy, so all three must be set.
       `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only`,
       update `R2_PUBLIC_URL` in `worker/wrangler.toml`, commit both.
 - [ ] Optional: enable **Images → Transformations** for the zone and set the `IMAGE_RESIZING=cloudflare` variable
-- [ ] Old WordPress URLs: slugs are preserved (`/about/`, `/boutique-day-2020/`), but date-based post
-      permalinks (`/2024/05/slug/`) need redirects — add a `site/public/_redirects` file if the old site used them
+- [ ] Old WordPress URLs: the build generates 301s automatically (moved pages, `/wp-content/uploads/…`
+      → R2, archives and feeds → /news/, `/?p=123` links). Add anything else to `redirects.csv`
+      (copy `redirects.csv.example`), then run the check against the site and fix what it lists:
+      `node scripts/check-redirects.mjs --new https://<client>-site.pages.dev --old https://<wordpress site>`
+- [ ] SEO: if the old site used Yoast/All in One SEO, the export copied each page's title and
+      description (`"seo"` in content.json); check a few. Set `shareImage` in `config/site.json`.
+- [ ] Analytics: the export lists the tags it found (`detected.analytics` in content.json). Add the ones
+      still in use to `config/site.json` → `analytics` (a Universal Analytics `UA-` ID is dead since
+      July 2023; suggest GA4, or Cloudflare Web Analytics, which needs no cookie banner).
 - [ ] Switch DNS for the apex/www from the old host to Pages; keep the old host up until verified
+- [ ] Search Console: verify the domain (HTML tag → `searchConsole` in `config/site.json`, or DNS),
+      submit `https://<domain>/sitemap-index.xml`, and check **Pages → Not found** weekly for a month;
+      add any old addresses it reports to `redirects.csv`
 
 ## 7. Protect the staff form
 

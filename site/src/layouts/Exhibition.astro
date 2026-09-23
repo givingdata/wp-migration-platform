@@ -25,7 +25,7 @@ const structuredData = {
 };
 ---
 
-<BaseLayout title={entry.title} description={excerpt(entry)} image={entry.image} imageType="exhibition" ogType="article" structuredData={structuredData}>
+<BaseLayout seo={entry.seo} title={entry.title} description={excerpt(entry)} image={entry.image} imageType="exhibition" ogType="article" structuredData={structuredData}>
   <article class="entry entry-exhibition">
     {entry.image && (
       <div class="hero">

@@ -30,6 +30,16 @@ export interface Entry {
   parent?: number | string | null;
   menuOrder?: number | null;
   link?: string | null;
+  seo?: Seo | null;
+}
+
+/** Per-page SEO overrides; anything missing falls back to the page's own title/description/image. */
+export interface Seo {
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  noindex?: boolean;
+  canonical?: string | null;
 }
 
 export interface MenuItem {

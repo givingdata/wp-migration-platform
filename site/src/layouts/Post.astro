@@ -29,7 +29,7 @@ const structuredData = isPage
     };
 ---
 
-<BaseLayout title={entry.title} description={excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData}>
+<BaseLayout seo={entry.seo} title={entry.title} description={excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData}>
   <article class:list={["entry", isPage ? "entry-page" : "entry-post"]}>
     <div class="wrap narrow">
       {!isPage && <p class="eyebrow">News</p>}

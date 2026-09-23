@@ -243,6 +243,7 @@ class WordPressExporter:
             "parent": item.get("parent") or None,
             "menuOrder": item.get("menu_order"),
             "status": item.get("status"),
+            "seo": seo_fields(item),
         }
 
     def export(self):
@@ -273,14 +274,19 @@ class WordPressExporter:
             resp.raise_for_status()
         except requests.RequestException as e:
             log.warning("Could not fetch the homepage (menu, footer and front page not exported): %s", e)
-            return {"menu": [], "footer": parse_footer("", self.base_url), "frontPage": None}
+            return {"menu": [], "footer": parse_footer("", self.base_url), "frontPage": None, "detected": {"analytics": []}}
         menu = parse_menu(resp.text, self.base_url)
         footer = parse_footer(resp.text, self.base_url)
         front = parse_front_page_id(resp.text)
+        analytics = detect_analytics(resp.text)
+        for a in analytics:
+            log.info("analytics: %s %s%s", a["provider"], a["id"], f" ({a['note']})" if a.get("note") else "")
+        if any(a["provider"] != "universal-analytics" for a in analytics):
+            log.info("  → copy the ones you still use into config/site.json \"analytics\" (not done automatically)")
         log.info("menu: %d top-level items; front page: %s", len(menu), front or "latest posts")
         log.info("footer: %d text blocks, %d links, social: %s", len(footer["text"]), len(footer["menu"]),
                  ", ".join(s["network"] for s in footer["social"]) or "none")
-        return {"menu": menu, "footer": footer, "frontPage": front}
+        return {"menu": menu, "footer": footer, "frontPage": front, "detected": {"analytics": analytics}}
 
 
 class MediaMirror:
@@ -456,7 +462,7 @@ class MediaMirror:
         return data
 
 
-NON_CONTENT_KEYS = {"media", "mediaErrors", "menu"}  # lists that aren't content collections
+NON_CONTENT_KEYS = {"media", "mediaErrors", "menu"}  # dicts like "footer"/"detected" are skipped anyway  # lists that aren't content collections
 
 
 def content_collections(data):
@@ -502,6 +508,55 @@ class _MenuParser(HTMLParser):
     def handle_data(self, data):
         if self.link is not None:
             self.link["title"] = (self.link["title"] + " " + data).strip()
+
+
+def seo_fields(item):
+    """SEO title/description/share image/noindex from Yoast (yoast_head_json) or All in One SEO
+    (aioseo_head_json) when the site uses them; None otherwise. The canonical address is left
+    out on purpose: it points at the old site."""
+    head = item.get("yoast_head_json") or item.get("aioseo_head_json") or {}
+    if not isinstance(head, dict):
+        return None
+    image = head.get("og_image")
+    if isinstance(image, list):
+        image = (image[0] or {}).get("url") if image else None
+    robots = head.get("robots") or {}
+    noindex = (robots.get("index") == "noindex") if isinstance(robots, dict) else "noindex" in str(robots)
+    seo = {
+        "title": html.unescape(head.get("title") or "").strip() or None,
+        "description": html.unescape(head.get("description") or head.get("og_description") or "").strip() or None,
+        "image": image if isinstance(image, str) else None,
+        "noindex": True if noindex else None,
+    }
+    seo = {k: v for k, v in seo.items() if v}
+    return seo or None
+
+
+# Analytics tags on the homepage: (provider, regex); Universal Analytics stopped in July 2023.
+ANALYTICS_PATTERNS = [
+    ("google", r"\b(G-[A-Z0-9]{6,12})\b"),
+    ("universal-analytics", r"\b(UA-\d{4,10}-\d{1,4})\b"),
+    ("gtm", r"\b(GTM-[A-Z0-9]{4,10})\b"),
+    ("cloudflare", r"data-cf-beacon=['\"]\{[^}]*\"token\"\s*:\s*\"([a-f0-9]{32})\""),
+    ("plausible", r"data-domain=['\"]([^'\"]+)['\"][^>]*plausible"),
+    ("fathom", r"usefathom\.com[^>]*data-site=['\"]([A-Z0-9]+)['\"]|data-site=['\"]([A-Z0-9]+)['\"][^>]*usefathom"),
+    ("meta", r"fbq\(\s*['\"]init['\"]\s*,\s*['\"](\d{10,20})['\"]"),
+]
+
+
+def detect_analytics(page_html):
+    """Analytics IDs found on the page, e.g. [{"provider": "google", "id": "G-…"}]."""
+    found, seen = [], set()
+    for provider, pattern in ANALYTICS_PATTERNS:
+        for m in re.finditer(pattern, page_html):
+            value = next((g for g in m.groups() if g), None)
+            if value and (provider, value) not in seen:
+                seen.add((provider, value))
+                item = {"provider": provider, "id": value}
+                if provider == "universal-analytics":
+                    item["note"] = "Universal Analytics stopped collecting data in July 2023; not carried over"
+                found.append(item)
+    return found
 
 
 def parse_front_page_id(page_html):

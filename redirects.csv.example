@@ -1,0 +1,7 @@
+# Copy to redirects.csv (in the client repo root) for your own redirects. One per line:
+#   from,to[,status]      status defaults to 301 (permanent)
+# "from" is a path on this site; "to" is a path or a full URL. These win over the redirects
+# generated automatically from the WordPress export (see site/redirects.mjs).
+from,to,status
+# /old-page/,/new-page/
+# /donate-now/,https://www.canadahelps.org/en/charities/example/,302

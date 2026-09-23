@@ -15,7 +15,7 @@ const featured = exhibitions[0];
 const rest = exhibitions.slice(1, 4);
 ---
 
-<BaseLayout description={frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline}>
+<BaseLayout seo={frontPage?.seo} description={frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline}>
   {frontPage ? (
     <article class="entry entry-page entry-home">
       <div class="wrap narrow">
