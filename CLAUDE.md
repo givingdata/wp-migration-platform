@@ -36,6 +36,7 @@ In a client repo, pushing redeploys whatever changed:
 - `site/` → site (`deploy-site.yml`)
 - `worker/` → Worker (`deploy-worker.yml`)
 - `config/design-specs.json` → both (aspect ratios, breakpoints, form fields)
+- `config/theme.json` → site (preset, colours, fonts, logo; designers follow `docs/DESIGN_HANDOFF.md`)
 
 Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `content.json` is missing).
 

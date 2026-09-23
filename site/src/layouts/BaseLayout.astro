@@ -3,6 +3,7 @@ import "../styles/global.css";
 import { SITE } from "../lib/site";
 import Nav from "../components/Nav.astro";
 import { buildImageSet } from "../lib/images";
+import { THEME, themeCss, googleFontsHref, warnOnce } from "../lib/theme";
 
 interface Props {
   title?: string;
@@ -25,6 +26,10 @@ const ld = [
   { "@context": "https://schema.org", "@type": "Organization", name: SITE.name, url: Astro.site?.href },
   ...(Array.isArray(structuredData) ? structuredData : structuredData ? [structuredData] : []),
 ];
+
+warnOnce();
+const fontsHref = googleFontsHref();
+const logo = THEME.logo;
 ---
 
 <!doctype html>
@@ -37,7 +42,10 @@ const ld = [
     <link rel="canonical" href={canonical} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content={THEME.darkMode ? "light dark" : "light"} />
+    <style is:inline set:html={themeCss()} />
+    {fontsHref && <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />}
+    {fontsHref && <link rel="stylesheet" href={fontsHref} />}
 
     <meta property="og:site_name" content={SITE.name} />
     <meta property="og:locale" content={SITE.locale} />
@@ -54,7 +62,15 @@ const ld = [
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap header-inner">
-        <a class="brand" href="/">{SITE.name}</a>
+        <a class="brand" href="/">
+          {logo && (
+            <picture>
+              {logo.darkSrc && THEME.darkMode && <source media="(prefers-color-scheme: dark)" srcset={logo.darkSrc} />}
+              <img src={logo.src} alt={logo.showName ? "" : SITE.name} height={logo.height ?? 40} style={`height: ${logo.height ?? 40}px`} />
+            </picture>
+          )}
+          {(!logo || logo.showName) && <span>{SITE.name}</span>}
+        </a>
         <Nav />
       </div>
     </header>

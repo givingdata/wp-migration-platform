@@ -1,33 +1,5 @@
-:root {
-  --bg: #fbfaf8;
-  --surface: #ffffff;
-  --surface-2: #efece7;
-  --text: #1c1b1f;
-  --muted: #5d5a63;
-  --border: #dedad3;
-  --accent: #6b2d5c;
-  --accent-hover: #4f1f44;
-  --focus: #1a5fb4;
-  --radius: 10px;
-  --wrap: 72rem;
-  --narrow: 44rem;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141316;
-    --surface: #1d1c20;
-    --surface-2: #2a282e;
-    --text: #f1eff3;
-    --muted: #b3afb9;
-    --border: #3a3740;
-    --accent: #e0a9d1;
-    --accent-hover: #f2c9e6;
-    --focus: #8cb8ff;
-  }
-}
+/* Colours, fonts, radius and widths (--bg, --accent, --font-heading, …) come from
+   config/theme.json via src/lib/theme.ts; see docs/DESIGN_HANDOFF.md. */
 
 *,
 *::before,
@@ -39,7 +11,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 1.0625rem/1.65 var(--font);
+  font: var(--text-size)/1.65 var(--font-body);
   text-rendering: optimizeLegibility;
 }
 
@@ -49,7 +21,7 @@ a { color: var(--accent); text-underline-offset: 0.15em; }
 a:hover { color: var(--accent-hover); }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-h1, h2, h3 { font-family: var(--font-serif); line-height: 1.2; font-weight: 600; margin: 0 0 0.5em; }
+h1, h2, h3 { font-family: var(--font-heading); line-height: 1.2; font-weight: var(--heading-weight); margin: 0 0 0.5em; }
 h1 { font-size: clamp(2rem, 4.5vw, 3rem); }
 h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); }
 h3 { font-size: 1.25rem; }
@@ -68,8 +40,9 @@ h3 { font-size: 1.25rem; }
 /* Header / footer */
 .site-header { border-bottom: 1px solid var(--border); background: var(--surface); }
 .header-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1.5rem; padding-block: 1rem; }
-.brand { font-family: var(--font-serif); font-size: 1.35rem; font-weight: 600; color: var(--text); text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-heading); font-size: 1.35rem; font-weight: var(--heading-weight); color: var(--text); text-decoration: none; }
 .site-header { position: relative; z-index: 5; }
+.brand img { display: block; width: auto; }
 .main-nav > ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
 .main-nav li { position: relative; display: flex; align-items: center; }
 .main-nav a, .main-nav .nav-label { color: var(--text); text-decoration: none; font-weight: 500; padding-block: 0.25rem; }
