@@ -20,7 +20,9 @@ staff add content through a form → Cloudflare Worker (Claude tidies the text) 
 | Migrate WordPress | `python wordpress_export.py --wordpress-url https://<site> --output content.json` | Posts/pages/images → `content.json` + R2 (needs `R2_*` in `.env`) |
 | Publish | `git add content.json && git commit && git push` | GitHub builds and deploys the site |
 
-Follow `docs/DEPLOYMENT_CHECKLIST.md` for every new client.
+Follow `docs/DEPLOYMENT_CHECKLIST.md` for every new client. On the Mac mini the same steps run from a
+settings file with `~/Documents/1wp-ops/provision.mjs` (or the dashboard's **Set up clients** page); see
+`docs/ROADMAP.md` for where setup and the admin are heading.
 
 ### Day to day: nothing to run
 
