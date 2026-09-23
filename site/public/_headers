@@ -1,0 +1,12 @@
+# Security headers for every page (Cloudflare Pages reads this file from the build output).
+# Kept compatible with migrated WordPress content: the site may still embed YouTube, donation
+# forms, maps and so on; these rules only stop other sites framing this one, force HTTPS, and
+# switch off browser features the site doesn't use. A stricter Content Security Policy (limiting
+# scripts and frames to named sites) would need a list per client, so it isn't set here.
+/*
+  Strict-Transport-Security: max-age=31536000
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()
