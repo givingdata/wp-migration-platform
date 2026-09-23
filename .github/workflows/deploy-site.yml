@@ -9,6 +9,10 @@ on:
       - site/**
       - config/design-specs.json
       - config/theme.json
+      - config/site.json
+      - sections.json
+      - redirects.csv
+      - functions/**
       - package.json
       - package-lock.json
       - .github/workflows/deploy-site.yml

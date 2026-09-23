@@ -37,6 +37,8 @@ In a client repo, pushing redeploys whatever changed:
 - `worker/` → Worker (`deploy-worker.yml`)
 - `config/design-specs.json` → both (aspect ratios, breakpoints, form fields)
 - `config/theme.json` → site (preset, colours, fonts, logo; designers follow `docs/DESIGN_HANDOFF.md`)
+- `config/site.json` → site (analytics tags, Search Console verification, default share image)
+- `redirects.csv` → site (your own 301s; the build adds automatic ones, see below)
 
 Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `content.json` is missing).
 
@@ -47,6 +49,10 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Bad change | `git revert <commit> && git push`, or **Rollback** in Pages/Workers → Deployments (`cd worker && npx wrangler rollback`) |
 | Remove/fix a published entry | Edit `content.json`, commit, push |
 | Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push |
+| Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
+| Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
+| Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push |
+| Before switching the domain | `node scripts/check-redirects.mjs --new https://<preview or new site> --old https://<WordPress site>`: lists old addresses that don't reach a working page |
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |
@@ -62,5 +68,6 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 - GitHub secrets can't start with `GITHUB_`: the Worker's repo token is the `CONTENT_REPO_TOKEN` secret and the form key is `FORM_API_KEY`.
 - The site's `/cdn-cgi/image` resizing only works on a custom domain with Image Transformations enabled; keep the `IMAGE_RESIZING` variable unset on `*.pages.dev`.
 - CI builds fail on purpose if `content.json` is missing (so sample data never ships).
+- Redirects: the build writes `_redirects` (redirects.csv first, then moved pages, WordPress uploads/gallery → R2, archives/feeds → /news/, old sitemap names) and `wp-ids.json`; `functions/index.js` 301s old `/?p=123` links (the only Pages Function; it runs for `/` only). For manual preview deploys run wrangler from the repo root (`worker/node_modules/.bin/wrangler pages deploy site/dist …`) so `functions/` is included.
 - The staff form's API key is visible in the browser: keep the form behind Cloudflare Access.
-- Tests: `cd worker && npm test`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
+- Tests: `cd worker && npm test`; `node --test site/redirects.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.

@@ -20,7 +20,7 @@ const firstIsHero = built?.sections[0]?.type === "hero";
 const rest = exhibitions.slice(1, 4);
 ---
 
-<BaseLayout description={(built && sectionsDescription(built.sections)) || (frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline)} sectioned={!!built}>
+<BaseLayout seo={built?.seo || frontPage?.seo} description={(built && sectionsDescription(built.sections)) || (frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline)} sectioned={!!built}>
   {built ? (
     <>
       {!firstIsHero && <h1 class="visually-hidden">{SITE.name}</h1>}

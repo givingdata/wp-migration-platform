@@ -34,7 +34,7 @@ export interface SiteSettings {
   header?: { style?: "default" | "band"; button?: Button };
   footer?: { about?: string; address?: string[]; contacts?: { label: string; email: string }[]; note?: string };
 }
-interface PageSections { sections: Section[]; content?: "before" | "after" }
+interface PageSections { sections: Section[]; content?: "before" | "after"; seo?: import("./content").Seo }
 interface SectionsFile { site?: SiteSettings; pages?: Record<string, PageSections> }
 
 let cache: SectionsFile | null = null;
