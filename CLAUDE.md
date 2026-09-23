@@ -68,6 +68,6 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 - GitHub secrets can't start with `GITHUB_`: the Worker's repo token is the `CONTENT_REPO_TOKEN` secret and the form key is `FORM_API_KEY`.
 - The site's `/cdn-cgi/image` resizing only works on a custom domain with Image Transformations enabled; keep the `IMAGE_RESIZING` variable unset on `*.pages.dev`.
 - CI builds fail on purpose if `content.json` is missing (so sample data never ships).
-- Redirects: the build writes `_redirects` (redirects.csv first, then moved pages, WordPress uploads/gallery → R2, archives/feeds → /news/, old sitemap names) and `wp-ids.json`; `functions/index.js` 301s old `/?p=123` links (the only Pages Function; it runs for `/` only). For manual preview deploys run wrangler from the repo root (`worker/node_modules/.bin/wrangler pages deploy site/dist …`) so `functions/` is included.
+- Redirects: the build writes `_redirects` (redirects.csv first, then moved pages, WordPress uploads/gallery → R2, archives/feeds → /news/, old sitemap names) and `wp-ids.json`; `functions/index.js` 301s old `/?p=123` links (the only Pages Function; it runs for `/` only). For manual deploys run `npx wrangler pages deploy site/dist …` from the repo root (not `worker/`) so `functions/` is included.
 - The staff form's API key is visible in the browser: keep the form behind Cloudflare Access.
 - Tests: `cd worker && npm test`; `node --test site/redirects.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
