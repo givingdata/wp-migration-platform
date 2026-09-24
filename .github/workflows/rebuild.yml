@@ -4,6 +4,10 @@ name: Rebuild Site on Content Change
 
 on:
   workflow_dispatch: # manual trigger for testing
+  # Daily, so date-based content moves on without a commit: events go from upcoming to
+  # past and announcements appear and expire on their dates (06:00 UTC ≈ overnight in North America).
+  schedule:
+    - cron: "0 6 * * *"
   push:
     branches: [main]
     paths:
@@ -15,5 +19,5 @@ jobs:
     if: vars.CLOUDFLARE_PAGES_PROJECT != ''
     uses: ./.github/workflows/_site.yml
     with:
-      reason: ${{ github.event_name == 'workflow_dispatch' && 'Manual rebuild' || 'Content updated' }}
+      reason: ${{ github.event_name == 'workflow_dispatch' && 'Manual rebuild' || github.event_name == 'schedule' && 'Daily rebuild' || 'Content updated' }}
     secrets: inherit

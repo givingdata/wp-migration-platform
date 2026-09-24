@@ -1,0 +1,19 @@
+---
+// Current announcements (content types with "banner": true), shown at the top of the homepage.
+import { activeAnnouncements, urlFor } from "../lib/content";
+const items = activeAnnouncements().slice(0, 3);
+---
+{items.length > 0 && (
+  <aside class="announcements" aria-label="Announcements">
+    <div class="wrap">
+      <ul>
+        {items.map((a) => (
+          <li>
+            <strong><a href={urlFor(a)}>{a.title}</a></strong>
+            {a.description && <span> {a.description}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </aside>
+)}

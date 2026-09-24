@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - worker/**
+      - lib/**
       - config/design-specs.json
       - .github/workflows/deploy-worker.yml
 

@@ -2,8 +2,29 @@
 // and gives every entry a unique URL.
 import fs from "node:fs";
 import path from "node:path";
+import specs from "../../../config/design-specs.json";
+import { contentTypes, allCollections, typeForCollection } from "../../../lib/content-types.js";
 
-export type ContentType = "exhibition" | "event" | "post" | "page";
+/** A content type key from config/design-specs.json ("post", "event", "announcement", …) or "page". */
+export type ContentType = string;
+
+export interface TypeDef {
+  key: string;
+  label: string;
+  collection: string;
+  layout: "article" | "event" | "exhibition";
+  enabled: boolean;
+  listing?: { path: string; title: string; intro?: string; upcoming?: boolean; currentLabel?: string; pastLabel?: string } | false;
+  homepage?: boolean;
+  banner?: boolean;
+  aspectRatio?: string;
+}
+
+/** Every content type, enabled (in design-specs) or kept for older entries. */
+export const TYPES = contentTypes(specs) as Record<string, TypeDef>;
+export const typeDef = (key: string): TypeDef | null => TYPES[key] ?? null;
+/** Types with a listing page (/news/, /events/, …), in design-specs order. */
+export const LISTED_TYPES = Object.values(TYPES).filter((t) => t.listing);
 
 export interface Entry {
   id: string;
@@ -24,6 +45,8 @@ export interface Entry {
   time?: string | null;
   location?: string | null;
   author?: string | null;
+  /** "Learn more" link (announcements). */
+  linkUrl?: string | null;
   categories?: string[];
   tags?: string[];
   modified?: string | null;
@@ -57,10 +80,9 @@ export interface SiteFooter {
 }
 
 export interface SiteContent {
-  exhibitions: Entry[];
-  events: Entry[];
-  posts: Entry[];
   pages: Entry[];
+  /** Entries by collection ("posts", "events", "announcements", …), pages included. */
+  collections: Record<string, Entry[]>;
   /** Main navigation copied from WordPress (wordpress_export.py), if any. */
   menu: MenuItem[];
   /** Footer copied from WordPress (wordpress_export.py), if any. */
@@ -73,9 +95,9 @@ export interface SiteContent {
 /** Entry plus the path it is published at (no leading/trailing slash). */
 export type RoutedEntry = Entry & { path: string };
 
-const COLLECTIONS = { exhibitions: "exhibition", events: "event", posts: "post", pages: "page" } as const;
+const COLLECTIONS: string[] = allCollections(TYPES);
 // Paths the site itself uses; content can't take them.
-const RESERVED = new Set(["", "index", "exhibitions", "events", "news", "404", "rss.xml", "sitemap-index.xml", "robots.txt"]);
+const RESERVED = new Set(["", "index", "404", "rss.xml", "sitemap-index.xml", "robots.txt", ...LISTED_TYPES.map((t) => (t.listing as { path: string }).path)]);
 
 function resolveContentPath(): string | null {
   const candidates = [process.env.CONTENT_PATH, path.resolve(process.cwd(), "../content.json"), path.resolve(process.cwd(), "content.json")];
@@ -99,10 +121,8 @@ function load() {
 
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
   const content: SiteContent = {
-    exhibitions: [],
-    events: [],
-    posts: [],
     pages: [],
+    collections: {},
     menu: Array.isArray(raw.menu) ? raw.menu : [],
     footer: {
       text: Array.isArray(raw.footer?.text) ? raw.footer.text.filter((t: unknown) => typeof t === "string" && t.trim()) : [],
@@ -112,20 +132,24 @@ function load() {
     frontPage: raw.frontPage ? String(raw.frontPage) : null,
     siteUrl: raw.siteUrl,
   };
-  for (const [collection, type] of Object.entries(COLLECTIONS)) {
+  for (const collection of COLLECTIONS) {
+    const type = typeForCollection(TYPES, collection)?.key ?? collection;
     const items: Entry[] = Array.isArray(raw[collection]) ? raw[collection] : [];
-    (content as any)[collection] = items
+    content.collections[collection] = items
       .filter((e) => e && e.slug && e.title)
-      .map((e) => ({ ...e, id: String(e.id ?? e.slug), type: (e.type as ContentType) || type }));
+      // An entry's type follows the collection it is in.
+      .map((e) => ({ ...e, id: String(e.id ?? e.slug), type }));
   }
+  content.pages = content.collections.pages;
 
   // Assign unique paths. Pages keep their bare slug (/about); everything else too,
   // unless it collides, in which case it is prefixed with its type (/event/about).
   const taken = new Set(RESERVED);
   const routed: RoutedEntry[] = [];
-  const order: (keyof typeof COLLECTIONS)[] = ["pages", "exhibitions", "events", "posts"];
-  for (const collection of order) {
-    for (const entry of (content as any)[collection] as Entry[]) {
+  // Pages first (they keep bare slugs), then legacy types before newer ones so no existing link moves.
+  const order = ["pages", "exhibitions", "events", "posts", ...COLLECTIONS];
+  for (const collection of [...new Set(order)]) {
+    for (const entry of content.collections[collection] ?? []) {
       if (isFrontPage(entry, content)) continue; // published at "/" instead
       let p = entry.slug.replace(/^\/+|\/+$/g, "");
       if (taken.has(p)) p = `${entry.type}/${p}`;
@@ -171,30 +195,50 @@ const today = () => new Date().toISOString().slice(0, 10);
 export const byDateDesc = (a: Entry, b: Entry) => (b.date ?? "").localeCompare(a.date ?? "");
 export const byDateAsc = (a: Entry, b: Entry) => (a.date ?? "").localeCompare(b.date ?? "");
 
-/** Exhibitions on now or opening later, soonest first. */
-export function currentExhibitions(): Entry[] {
-  const t = today();
-  return getContent().exhibitions.filter((e) => (e.endDate ?? e.date ?? "") >= t).sort(byDateAsc);
+/** All entries of a type (e.g. "event"). */
+export function entriesOf(typeKey: string): Entry[] {
+  const t = typeDef(typeKey);
+  return t ? getContent().collections[t.collection] ?? [] : [];
 }
 
-export function pastExhibitions(): Entry[] {
+/** Entries on now or starting later (events, exhibitions), soonest first. */
+export function upcoming(typeKey: string): Entry[] {
   const t = today();
-  return getContent().exhibitions.filter((e) => (e.endDate ?? e.date ?? "") < t).sort(byDateDesc);
+  return entriesOf(typeKey).filter((e) => (e.endDate ?? e.date ?? "") >= t).sort(byDateAsc);
 }
 
-export function upcomingEvents(): Entry[] {
+export function past(typeKey: string): Entry[] {
   const t = today();
-  return getContent().events.filter((e) => (e.endDate ?? e.date ?? "") >= t).sort(byDateAsc);
+  return entriesOf(typeKey).filter((e) => (e.endDate ?? e.date ?? "") < t).sort(byDateDesc);
 }
 
-export function pastEvents(): Entry[] {
-  const t = today();
-  return getContent().events.filter((e) => (e.endDate ?? e.date ?? "") < t).sort(byDateDesc);
+/** Newest first; types with a schedule (events) only list what hasn't ended. */
+export function latest(typeKey: string, limit?: number): Entry[] {
+  const listing = typeDef(typeKey)?.listing;
+  const list = listing && listing.upcoming ? upcoming(typeKey) : [...entriesOf(typeKey)].sort(byDateDesc);
+  return limit ? list.slice(0, limit) : list;
 }
 
-export function latestPosts(limit?: number): Entry[] {
-  const posts = [...getContent().posts].sort(byDateDesc);
-  return limit ? posts.slice(0, limit) : posts;
+export const latestPosts = (limit?: number) => latest("post", limit);
+
+/**
+ * Announcements to show in the banner: started (date ≤ today) and not ended. Dates are
+ * checked when the site is built; rebuild.yml also rebuilds daily so they expire on time.
+ */
+export function activeAnnouncements(): Entry[] {
+  const t = today();
+  return Object.values(TYPES)
+    .filter((type) => type.banner)
+    .flatMap((type) => entriesOf(type.key))
+    .filter((e) => (e.date ?? "") <= t && (e.endDate ?? "9999") >= t)
+    .sort(byDateDesc);
+}
+
+/** Body HTML, or the summary as a paragraph when there is no body. */
+export function bodyHtml(entry: Entry): string {
+  if (entry.content) return fixContentLinks(entry.content);
+  const text = String(entry.description ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  return text ? `<p>${text}</p>` : "";
 }
 
 /**

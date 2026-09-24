@@ -286,3 +286,10 @@ h3 { font-size: 1.25rem; }
 .footer-note { font-size: 0.85rem; }
 .footer-rich address { font-style: normal; margin-bottom: 0.75rem; }
 .footer-contacts { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.3rem; }
+
+/* Announcement banner (homepage) */
+.announcements { background: var(--band-bg); color: var(--band-text); padding: 0.85rem 0; }
+.announcements ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.announcements a { color: var(--band-accent); }
+.announcements a:hover { color: var(--band-text); }
+.announcements span { color: var(--band-muted); }

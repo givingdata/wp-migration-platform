@@ -52,10 +52,10 @@ the steps for growing without rebuilding what exists.
 3. **Cloudflare account limits.** Each client uses a Worker, a KV namespace, an R2 bucket
    and two Pages projects; the Pages project limit (about 100 per account unless raised)
    is reached first. The central admin removes one Pages project and the Worker per client.
-4. **Generic content types (planned).** The staff form, the Worker's Claude prompt and the
-   site still offer the three types from the first client (an art gallery): Exhibition,
-   Event and Post. Most clients don't have exhibitions (Cinderella Project has none), and
-   staff need other kinds of update. Plan:
+4. **Generic content types (done 2026-09-24; `docs/CONTENT_TYPES.md`).** The form, Worker and
+   site used to offer the first client's types (Exhibition, Event, Post). Now each client's types
+   come from `config/design-specs.json`, defaulting to News, Event and Announcement, with
+   Exhibition opt-in. The original plan:
    - Define each client's types in `config/design-specs.json` (label, fields, image shape,
      listing page, whether it shows on the homepage), so the form, the Worker and the site
      all read the same list and a client can add or hide types without code changes.
@@ -69,6 +69,15 @@ the steps for growing without rebuilding what exists.
    Touches: `config/design-specs.json`, `form/` (labels and fields), `worker/src/claude.js`
    (prompt per type), `worker/src/github.js`, `site/src/lib/content.ts`, the
    `exhibitions`/`events` pages and layouts, and the export's type mapping.
+
+## Edit module (built 2026-09-24)
+
+`lib/edit/` (see its README): list, get, create, update with a version check, delete to
+`trash.json` and restore. The staff form's **Edit existing** mode uses it through the Worker.
+Storage is a pluggable **store** (GitHub `content.json` today), which is the connector point for
+a future lightweight content platform or database: a new store implements `read`/`write`, and
+the form, dashboard and Claude routes below keep working. Still to do: a dashboard Edit page
+(can reuse the Worker routes), per-entry history ("restore an earlier version") from git.
 
 ## Future option: Claude edits the site
 

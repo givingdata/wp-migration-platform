@@ -3,15 +3,22 @@
 //   POST /submit        multipart form → validate → R2 images → Claude → KV → GitHub commit
 //   GET  /content/:id   submission record from KV (auth required)
 //   GET  /content       recent submissions (auth required)
-//   GET  /specs         public design specs (lets the form show image rules)
+//   GET  /specs         public design specs (content types, image rules) for the form
 //   GET  /health
+//   /entries, /trash    staff editing: see edit-routes.js
 //
 // See worker/README.md for the full API contract.
-import specs from "../../config/design-specs.json";
+import specs from "../../config/design-specs.json" with { type: "json" };
 import { authenticate, AuthError, safeEqual } from "./auth.js";
 import { structureContent, ClaudeError } from "./claude.js";
 import { storeImage, saveSubmission, getSubmission, listSubmissions } from "./cloudflare.js";
-import { commitEntry } from "./github.js";
+import { editorFor, GitHubError } from "./content.js";
+import { handleEditRoute } from "./edit-routes.js";
+import { contentTypes } from "../../lib/content-types.js";
+import { EditError, StaleError } from "../../lib/edit/index.js";
+
+const TYPES = contentTypes(specs);
+const ENABLED = Object.keys(TYPES).filter((k) => TYPES[k].enabled);
 
 const MAX_TEXT = { title: 200, description: 20000, other: 2000 };
 const RESERVED_FIELDS = new Set(["type", "title", "description", "date", "image"]);
@@ -30,7 +37,7 @@ function corsHeaders(request, env) {
   const allow = origin && (allowed.includes("*") || allowed.includes(origin)) ? origin : allowed[0] || "";
   return {
     ...(allow ? { "Access-Control-Allow-Origin": allow } : {}),
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Signature, X-Timestamp",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -42,16 +49,6 @@ function json(body, status, request, env) {
     status,
     headers: { "Content-Type": "application/json; charset=utf-8", ...corsHeaders(request, env) },
   });
-}
-
-function slugify(text) {
-  return String(text || "")
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
 }
 
 /** Parse and validate the multipart body. Returns { submission, imageFile }. */
@@ -73,8 +70,8 @@ async function parseSubmission(request, rawBody) {
   };
 
   const type = text("type");
-  const typeSpec = specs.contentTypes[type];
-  if (!typeSpec) errors.type = `Must be one of: ${Object.keys(specs.contentTypes).join(", ")}`;
+  const typeSpec = ENABLED.includes(type) ? TYPES[type] : null;
+  if (!typeSpec) errors.type = `Must be one of: ${ENABLED.join(", ")}`;
 
   const title = text("title");
   if (!title) errors.title = "Required";
@@ -87,12 +84,14 @@ async function parseSubmission(request, rawBody) {
   const date = text("date");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) errors.date = "Required, format YYYY-MM-DD";
 
-  // Any other declared field for this type (endDate, time, location, author, …)
+  // Any other declared field for this type (endDate, time, location, author, linkUrl, …)
   const fields = {};
   for (const name of typeSpec?.fields || []) {
     if (RESERVED_FIELDS.has(name)) continue;
     const v = text(name);
     if (v.length > MAX_TEXT.other) errors[name] = `Max ${MAX_TEXT.other} characters`;
+    else if (name === "linkUrl" && v && !/^(https?:\/\/|\/)\S*$/i.test(v)) errors[name] = "Must start with https:// (or / for a page on this site)";
+    else if (name === "endDate" && v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) errors[name] = "Format YYYY-MM-DD";
     else if (v) fields[name] = v;
   }
 
@@ -136,8 +135,7 @@ async function handleSubmit(request, env) {
   const structured = await structureContent(env, submission, typeSpec);
   const entry = {
     id,
-    slug: slugify(structured.slug || structured.title) || id,
-    type: submission.type,
+    slug: structured.slug || structured.title,
     title: structured.title || submission.title,
     description: structured.description,
     content: structured.content,
@@ -150,6 +148,8 @@ async function handleSubmit(request, env) {
     time: structured.time,
     location: structured.location,
     author: structured.author,
+    // Links are used exactly as typed, never rewritten by Claude.
+    linkUrl: submission.fields.linkUrl ?? null,
     tags: structured.tags || [],
     source: "form",
     createdAt: now,
@@ -161,8 +161,10 @@ async function handleSubmit(request, env) {
 
   // 4. GitHub commit → triggers site rebuild
   try {
-    const commit = await commitEntry(env, entry);
-    Object.assign(record, { status: "committed", commit, updatedAt: new Date().toISOString() });
+    const saved = await editorFor(env).create(submission.type, entry, { message: `content: ${typeSpec.label.toLowerCase()} "${entry.title}" via form\n\nSubmission ${id}` });
+    Object.assign(entry, saved.entry);
+    const commit = saved.commit;
+    Object.assign(record, { status: "committed", entry, commit, updatedAt: new Date().toISOString() });
     await saveSubmission(env, record);
   } catch (e) {
     console.error("GitHub commit failed", id, e.message);
@@ -220,6 +222,8 @@ export default {
         const { status, body } = await handleSubmit(request, env);
         return json(body, status, request, env);
       }
+      const edit = await handleEditRoute(request, env, () => editorFor(env));
+      if (edit) return json(edit.body, edit.status, request, env);
       if (pathname === "/content" && request.method === "GET") {
         await requireApiKey(request, env);
         return json({ success: true, items: await listSubmissions(env) }, 200, request, env);
@@ -233,9 +237,10 @@ export default {
       }
       throw new HttpError("Not found", 404);
     } catch (e) {
-      const status = e instanceof HttpError || e instanceof AuthError || e instanceof ClaudeError ? e.status : 500;
+      const known = [HttpError, AuthError, ClaudeError, EditError, StaleError].some((k) => e instanceof k);
+      const status = known ? e.status : e instanceof GitHubError ? 502 : 500;
       if (status >= 500) console.error(e.stack || e.message);
-      const message = status >= 500 && !(e instanceof ClaudeError) ? "Internal error" : e.message;
+      const message = e instanceof GitHubError ? "Couldn't reach the site's content on GitHub; try again in a minute" : status >= 500 && !(e instanceof ClaudeError) ? "Internal error" : e.message;
       return json({ success: false, error: message, ...(e.details ? { fields: e.details } : {}) }, status, request, env);
     }
   },

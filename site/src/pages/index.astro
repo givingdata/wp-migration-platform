@@ -2,7 +2,8 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Card from "../components/Card.astro";
 import Image from "../components/Image.astro";
-import { currentExhibitions, upcomingEvents, latestPosts, urlFor, formatRange, excerpt, getFrontPage, fixContentLinks } from "../lib/content";
+import AnnouncementBanner from "../components/AnnouncementBanner.astro";
+import { upcoming, latest, urlFor, formatRange, excerpt, getFrontPage, fixContentLinks, TYPES } from "../lib/content";
 import { SITE } from "../lib/site";
 import { pageSections, sectionsDescription } from "../lib/sections";
 import Sections from "../components/sections/Sections.astro";
@@ -10,17 +11,26 @@ import Sections from "../components/sections/Sections.astro";
 // A site migrated with a static WordPress homepage keeps that page as its homepage.
 const frontPage = getFrontPage();
 
-const exhibitions = currentExhibitions();
-const events = upcomingEvents().slice(0, 6);
-const posts = latestPosts(6);
+// Galleries lead with their current exhibition; otherwise a row of cards per content type
+// marked "homepage": true in design-specs (news, upcoming events, …).
+const exhibitions = upcoming("exhibition");
 const featured = exhibitions[0];
+const rows = Object.values(TYPES)
+  .filter((t) => t.listing && (t.homepage || t.key === "exhibition"))
+  .map((t) => {
+    const listing = t.listing as { path: string; title: string; upcoming?: boolean; currentLabel?: string };
+    const items = t.key === "exhibition" ? exhibitions.slice(1, 4) : latest(t.key, 6);
+    const title = listing.upcoming ? `${listing.currentLabel ?? "Upcoming"} ${listing.title.toLowerCase()}` : listing.title;
+    return { key: t.key, title: t.key === "post" ? "Latest news" : title, href: `/${listing.path}/`, all: `All ${listing.title.toLowerCase()}`, items };
+  })
+  .filter((r) => r.items.length);
 // sections.json can build the homepage from sections instead (optionally with the migrated content).
 const built = pageSections("/");
 const firstIsHero = built?.sections[0]?.type === "hero";
-const rest = exhibitions.slice(1, 4);
 ---
 
 <BaseLayout seo={built?.seo || frontPage?.seo} description={(built && sectionsDescription(built.sections)) || (frontPage ? excerpt(frontPage) || SITE.tagline : SITE.tagline)} sectioned={!!built}>
+  <AnnouncementBanner />
   {built ? (
     <>
       {!firstIsHero && <h1 class="visually-hidden">{SITE.name}</h1>}
@@ -54,24 +64,10 @@ const rest = exhibitions.slice(1, 4);
     </section>
   )}
 
-  {!built && !frontPage && rest.length > 0 && (
-    <section class="wrap section" aria-labelledby="exh-h">
-      <div class="section-head"><h2 id="exh-h">Exhibitions</h2><a href="/exhibitions/">All exhibitions</a></div>
-      <div class="grid">{rest.map((e) => <Card entry={e} />)}</div>
+  {!built && !frontPage && rows.map((row) => (
+    <section class="wrap section" aria-labelledby={`${row.key}-h`}>
+      <div class="section-head"><h2 id={`${row.key}-h`}>{row.title}</h2><a href={row.href}>{row.all}</a></div>
+      <div class="grid">{row.items.map((e) => <Card entry={e} />)}</div>
     </section>
-  )}
-
-  {!built && !frontPage && events.length > 0 && (
-    <section class="wrap section" aria-labelledby="ev-h">
-      <div class="section-head"><h2 id="ev-h">Upcoming events</h2><a href="/events/">All events</a></div>
-      <div class="grid">{events.map((e) => <Card entry={e} />)}</div>
-    </section>
-  )}
-
-  {!built && !frontPage && posts.length > 0 && (
-    <section class="wrap section" aria-labelledby="news-h">
-      <div class="section-head"><h2 id="news-h">Latest news</h2><a href="/news/">All news</a></div>
-      <div class="grid">{posts.map((e) => <Card entry={e} />)}</div>
-    </section>
-  )}
+  ))}
 </BaseLayout>

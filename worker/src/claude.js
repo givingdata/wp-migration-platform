@@ -16,7 +16,7 @@ function entrySchema() {
       description: { type: "string", description: "One or two sentence plain-text summary (max ~300 characters) for listings and meta description" },
       content: { type: "string", description: "Full body as simple semantic HTML (<p>, <h2>, <h3>, <ul>, <ol>, <li>, <strong>, <em>, <a href>). No inline styles, scripts, or images." },
       date: { type: "string", description: "Start or publish date, YYYY-MM-DD" },
-      endDate: { ...nullableString, description: "End date YYYY-MM-DD for exhibitions/multi-day events, else null" },
+      endDate: { ...nullableString, description: "End date YYYY-MM-DD if given (multi-day events, or the last day an announcement shows), else null" },
       time: { ...nullableString, description: "Human-readable time, e.g. '6:00–9:00 pm', else null" },
       location: { ...nullableString, description: "Venue or address if given, else null" },
       author: { ...nullableString, description: "Author name for posts if given, else null" },
@@ -39,7 +39,7 @@ function systemPrompt(siteName) {
 /**
  * @param {object} env Worker env (ANTHROPIC_API_KEY or CLAUDE_API_KEY, optional CLAUDE_MODEL, SITE_NAME)
  * @param {object} submission { type, title, description, date, fields: {extra form fields}, hasImage }
- * @param {object} typeSpec design-specs contentTypes[type]
+ * @param {object} typeSpec content type (lib/content-types.js): label, fields, optional prompt
  * @returns {Promise<object>} structured entry matching entrySchema()
  */
 export async function structureContent(env, submission, typeSpec) {
@@ -48,7 +48,7 @@ export async function structureContent(env, submission, typeSpec) {
 
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
   const userPayload = {
-    contentType: submission.type,
+    contentType: typeSpec.label || submission.type,
     expectedFields: typeSpec.fields,
     title: submission.title,
     date: submission.date,
@@ -64,11 +64,11 @@ export async function structureContent(env, submission, typeSpec) {
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: entrySchema() } },
-    system: systemPrompt(env.SITE_NAME || "organization"),
+    system: [systemPrompt(env.SITE_NAME || "organization"), typeSpec.prompt].filter(Boolean).join("\n\n"),
     messages: [
       {
         role: "user",
-        content: `Structure this ${submission.type} submission:\n\n<submission>\n${JSON.stringify(userPayload, null, 2)}\n</submission>`,
+        content: `Structure this ${(typeSpec.label || submission.type).toLowerCase()} submission:\n\n<submission>\n${JSON.stringify(userPayload, null, 2)}\n</submission>`,
       },
     ],
   });

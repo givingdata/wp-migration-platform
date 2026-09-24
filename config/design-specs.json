@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "site": "example.org",
   "breakpoints": [300, 600, 800, 1200],
   "image": {
@@ -9,26 +9,46 @@
     "acceptedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
   },
   "contentTypes": {
-    "exhibition": {
-      "aspectRatio": "1.5:1",
-      "minWidth": 300,
-      "maxWidth": 1200,
-      "crop": "center",
-      "fields": ["title", "description", "date", "endDate", "location", "image"]
-    },
-    "event": {
-      "aspectRatio": "1:1",
-      "minWidth": 300,
-      "maxWidth": 1200,
-      "crop": "center",
-      "fields": ["title", "description", "date", "time", "location", "image"]
-    },
     "post": {
+      "label": "News",
+      "collection": "posts",
+      "layout": "article",
+      "listing": { "path": "news", "title": "News", "intro": "News and updates." },
+      "homepage": true,
+      "dateLabel": "Publish date",
       "aspectRatio": "16:9",
       "minWidth": 300,
       "maxWidth": 1200,
       "crop": "center",
       "fields": ["title", "description", "date", "author", "image"]
+    },
+    "event": {
+      "label": "Event",
+      "collection": "events",
+      "layout": "event",
+      "listing": { "path": "events", "title": "Events", "intro": "Upcoming and past events.", "upcoming": true, "currentLabel": "Upcoming", "pastLabel": "Past events" },
+      "homepage": true,
+      "dateLabel": "Event date",
+      "aspectRatio": "1:1",
+      "minWidth": 300,
+      "maxWidth": 1200,
+      "crop": "center",
+      "fields": ["title", "description", "date", "endDate", "time", "location", "image"]
+    },
+    "announcement": {
+      "label": "Announcement",
+      "collection": "announcements",
+      "layout": "article",
+      "listing": { "path": "announcements", "title": "Announcements" },
+      "banner": true,
+      "dateLabel": "Show from",
+      "fieldLabels": { "endDate": "Show until", "linkUrl": "Link for “Learn more”" },
+      "prompt": "Announcements are short notices (closures, deadlines, calls for volunteers). Keep the body to one to three short paragraphs.",
+      "aspectRatio": "16:9",
+      "minWidth": 300,
+      "maxWidth": 1200,
+      "crop": "center",
+      "fields": ["title", "description", "date", "endDate", "linkUrl", "image"]
     }
   }
 }

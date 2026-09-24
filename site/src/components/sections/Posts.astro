@@ -2,10 +2,11 @@
 import type { Posts } from "../../lib/sections";
 import Heading from "./Heading.astro";
 import Card from "../Card.astro";
-import { latestPosts } from "../../lib/content";
+import { latest } from "../../lib/content";
 interface Props { s: Posts }
 const { s } = Astro.props;
-const posts = latestPosts(s.count ?? 3);
+// Latest news by default; "contentType": "event" (etc.) lists another type.
+const posts = latest(s.contentType ?? "post", s.count ?? 3);
 ---
 {posts.length > 0 && (
   <section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>

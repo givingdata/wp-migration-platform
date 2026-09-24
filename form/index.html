@@ -46,7 +46,7 @@
     .field { margin-bottom: 1.25rem; }
     .hint { color: var(--muted); font-size: .9rem; margin: .25rem 0 0; }
     .optional { font-weight: 400; color: var(--muted); }
-    input[type="text"], input[type="date"], textarea {
+    input[type="text"], input[type="date"], input[type="url"], input[type="search"], textarea {
       width: 100%; padding: .65rem .75rem; font: inherit; color: inherit;
       background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     }
@@ -106,6 +106,40 @@
     .status.error { background: var(--error-bg); color: var(--error); }
     .status ul { margin: .5rem 0 0; padding-left: 1.25rem; }
     .status a { color: inherit; }
+    .modes { display: flex; gap: .5rem; margin: 0 0 1.25rem; }
+    .modes button { background: transparent; color: var(--accent); }
+    .modes button[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .panel form { border: 0; padding: 0; background: none; }
+    .toolbar-row { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .toolbar-row input { flex: 1; }
+    .entry-group h2 { font-size: 1rem; margin: 1.25rem 0 .4rem; color: var(--muted); }
+    .entry-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+    .entry-list li { border-bottom: 1px solid var(--border); display: flex; gap: .75rem; align-items: center; justify-content: space-between; padding: .55rem 0; }
+    .entry-list .meta { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+    .entry-list button.link { text-align: left; font-weight: 500; }
+    button.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; font-weight: 500; }
+    button.danger { background: transparent; border-color: var(--error); color: var(--error); }
+    button.small { padding: .4rem .9rem; font-size: .9rem; }
+    .back-row { margin: 0 0 .75rem; }
+    .label { font-weight: 600; display: block; margin-bottom: .35rem; }
+    .eyebrow { margin: 0 0 .75rem; font-weight: 600; color: var(--accent); }
+    textarea.short { min-height: 4.5rem; }
+    .actions.spread { justify-content: space-between; margin-top: .5rem; }
+    .editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .editor-bar { display: flex; flex-wrap: wrap; gap: .25rem; padding: .4rem; background: var(--bg); border-bottom: 1px solid var(--border); }
+    .editor-bar button { padding: .3rem .6rem; font-size: .85rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+    .editor-bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+    .editor-area { min-height: 16rem; max-height: 60vh; overflow: auto; padding: .75rem; width: 100%; border: 0; border-radius: 0; }
+    .editor-area:focus-visible { outline-offset: -3px; }
+    .editor-area.code { font: .85rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 16rem; }
+    .prose img { max-width: 100%; height: auto; }
+    .prose :first-child { margin-top: 0; }
+    .note { background: var(--bg); border-radius: 8px; padding: .6rem .75rem; margin: 0 0 1rem; font-size: .9rem; }
+    dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); max-width: 30rem; width: calc(100% - 2rem); padding: 1.5rem; }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    dialog h2 { margin-top: 0; }
+    dialog input { margin-bottom: 1rem; }
     .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   </style>
 </head>
@@ -113,18 +147,18 @@
   <main>
     <header>
       <p class="eyebrow" id="site-name"></p>
-      <h1>Submit Content</h1>
-      <p>Add an exhibition, event or post to the website. It will be live within a few minutes.</p>
+      <h1>Website content</h1>
+      <p id="intro">Add something new to the website, or change what's already there. Changes are live within a few minutes.</p>
+      <div class="modes" role="tablist" aria-label="What do you want to do?">
+        <button type="button" role="tab" id="tab-add" aria-selected="true" aria-controls="content-form">Add new</button>
+        <button type="button" role="tab" id="tab-edit" aria-selected="false" aria-controls="edit-mode">Edit existing</button>
+      </div>
     </header>
 
-    <form id="content-form" novalidate>
+    <form id="content-form" novalidate role="tabpanel" aria-labelledby="tab-add">
       <fieldset>
         <legend>What are you adding?</legend>
-        <div class="types" id="type-options">
-          <label><input type="radio" name="type" value="exhibition" required> Exhibition</label>
-          <label><input type="radio" name="type" value="event"> Event</label>
-          <label><input type="radio" name="type" value="post" checked> Post</label>
-        </div>
+        <div class="types" id="type-options"><!-- filled from the content types in /specs --></div>
         <p class="error-text" id="type-error" role="alert"></p>
       </fieldset>
 
@@ -148,7 +182,7 @@
           <p class="error-text" id="date-error"></p>
         </div>
         <div class="field" data-field="endDate" hidden>
-          <label for="endDate">End date <span class="optional">(optional)</span></label>
+          <label for="endDate"><span data-label="endDate">End date</span> <span class="optional">(optional)</span></label>
           <input type="date" id="endDate" name="endDate" aria-describedby="endDate-error">
           <p class="error-text" id="endDate-error"></p>
         </div>
@@ -166,6 +200,12 @@
       <div class="field" data-field="author" hidden>
         <label for="author">Author <span class="optional">(optional)</span></label>
         <input type="text" id="author" name="author" maxlength="200" autocomplete="name">
+      </div>
+
+      <div class="field" data-field="linkUrl" hidden>
+        <label for="linkUrl"><span data-label="linkUrl">Link</span> <span class="optional">(optional)</span></label>
+        <input type="url" id="linkUrl" name="linkUrl" maxlength="2000" placeholder="https://" aria-describedby="linkUrl-error">
+        <p class="error-text" id="linkUrl-error"></p>
       </div>
 
       <div class="field">
@@ -203,6 +243,121 @@
 
       <div id="status" role="status" aria-live="polite" tabindex="-1"></div>
     </form>
+
+    <section id="edit-mode" class="panel" role="tabpanel" aria-labelledby="tab-edit" hidden>
+      <div id="edit-browse">
+        <div class="toolbar-row">
+          <label class="visually-hidden" for="edit-search">Search</label>
+          <input type="search" id="edit-search" placeholder="Search by title" autocomplete="off">
+          <button type="button" class="secondary" id="show-trash">Deleted items</button>
+        </div>
+        <div id="browse-status" role="status" aria-live="polite" tabindex="-1"></div>
+        <div id="edit-list" aria-live="polite"><p class="hint">Loading…</p></div>
+      </div>
+
+      <form id="edit-form" novalidate hidden>
+        <p class="back-row"><button type="button" class="link" id="edit-back">← All content</button></p>
+        <p class="eyebrow" id="edit-kind"></p>
+        <div id="edit-notes"></div>
+
+        <div class="field">
+          <label for="e-title">Title</label>
+          <input type="text" id="e-title" name="title" maxlength="200" required aria-describedby="e-title-hint e-title-error">
+          <p class="hint" id="e-title-hint">Changing the title doesn't change the page's web address, so links to it keep working.</p>
+          <p class="error-text" id="e-title-error"></p>
+        </div>
+
+        <div class="field">
+          <label for="e-description">Summary <span class="optional">(shown in listings and search results)</span></label>
+          <textarea id="e-description" name="description" maxlength="1000" rows="3" class="short" aria-describedby="e-description-error"></textarea>
+          <p class="error-text" id="e-description-error"></p>
+        </div>
+
+        <div class="row">
+          <div class="field" data-edit-field="date" hidden>
+            <label for="e-date" id="e-date-label">Date</label>
+            <input type="date" id="e-date" name="date" aria-describedby="e-date-error">
+            <p class="error-text" id="e-date-error"></p>
+          </div>
+          <div class="field" data-edit-field="endDate" hidden>
+            <label for="e-endDate"><span data-edit-label="endDate">End date</span> <span class="optional">(optional)</span></label>
+            <input type="date" id="e-endDate" name="endDate" aria-describedby="e-endDate-error">
+            <p class="error-text" id="e-endDate-error"></p>
+          </div>
+          <div class="field" data-edit-field="time" hidden>
+            <label for="e-time">Time <span class="optional">(optional)</span></label>
+            <input type="text" id="e-time" name="time" maxlength="200">
+          </div>
+        </div>
+        <div class="field" data-edit-field="location" hidden>
+          <label for="e-location">Location <span class="optional">(optional)</span></label>
+          <input type="text" id="e-location" name="location" maxlength="500">
+        </div>
+        <div class="field" data-edit-field="author" hidden>
+          <label for="e-author">Author <span class="optional">(optional)</span></label>
+          <input type="text" id="e-author" name="author" maxlength="200">
+        </div>
+        <div class="field" data-edit-field="linkUrl" hidden>
+          <label for="e-linkUrl"><span data-edit-label="linkUrl">Link</span> <span class="optional">(optional)</span></label>
+          <input type="url" id="e-linkUrl" name="linkUrl" maxlength="2000" placeholder="https://" aria-describedby="e-linkUrl-error">
+          <p class="error-text" id="e-linkUrl-error"></p>
+        </div>
+
+        <div class="field">
+          <span class="label" id="e-content-label">Text</span>
+          <div class="editor">
+            <div class="editor-bar" role="toolbar" aria-label="Formatting" aria-controls="e-content">
+              <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+              <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+              <button type="button" data-cmd="h2" title="Heading">H2</button>
+              <button type="button" data-cmd="h3" title="Smaller heading">H3</button>
+              <button type="button" data-cmd="p" title="Normal text">¶</button>
+              <button type="button" data-cmd="insertUnorderedList" title="Bulleted list">• List</button>
+              <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+              <button type="button" data-cmd="link" title="Add link">Link</button>
+              <button type="button" data-cmd="unlink" title="Remove link">Unlink</button>
+              <button type="button" data-cmd="html" id="toggle-html" aria-pressed="false" title="Edit the HTML directly">HTML</button>
+            </div>
+            <div id="e-content" class="editor-area prose" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="e-content-label"></div>
+            <textarea id="e-content-html" class="editor-area code" hidden aria-label="Text as HTML"></textarea>
+          </div>
+          <p class="hint">Pasted text keeps its paragraphs but not its fonts or colours.</p>
+        </div>
+
+        <div class="field" data-edit-field="imageAlt" hidden>
+          <label for="e-imageAlt">Image description <span class="optional">(for screen readers)</span></label>
+          <input type="text" id="e-imageAlt" name="imageAlt" maxlength="300">
+        </div>
+
+        <div class="actions spread">
+          <button type="submit" id="edit-save">Save changes</button>
+          <button type="button" class="danger" id="edit-delete">Delete…</button>
+        </div>
+        <div id="edit-status" role="status" aria-live="polite" tabindex="-1"></div>
+      </form>
+
+      <div id="trash-view" hidden>
+        <p class="back-row"><button type="button" class="link" id="trash-back">← All content</button></p>
+        <h2>Deleted items</h2>
+        <p class="hint">Deleted items are kept here and can be put back on the site.</p>
+        <div id="trash-list" aria-live="polite"></div>
+        <div id="trash-status" role="status" aria-live="polite" tabindex="-1"></div>
+      </div>
+    </section>
+
+    <dialog id="delete-dialog" aria-labelledby="delete-title">
+      <form method="dialog">
+        <h2 id="delete-title">Delete this?</h2>
+        <p id="delete-what"></p>
+        <p>It comes off the website within a few minutes. You can put it back from <strong>Deleted items</strong>.</p>
+        <label for="delete-reason">Reason <span class="optional">(optional)</span></label>
+        <input type="text" id="delete-reason" maxlength="500">
+        <div class="actions spread">
+          <button value="cancel" class="secondary">Keep it</button>
+          <button value="delete" class="danger" id="delete-confirm">Delete</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 
   <script type="module" src="form-handler.js"></script>

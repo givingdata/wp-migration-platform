@@ -1,7 +1,7 @@
 ---
 // Main navigation. Uses the menu copied from WordPress when there is one (with
 // dropdowns); otherwise section listings plus top-level pages.
-import { getContent, navPages, urlFor, resolveMenuUrl, type MenuItem } from "../lib/content";
+import { getContent, navPages, urlFor, resolveMenuUrl, LISTED_TYPES, entriesOf, type MenuItem } from "../lib/content";
 import { siteSettings } from "../lib/sections";
 
 interface NavItem {
@@ -17,9 +17,10 @@ const fromMenu = (items: MenuItem[]): NavItem[] =>
 const items: NavItem[] = content.menu.length
   ? fromMenu(content.menu)
   : [
-      ...(content.exhibitions.length ? [{ label: "Exhibitions", href: "/exhibitions/", children: [] }] : []),
-      ...(content.events.length ? [{ label: "Events", href: "/events/", children: [] }] : []),
-      ...(content.posts.length ? [{ label: "News", href: "/news/", children: [] }] : []),
+      ...LISTED_TYPES.filter((t) => entriesOf(t.key).length && t.listing).map((t) => {
+        const listing = t.listing as { path: string; title: string };
+        return { label: listing.title, href: `/${listing.path}/`, children: [] };
+      }),
       ...navPages().map((p) => ({ label: p.title, href: urlFor(p), children: [] })),
     ];
 

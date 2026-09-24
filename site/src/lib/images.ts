@@ -1,13 +1,14 @@
 // Responsive image URLs from config/design-specs.json.
 import specs from "../../../config/design-specs.json";
+import { TYPES } from "./content";
 
-export type ImageType = keyof typeof specs.contentTypes | "page";
+/** A content type key ("post", "event", …) or "page". */
+export type ImageType = string;
 
 export const BREAKPOINTS: number[] = specs.breakpoints;
 
 export function ratioFor(type: string): number {
-  const spec = (specs.contentTypes as Record<string, { aspectRatio: string }>)[type];
-  const [w, h] = (spec?.aspectRatio ?? "16:9").split(":").map(Number);
+  const [w, h] = (TYPES[type]?.aspectRatio ?? "16:9").split(":").map(Number);
   return w > 0 && h > 0 ? w / h : 16 / 9;
 }
 

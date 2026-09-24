@@ -25,7 +25,7 @@ export interface Cards extends Base { type: "cards"; intro?: string; items: { ti
 export interface Quote extends Base { type: "quote"; text: string; by?: string; image?: Img }
 export interface Stories extends Base { type: "stories"; items: { quote: string; by: string; detail?: string }[] }
 export interface Text extends Base { type: "text"; paragraphs?: string[]; list?: string[]; buttons?: Button[]; image?: Img }
-export interface Posts extends Base { type: "posts"; count?: number; link?: Button }
+export interface Posts extends Base { type: "posts"; contentType?: string; count?: number; link?: Button }
 
 export type Section = Hero | Stats | Split | Cards | Quote | Stories | Text | Posts;
 export const SECTION_TYPES = ["hero", "stats", "split", "cards", "quote", "stories", "text", "posts"] as const;

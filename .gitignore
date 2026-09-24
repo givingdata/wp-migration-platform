@@ -15,3 +15,6 @@ dist/
 
 # Hand-off folder for instruction files from the cloud session (Mac mini only)
 access/
+
+# Section drafts for review (scripts/draft-sections.mjs)
+sections.draft.*

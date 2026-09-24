@@ -76,7 +76,7 @@ export function buildRules({ map, csv = [], media = [], skipped = [], builtPaths
     if (prefix && n >= d.total * 0.8) add(`/wp-content/${folder}/*`, `${prefix}:splat`, "WordPress files → media");
   }
 
-  const listing = map.hasNews ? "/news/" : "/";
+  const listing = map.hasNews ? map.newsPath ?? "/news/" : "/";
   // Entries the new site leaves out (e.g. untitled posts) go to the listing rather than a 404.
   for (const link of skipped) {
     const old = pathOf(link);
@@ -131,7 +131,7 @@ export default function redirects() {
         const contentFile = process.env.CONTENT_PATH || path.join(root, "content.json");
         const content = fs.existsSync(contentFile) ? JSON.parse(fs.readFileSync(contentFile, "utf8")) : {};
         const built = new Set(map.entries.map((e) => e.link).filter(Boolean));
-        const skipped = ["pages", "posts", "events", "exhibitions"].flatMap((k) => content[k] || []).map((e) => e?.link).filter((l) => l && !built.has(l));
+        const skipped = (map.collections ?? ["pages", "posts", "events", "exhibitions"]).flatMap((k) => content[k] || []).map((e) => e?.link).filter((l) => l && !built.has(l));
 
         const rules = buildRules({ map, csv, media: content.media || [], skipped, builtPaths: builtPathsIn(out) });
         fs.writeFileSync(path.join(out, "_redirects"), toRedirectsFile(rules));

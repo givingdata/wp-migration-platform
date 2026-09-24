@@ -1,9 +1,11 @@
 import config from "./config.js";
 import { signedMultipart } from "./signing.js";
+import { initEdit } from "./edit.js";
 
 const SUBMIT_TIMEOUT_MS = 120_000; // Claude + image processing can take a while
-const LABELS = { exhibition: "Exhibition", event: "Event", post: "Post" };
-const DATE_LABEL = { exhibition: "Opening date", event: "Event date", post: "Publish date" };
+// Used when the Worker's /specs can't be loaded and config.js has no designSpecs.
+const FALLBACK_TYPES = { post: { label: "News", aspectRatio: "16:9", minWidth: 300, maxWidth: 1200, fields: ["title", "description", "date", "author", "image"] } };
+const DEFAULT_FIELD_LABELS = { endDate: "End date", linkUrl: "Link" };
 
 const $ = (id) => document.getElementById(id);
 const form = $("content-form");
@@ -28,7 +30,7 @@ async function loadSpecs() {
 }
 
 function currentType() {
-  return form.elements.type.value || "post";
+  return form.elements.type?.value || Object.keys(specs?.contentTypes || FALLBACK_TYPES)[0];
 }
 
 function typeSpec() {
@@ -43,7 +45,7 @@ function parseRatio(ratio) {
 function describeSpec(type, spec) {
   const mb = Math.round((specs.image?.maxUploadBytes ?? 10485760) / 1048576);
   const kinds = (specs.image?.acceptedMimeTypes ?? []).map((m) => m.split("/")[1].toUpperCase()).join(", ");
-  return `${LABELS[type] || type} images: ${spec.aspectRatio} aspect ratio, at least ${spec.minWidth}px wide (up to ${spec.maxWidth}px is used). ${kinds}, max ${mb} MB.`;
+  return `${spec.label || type} images: ${spec.aspectRatio} aspect ratio, at least ${spec.minWidth}px wide (up to ${spec.maxWidth}px is used). ${kinds}, max ${mb} MB.`;
 }
 
 // ---- Type switching -------------------------------------------------------
@@ -52,10 +54,13 @@ function applyType() {
   const spec = typeSpec();
   if (!spec) return;
   const type = currentType();
-  document.querySelectorAll("[data-field]").forEach((el) => {
+  form.querySelectorAll("[data-field]").forEach((el) => {
     el.hidden = !spec.fields.includes(el.dataset.field);
   });
-  $("date-label").textContent = DATE_LABEL[type] || "Date";
+  form.querySelectorAll("[data-label]").forEach((el) => {
+    el.textContent = spec.fieldLabels?.[el.dataset.label] || DEFAULT_FIELD_LABELS[el.dataset.label] || el.dataset.label;
+  });
+  $("date-label").textContent = spec.dateLabel || "Date";
   $("image-spec").textContent = describeSpec(type, spec);
   if (imageMeta) renderPreview();
 }
@@ -149,7 +154,7 @@ function setFieldError(name, message) {
 }
 
 function clearErrors() {
-  for (const name of ["type", "title", "description", "date", "endDate", "image"]) setFieldError(name, "");
+  for (const name of ["type", "title", "description", "date", "endDate", "linkUrl", "image"]) setFieldError(name, "");
 }
 
 function validate() {
@@ -161,6 +166,10 @@ function validate() {
   const end = form.elements.endDate;
   if (!end.closest("[data-field]").hidden && end.value && form.elements.date.value && end.value < form.elements.date.value) {
     errors.endDate = "End date can't be before the start date.";
+  }
+  const link = form.elements.linkUrl;
+  if (!link.closest("[data-field]").hidden && link.value.trim() && !/^(https?:\/\/|\/)\S*$/i.test(link.value.trim())) {
+    errors.linkUrl = "Links start with https:// (or / for a page on this site).";
   }
   return errors;
 }
@@ -189,7 +198,7 @@ function buildFormData() {
   const fd = new FormData();
   fd.append("type", currentType());
   for (const name of ["title", "description", "date"]) fd.append(name, form.elements[name].value.trim());
-  document.querySelectorAll("[data-field]").forEach((wrapper) => {
+  form.querySelectorAll("[data-field]").forEach((wrapper) => {
     if (wrapper.hidden) return;
     const input = wrapper.querySelector("input, textarea");
     if (input?.value.trim()) fd.append(input.name, input.value.trim());
@@ -259,7 +268,7 @@ async function onSubmit(event) {
 
 async function init() {
   if (config.siteName) {
-    document.title = `Submit Content — ${config.siteName}`;
+    document.title = `Website content — ${config.siteName}`;
     $("site-name").textContent = config.siteName;
   }
   $("date").valueAsDate = new Date();
@@ -271,13 +280,13 @@ async function init() {
     submitBtn.disabled = false;
   }
 
-  // Only offer types the specs define.
-  if (specs) {
-    form.querySelectorAll('input[name="type"]').forEach((radio) => {
-      if (!specs.contentTypes[radio.value]) radio.closest("label").remove();
-    });
-  }
+  // One choice per content type (News, Event, Announcement, …).
+  if (!specs) specs = { contentTypes: FALLBACK_TYPES };
+  $("type-options").innerHTML = Object.entries(specs.contentTypes)
+    .map(([key, t], i) => `<label><input type="radio" name="type" value="${escapeHtml(key)}"${i === 0 ? " checked required" : ""}> ${escapeHtml(t.label || key)}</label>`)
+    .join("");
   applyType();
+  initEdit({ config, specs, escapeHtml });
 
   form.addEventListener("change", (e) => { if (e.target.name === "type") applyType(); });
   imageInput.addEventListener("change", () => handleFile(imageInput.files[0]));

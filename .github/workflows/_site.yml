@@ -33,7 +33,7 @@ jobs:
           test -f content.json || { echo "::error::content.json is missing — run wordpress_export.py and commit it"; exit 1; }
           node -e '
             const c = JSON.parse(require("fs").readFileSync("content.json", "utf8"));
-            const counts = ["exhibitions","events","posts","pages"].map(k => `${k}=${(c[k]||[]).length}`);
+            const counts = Object.keys(c).filter(k => Array.isArray(c[k]) && !["media","menu"].includes(k)).map(k => `${k}=${c[k].length}`);
             console.log("content.json:", counts.join(" "));
           '
 

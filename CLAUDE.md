@@ -6,7 +6,7 @@ private repo (`scripts/new-client.sh <slug>`) that holds that client's settings,
 where `scripts/deploy.sh` has set the `CLOUDFLARE_PAGES_PROJECT` variable.
 
 Moves a client's WordPress site to a static Astro site on Cloudflare Pages. Media lives in R2, and
-staff add content through a form → Cloudflare Worker (Claude tidies the text) → commit to
+staff add and edit content through a form → Cloudflare Worker (Claude tidies new text) → commit to
 `content.json` → GitHub Actions rebuild. See README.md for the architecture.
 
 ## How the scripts are used
@@ -27,6 +27,9 @@ settings file with `~/Documents/1WP/ops/provision.mjs` (or the dashboard's **Set
 ### Day to day: nothing to run
 
 Staff submit the form → the Worker structures the text with Claude, resizes the image into R2 and commits to `content.json` → `rebuild.yml` deploys → live in a few minutes.
+The form's **Edit existing** mode changes or deletes existing pages and entries the same way, through the
+Edit module (`lib/edit/`): one commit per change, deletes go to `trash.json` and **Deleted items → Put back**
+restores them. `rebuild.yml` also rebuilds daily so announcements expire and events move to "past".
 
 ### Changing the platform
 
@@ -35,7 +38,9 @@ Make generic fixes in the platform repo and push; then in each client folder run
 In a client repo, pushing redeploys whatever changed:
 - `site/` → site (`deploy-site.yml`)
 - `worker/` → Worker (`deploy-worker.yml`)
-- `config/design-specs.json` → both (aspect ratios, breakpoints, form fields)
+- `config/design-specs.json` → both (content types, aspect ratios, breakpoints, form fields; see `docs/CONTENT_TYPES.md`)
+- `lib/` → both (content types and the Edit module, shared by the Worker, site and form)
+- `form/` → staff form (`deploy-form.yml`)
 - `config/theme.json` → site (preset, colours, fonts, logo; designers follow `docs/DESIGN_HANDOFF.md`)
 - `config/site.json` → site (analytics tags, Search Console verification, default share image)
 - `redirects.csv` → site (your own 301s; the build adds automatic ones, see below)
@@ -47,7 +52,10 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Situation | Command |
 |---|---|
 | Bad change | `git revert <commit> && git push`, or **Rollback** in Pages/Workers → Deployments (`cd worker && npx wrangler rollback`) |
-| Remove/fix a published entry | Edit `content.json`, commit, push |
+| Remove/fix a published entry | Staff form → **Edit existing** (or edit `content.json`, commit, push) |
+| Undo a delete | Staff form → Edit existing → **Deleted items → Put back** (entries wait in `trash.json`) |
+| Add, rename or hide a content type (e.g. exhibitions for an arts client) | Edit `contentTypes` in `config/design-specs.json`, push (`docs/CONTENT_TYPES.md`) |
+| Draft sections for a page from its existing content | In the client folder: `CLAUDE_API_KEY=… node ../../platform/scripts/draft-sections.mjs --pages /,how-to-help` → review `sections.draft.md`/`.json` → `--merge` into `sections.json`, preview, push |
 | Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push |
 | Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
 | Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
@@ -69,4 +77,5 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 - CI builds fail on purpose if `content.json` is missing (so sample data never ships).
 - Redirects: the build writes `_redirects` (redirects.csv first, then moved pages, WordPress uploads/gallery → R2, archives/feeds → /news/, old sitemap names) and `wp-ids.json`; `functions/index.js` 301s old `/?p=123` links (the only Pages Function; it runs for `/` only). For manual deploys run `npx wrangler pages deploy site/dist …` from the repo root (not `worker/`) so `functions/` is included.
 - The staff form's API key is visible in the browser: keep the form behind Cloudflare Access.
-- Tests: `cd worker && npm test`; `node --test site/redirects.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
+- Tests: `cd worker && npm test` (also runs `lib/edit` tests); `node --test site/redirects.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
+- Default content types are News (key `post`), Event and Announcement. Keys, not labels, decide where entries are stored, so don't rename a key once a client has entries of it.

@@ -16,17 +16,17 @@ Looked up in order: `$CONTENT_PATH` (absolute, or relative to `site/`), `../cont
 (with a warning); builds with `CI` or `REQUIRE_CONTENT` set fail instead, so sample content can
 never be deployed.
 
-Collections read: `exhibitions`, `events`, `posts`, `pages` (see the root README for the entry
-format). Entries without `slug` or `title` are skipped.
+Collections read: `pages` plus one per content type (`posts`, `events`, `announcements`, and
+`exhibitions` when a client has them; see `docs/CONTENT_TYPES.md`). Entries without `slug` or
+`title` are skipped.
 
 ## Routes
 
 | Path | Source |
 | --- | --- |
-| `/` | Featured current exhibition, other exhibitions, upcoming events, latest news |
-| `/exhibitions/`, `/events/` | Current/upcoming and past, split on `endDate` (or `date`) vs today |
-| `/news/` | All posts, newest first |
-| `/<slug>/` | Every entry — `src/pages/[...slug].astro` picks the layout by `type` |
+| `/` | The WordPress homepage or `sections.json` if there is one; otherwise a featured exhibition (if any) and a row per type marked `homepage`. Current announcements show in a banner on top |
+| `/news/`, `/events/`, `/announcements/`, … | One listing per content type (`src/pages/[listing].astro`); `upcoming` types split into current and past on `endDate` (or `date`) vs the build date |
+| `/<slug>/` | Every entry — `src/pages/[...slug].astro` picks the layout from its type's `layout` |
 | `/sitemap-index.xml`, `/robots.txt`, `/404.html` | Generated |
 
 Slugs keep their WordPress URLs where possible (`/boutique-day-2020/`). If two entries share a
@@ -37,9 +37,9 @@ slug, or a slug clashes with a built-in route, later ones are namespaced by type
 
 | Layout | Used for | Image |
 | --- | --- | --- |
-| `Exhibition.astro` | `exhibition` | Full-width hero, 1.5:1 |
-| `Event.astro` | `event` | Square 1:1 beside the details (date, time, location) |
-| `Post.astro` | `post`, `page` | Featured image 16:9; pages omit date/author |
+| `Exhibition.astro` | `layout: "exhibition"` | Full-width hero, 1.5:1 |
+| `Event.astro` | `layout: "event"` | Square 1:1 beside the details (date, time, location) |
+| `Post.astro` | `layout: "article"` (news, announcements) and pages | Featured image 16:9; pages omit date/author; a "Learn more" button when there's a `linkUrl` |
 
 Aspect ratios and breakpoints come from `config/design-specs.json`.
 

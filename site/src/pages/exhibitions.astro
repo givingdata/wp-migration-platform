@@ -1,9 +1,0 @@
----
-import BaseLayout from "../layouts/BaseLayout.astro";
-import Listing from "../components/Listing.astro";
-import { currentExhibitions, pastExhibitions } from "../lib/content";
----
-
-<BaseLayout title="Exhibitions" description="Current, upcoming and past exhibitions.">
-  <Listing title="Exhibitions" current={currentExhibitions()} currentLabel="Current & upcoming" past={pastExhibitions()} pastLabel="Past exhibitions" empty="No exhibitions yet." />
-</BaseLayout>

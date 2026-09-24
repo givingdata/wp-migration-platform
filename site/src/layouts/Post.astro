@@ -1,8 +1,9 @@
 ---
-// Blog posts and static pages (pages omit the date/author line).
+// Articles (news, announcements, other article-layout types) and static pages
+// (pages omit the date/author line).
 import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
-import { formatDate, fixContentLinks, excerpt, type Entry } from "../lib/content";
+import { formatDate, fixContentLinks, bodyHtml, excerpt, typeDef, type Entry } from "../lib/content";
 import { SITE } from "../lib/site";
 import { pageSections, sectionsDescription } from "../lib/sections";
 import Sections from "../components/sections/Sections.astro";
@@ -35,7 +36,7 @@ const structuredData = isPage
     };
 ---
 
-<BaseLayout seo={built?.seo || entry.seo} title={entry.title} description={(built && sectionsDescription(built.sections)) || excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData} sectioned={!!built}>
+<BaseLayout seo={built?.seo || entry.seo} title={entry.title} description={(built && sectionsDescription(built.sections)) || excerpt(entry)} image={entry.image} imageType={entry.type} ogType={isPage ? "website" : "article"} structuredData={structuredData} sectioned={!!built}>
   {built ? (
     <>
       {!firstIsHero && <h1 class="visually-hidden">{entry.title}</h1>}
@@ -46,7 +47,7 @@ const structuredData = isPage
   ) : (
   <article class:list={["entry", isPage ? "entry-page" : "entry-post"]}>
     <div class="wrap narrow">
-      {!isPage && <p class="eyebrow">News</p>}
+      {!isPage && <p class="eyebrow">{typeDef(entry.type)?.label ?? "News"}</p>}
       <h1>{entry.title}</h1>
       {!isPage && (
         <p class="meta">
@@ -56,10 +57,11 @@ const structuredData = isPage
       )}
       {entry.image && (
         <figure class="featured">
-          <Image src={entry.image} alt={entry.imageAlt || ""} type="post" variants={entry.imageVariants} priority sizes="(min-width: 46rem) 44rem, 100vw" />
+          <Image src={entry.image} alt={entry.imageAlt || ""} type={entry.type} variants={entry.imageVariants} priority sizes="(min-width: 46rem) 44rem, 100vw" />
         </figure>
       )}
-      <div class="prose" set:html={fixContentLinks(entry.content || `<p>${entry.description ?? ""}</p>`)} />
+      <div class="prose" set:html={bodyHtml(entry)} />
+      {entry.linkUrl && <p><a class="btn btn-primary" href={entry.linkUrl}>Learn more</a></p>}
       {!isPage && entry.tags && entry.tags.length > 0 && (
         <ul class="tags" aria-label="Tags">{entry.tags.map((t) => <li>{t}</li>)}</ul>
       )}

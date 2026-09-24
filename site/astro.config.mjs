@@ -8,8 +8,8 @@ function noindexPaths() {
   const read = (p) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {});
   const content = read(process.env.CONTENT_PATH || new URL("../content.json", import.meta.url));
   const out = new Set();
-  for (const key of ["pages", "posts", "events", "exhibitions"]) {
-    for (const e of content[key] || []) if (e?.seo?.noindex && e.slug) out.add(`/${e.slug}/`);
+  for (const list of Object.values(content)) {
+    if (Array.isArray(list)) for (const e of list) if (e?.seo?.noindex && e.slug) out.add(`/${e.slug}/`);
   }
   for (const [key, page] of Object.entries(read(new URL("../sections.json", import.meta.url)).pages || {})) {
     if (page?.seo?.noindex) out.add(key === "/" ? "/" : `/${key.replace(/^\/+|\/+$/g, "")}/`);

@@ -8,8 +8,11 @@ POST /submit (multipart)
   → image → R2 original + WebP variants (Images binding: resize + crop to the type's aspect ratio)
   → Claude (claude-opus-5, JSON-schema output) → clean title / slug / summary / HTML body
   → KV  content:<id>  (full record + status)
-  → GitHub commit to content.json → Pages rebuild (see .github/workflows)
+  → GitHub commit to content.json (through the Edit module, lib/edit) → Pages rebuild
 ```
+
+The staff form's **Edit existing** mode uses the `/entries` and `/trash` routes below, which run
+the same Edit module: every change is a commit, deletes go to `trash.json` and can be restored.
 
 ## Setup
 
@@ -17,7 +20,7 @@ POST /submit (multipart)
 cd worker
 npm install
 cp .dev.vars.example .dev.vars   # local secrets
-npm test                         # unit tests (auth, content merge, image sizing)
+npm test                         # unit tests (auth, image sizing, submit/edit through a fake GitHub, lib/edit)
 npm run dev                      # http://localhost:8787
 ```
 
@@ -69,7 +72,7 @@ Fields:
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `type` | yes | `exhibition`, `event` or `post` (keys of `contentTypes` in design-specs) |
+| `type` | yes | A key of `contentTypes` in design-specs (default `post`, `event`, `announcement`; see `docs/CONTENT_TYPES.md`) |
 | `title` | yes | ≤ 200 chars |
 | `description` | yes | ≤ 20 000 chars; free text, Claude formats it |
 | `date` | yes | `YYYY-MM-DD` |
@@ -109,7 +112,22 @@ Bearer API key required. Returns the KV record (`status`: `structured` → `comm
 
 ### `GET /specs`, `GET /health`
 
-Public. Design specs JSON (for the form) and a liveness check.
+Public. Design specs JSON (content types and image rules, for the form) and a liveness check.
+
+### Editing: `/entries`, `/trash`
+
+Reads need the Bearer API key; changes also need the HMAC signature over the JSON body (same
+scheme as `/submit`; `form/signing.js` → `signedJson`). `by` is the staff member's email from
+Cloudflare Access, recorded in the commit message and on the entry.
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /entries` | | Every page and entry by collection, plus `trashCount` |
+| `GET /entries/:collection/:id` | | `{ entry, version, type, frontPage, inMenu }` |
+| `PUT /entries/:collection/:id` | `{ changes, version, by }` | Saves the changed fields; 409 if the entry changed since `version`; 400 with `fields` for bad values |
+| `DELETE /entries/:collection/:id` | `{ version, reason, by }` | Moves it to `trash.json`; 409 for the homepage |
+| `GET /trash` | | Deleted entries, newest first |
+| `POST /trash/:trashId/restore` | `{ by }` | Puts it back (`slugChanged` if its old address was taken) |
 
 ## Stored media layout (R2)
 

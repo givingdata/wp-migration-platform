@@ -1,6 +1,6 @@
 ---
 import Image from "./Image.astro";
-import { urlFor, formatDate, formatRange, excerpt, type Entry } from "../lib/content";
+import { urlFor, formatDate, formatRange, excerpt, typeDef, type Entry } from "../lib/content";
 
 interface Props {
   entry: Entry;
@@ -9,7 +9,8 @@ interface Props {
 
 const { entry, headingLevel = 3 } = Astro.props;
 const Heading = `h${headingLevel}` as "h2" | "h3";
-const when = entry.type === "post" ? formatDate(entry.date) : formatRange(entry.date, entry.endDate);
+// Articles (news, announcements) show their date; events and exhibitions their date range.
+const when = (typeDef(entry.type)?.layout ?? "article") === "article" ? formatDate(entry.date) : formatRange(entry.date, entry.endDate);
 ---
 
 <article class="card">

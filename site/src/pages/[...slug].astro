@@ -1,16 +1,17 @@
 ---
-// One static page per exhibition, event, post and page in content.json.
+// One static page per entry and page in content.json, with the layout its type asks for.
 // Rest param because colliding slugs are namespaced (e.g. /event/open-house/).
 import Exhibition from "../layouts/Exhibition.astro";
 import Event from "../layouts/Event.astro";
 import Post from "../layouts/Post.astro";
-import { getRoutedEntries } from "../lib/content";
+import { getRoutedEntries, typeDef } from "../lib/content";
 
 export function getStaticPaths() {
   return getRoutedEntries().map((entry) => ({ params: { slug: entry.path }, props: { entry } }));
 }
 
 const { entry } = Astro.props;
+const layout = typeDef(entry.type)?.layout;
 ---
 
-{entry.type === "exhibition" ? <Exhibition entry={entry} /> : entry.type === "event" ? <Event entry={entry} /> : <Post entry={entry} />}
+{layout === "exhibition" ? <Exhibition entry={entry} /> : layout === "event" ? <Event entry={entry} /> : <Post entry={entry} />}

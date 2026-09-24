@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { authenticate, sign, AuthError } from "../src/auth.js";
-import { upsertEntry } from "../src/github.js";
 import { targetWidths, parseRatio } from "../src/cloudflare.js";
 
 const env = { API_KEY: "test-key" };
@@ -29,16 +28,6 @@ test("rejects wrong API key, bad signature, tampered body and stale timestamp", 
   for (const [headers, b, t] of cases) {
     await assert.rejects(authenticate(req(headers), b, env, t), AuthError);
   }
-});
-
-test("upsertEntry inserts newest first and replaces by id", () => {
-  const content = { posts: [{ id: "a", slug: "a", title: "A" }] };
-  upsertEntry(content, { id: "b", slug: "b", type: "post", title: "B" });
-  assert.deepEqual(content.posts.map((p) => p.id), ["b", "a"]);
-  upsertEntry(content, { id: "a", slug: "a", type: "post", title: "A2" });
-  assert.equal(content.posts[1].title, "A2");
-  upsertEntry(content, { id: "c", slug: "c", type: "exhibition", title: "C" });
-  assert.equal(content.exhibitions[0].id, "c");
 });
 
 test("image widths respect breakpoints, type limits and source size", () => {

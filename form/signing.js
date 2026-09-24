@@ -38,3 +38,21 @@ export async function signedMultipart(formData, { apiKey, hmacSecret }, now = Da
     },
   };
 }
+
+/**
+ * Sign a JSON body (the edit requests). Returns { body, headers } ready for fetch().
+ */
+export async function signedJson(data, { apiKey, hmacSecret }, now = Date.now()) {
+  const body = new TextEncoder().encode(JSON.stringify(data ?? {}));
+  const timestamp = String(Math.floor(now / 1000));
+  const signature = await hmacHex(hmacSecret || apiKey, timestamp, body);
+  return {
+    body,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "X-Timestamp": timestamp,
+      "X-Signature": signature,
+    },
+  };
+}

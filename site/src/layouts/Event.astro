@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
-import { formatRange, fixContentLinks, excerpt, type Entry } from "../lib/content";
+import { formatRange, bodyHtml, excerpt, typeDef, type Entry } from "../lib/content";
 
 interface Props {
   entry: Entry;
@@ -26,23 +26,23 @@ const structuredData = {
 };
 ---
 
-<BaseLayout seo={entry.seo} title={entry.title} description={excerpt(entry)} image={entry.image} imageType="event" ogType="article" structuredData={structuredData}>
+<BaseLayout seo={entry.seo} title={entry.title} description={excerpt(entry)} image={entry.image} imageType={entry.type} ogType="article" structuredData={structuredData}>
   <article class="entry entry-event wrap">
     <div class="event-grid">
       {entry.image && (
         <div class="event-image">
-          <Image src={entry.image} alt={entry.imageAlt || ""} type="event" variants={entry.imageVariants} priority sizes="(min-width: 50rem) 26rem, 100vw" />
+          <Image src={entry.image} alt={entry.imageAlt || ""} type={entry.type} variants={entry.imageVariants} priority sizes="(min-width: 50rem) 26rem, 100vw" />
         </div>
       )}
       <div>
-        <p class="eyebrow">Event</p>
+        <p class="eyebrow">{typeDef(entry.type)?.label ?? "Event"}</p>
         <h1>{entry.title}</h1>
         <dl class="facts">
           {dates && <div><dt>Date</dt><dd><time datetime={entry.date ?? undefined}>{dates}</time></dd></div>}
           {entry.time && <div><dt>Time</dt><dd>{entry.time}</dd></div>}
           {entry.location && <div><dt>Location</dt><dd>{entry.location}</dd></div>}
         </dl>
-        <div class="prose" set:html={fixContentLinks(entry.content || `<p>${entry.description ?? ""}</p>`)} />
+        <div class="prose" set:html={bodyHtml(entry)} />
       </div>
     </div>
   </article>

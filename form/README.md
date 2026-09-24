@@ -1,14 +1,16 @@
 # Staff Content Form
 
-A static, dependency-free form that staff use to add exhibitions, events and posts. It signs
-each request and sends it to the Worker (`worker/`), which optimizes the image, has Claude tidy
-the text, and publishes it to the site.
+A static, dependency-free form that staff use to add news, events and announcements (the
+client's content types, `docs/CONTENT_TYPES.md`) and to edit or delete what's already on the
+site. It signs each request and sends it to the Worker (`worker/`), which optimizes the image,
+has Claude tidy the text, and publishes it to the site.
 
 | File | Purpose |
 | --- | --- |
 | `index.html` | Markup + styles (responsive, dark-mode aware, WCAG-oriented) |
 | `config.js` | Per-client settings: site name, Worker URL, API key |
-| `form-handler.js` | Validation, image preview + crop guidance, submit/response handling |
+| `form-handler.js` | Add new: validation, image preview + crop guidance, submit/response handling |
+| `edit.js` | Edit existing: find, edit (simple editor or HTML), delete, Deleted items / put back |
 | `signing.js` | HMAC-SHA256 signing, identical scheme to `worker/src/auth.js` |
 | `mock-worker.mjs` | Local stand-in for the Worker (real auth check, fake publishing) |
 
@@ -58,15 +60,37 @@ npx wrangler pages deploy form --project-name cinderella-form
 
 ## What staff see
 
-1. **Type** — Exhibition / Event / Post. The extra fields shown (end date, time, location,
-   author) come from that type's `fields` in `config/design-specs.json`.
+**Add new**
+
+1. **Type**: one choice per content type (News / Event / Announcement by default). The extra
+   fields shown (end date, time, location, author, link) and their labels come from that type
+   in `config/design-specs.json`.
 2. **Title, description, date** — required. The description can be rough; Claude formats it.
 3. **Image** (optional) — the requirements for the chosen type are shown under the picker
-   (e.g. *Exhibition images: 1.5:1 aspect ratio, at least 300px wide*). After choosing a file
+   (e.g. *Event images: 1:1 aspect ratio, at least 300px wide*). After choosing a file
    they see the original with the crop area highlighted and a preview at the site's aspect
    ratio, plus warnings if more than 5% will be trimmed or the image is too small.
 4. **Submit** — a spinner while the Worker works (up to ~2 minutes), then a success message
    and a cleared form, or a specific error. On failure the text they typed stays in the form.
+
+**Edit existing**
+
+1. Everything on the site, grouped (Pages, News, Events, …), with a search box.
+2. Opening one shows its title, summary, the date/time/location/link fields its type has, and
+   the body in a simple editor (bold, italic, headings, lists, links; **HTML** switches to the
+   source). Pasted text keeps paragraphs but not fonts. The web address never changes.
+3. **Save changes** commits only the fields that changed. If someone else changed it meanwhile,
+   they're told and can reload it.
+4. **Delete…** asks for confirmation and an optional reason, then moves it to **Deleted items**,
+   where **Put back** restores it. The homepage can't be deleted.
+
+Changes are labelled with the staff member's email when the form is behind Cloudflare Access
+(the page reads `/cdn-cgi/access/get-identity`). `node form/mock-worker.mjs` supports editing
+too: it works on a temporary copy of the sample content (or `MOCK_CONTENT_DIR`).
+
+The form is deployed by `scripts/deploy.sh` the first time and by `.github/workflows/deploy-form.yml`
+whenever `form/` changes (needs the `FORM_PROJECT` and `WORKER_URL` variables and the
+`FORM_API_KEY` secret).
 
 ## Accessibility
 

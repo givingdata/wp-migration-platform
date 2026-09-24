@@ -1,0 +1,26 @@
+---
+// A listing page for each content type (/news/, /events/, /announcements/, …), from
+// config/design-specs.json. Types kept only for older entries get one while they have any.
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Listing from "../components/Listing.astro";
+import { LISTED_TYPES, entriesOf, upcoming, past, latest, type TypeDef } from "../lib/content";
+
+export function getStaticPaths() {
+  return LISTED_TYPES.filter((t) => t.enabled || entriesOf(t.key).length).map((type) => ({
+    params: { listing: (type.listing as { path: string }).path },
+    props: { type },
+  }));
+}
+
+const { type } = Astro.props as { type: TypeDef };
+const listing = type.listing as Exclude<TypeDef["listing"], false | undefined>;
+const empty = `No ${listing.title.toLowerCase()} yet.`;
+---
+
+<BaseLayout title={listing.title} description={listing.intro}>
+  {listing.upcoming ? (
+    <Listing title={listing.title} current={upcoming(type.key)} currentLabel={listing.currentLabel ?? "Upcoming"} past={past(type.key)} pastLabel={listing.pastLabel ?? "Past"} empty={empty} />
+  ) : (
+    <Listing title={listing.title} current={latest(type.key)} empty={empty} />
+  )}
+</BaseLayout>

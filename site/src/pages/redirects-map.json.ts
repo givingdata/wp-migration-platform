@@ -1,6 +1,6 @@
 // Build-time list of every entry's old WordPress address and its new one. redirects.mjs
 // turns it into Cloudflare's _redirects (and removes this file from the output).
-import { getContent, getFrontPage, getRoutedEntries, urlFor } from "../lib/content";
+import { getContent, getFrontPage, getRoutedEntries, urlFor, entriesOf, typeDef } from "../lib/content";
 
 export function GET() {
   const content = getContent();
@@ -10,5 +10,12 @@ export function GET() {
     wpId: e.wpId ?? null,
     path: urlFor(e),
   }));
-  return new Response(JSON.stringify({ siteUrl: content.siteUrl ?? null, hasNews: content.posts.length > 0, entries }));
+  const news = typeDef("post")?.listing;
+  return new Response(JSON.stringify({
+    siteUrl: content.siteUrl ?? null,
+    hasNews: entriesOf("post").length > 0,
+    newsPath: news ? `/${news.path}/` : null,
+    collections: Object.keys(content.collections),
+    entries,
+  }));
 }

@@ -1,9 +1,0 @@
----
-import BaseLayout from "../layouts/BaseLayout.astro";
-import Listing from "../components/Listing.astro";
-import { latestPosts } from "../lib/content";
----
-
-<BaseLayout title="News" description="News and updates.">
-  <Listing title="News" current={latestPosts()} empty="No news yet." />
-</BaseLayout>
