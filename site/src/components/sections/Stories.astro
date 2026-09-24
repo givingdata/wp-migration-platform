@@ -1,0 +1,48 @@
+---
+// Testimonials: one shown at a time with a picker (all visible without JavaScript).
+// Initials instead of photos by default: many sites quote people anonymously.
+import type { Stories } from "../../lib/sections";
+import Heading from "./Heading.astro";
+interface Props { s: Stories }
+const { s } = Astro.props;
+const uid = s.id ?? `stories-${Math.abs([...s.items.map((i) => i.by).join()].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7))}`;
+const initials = (by: string) => by.replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={uid} data-stories>
+  <div class="wrap">
+    <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
+    <div class="s-stories">
+      <div class="s-story-quotes">
+        {s.items.map((it, i) => (
+          <figure class="s-story" data-story={i}>
+            <blockquote><p>“{it.quote}”</p></blockquote>
+            <figcaption><span class="s-initials" aria-hidden="true">{initials(it.by)}</span><span><strong>{it.by}</strong>{it.detail && <span class="s-small">{it.detail}</span>}</span></figcaption>
+          </figure>
+        ))}
+      </div>
+      <div class="s-story-picker" role="group" aria-label="Choose a story" hidden>
+        {s.items.map((it, i) => (
+          <button type="button" data-pick={i} aria-pressed={i === 0 ? "true" : "false"}>
+            <span class="s-initials" aria-hidden="true">{initials(it.by)}</span>
+            <span><strong>{it.by}</strong>{it.detail && <span class="s-small">{it.detail}</span>}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+  document.querySelectorAll<HTMLElement>("[data-stories]").forEach((root) => {
+    const stories = [...root.querySelectorAll<HTMLElement>("[data-story]")];
+    const picker = root.querySelector<HTMLElement>(".s-story-picker");
+    if (!picker || stories.length < 2) return;
+    picker.hidden = false;
+    const buttons = [...picker.querySelectorAll<HTMLButtonElement>("[data-pick]")];
+    const show = (n: number) => {
+      stories.forEach((el, i) => (el.hidden = i !== n));
+      buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(i === n)));
+    };
+    buttons.forEach((b, i) => b.addEventListener("click", () => show(i)));
+    show(0);
+  });
+</script>

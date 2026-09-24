@@ -4,6 +4,8 @@ import BaseLayout from "./BaseLayout.astro";
 import Image from "../components/Image.astro";
 import { formatDate, fixContentLinks, excerpt, type Entry } from "../lib/content";
 import { SITE } from "../lib/site";
+import { pageSections, sectionsDescription } from "../lib/sections";
+import Sections from "../components/sections/Sections.astro";
 
 interface Props {
   entry: Entry;
@@ -12,6 +14,10 @@ interface Props {
 const { entry } = Astro.props;
 const isPage = entry.type === "page";
 const url = new URL(Astro.url.pathname, Astro.site).href;
+// A page listed in sections.json is built from sections instead of its migrated content.
+const built = isPage ? pageSections((entry as { path?: string }).path ?? entry.slug) : null;
+const firstIsHero = built?.sections[0]?.type === "hero";
+const contentBlock = entry.content ? fixContentLinks(entry.content) : null;
 
 const structuredData = isPage
   ? { "@context": "https://schema.org", "@type": "WebPage", name: entry.title, description: excerpt(entry, 300), url }
@@ -29,7 +35,15 @@ const structuredData = isPage
     };
 ---
 
-<BaseLayout seo={entry.seo} title={entry.title} description={excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData}>
+<BaseLayout seo={built?.seo || entry.seo} title={entry.title} description={(built && sectionsDescription(built.sections)) || excerpt(entry)} image={entry.image} imageType="post" ogType={isPage ? "website" : "article"} structuredData={structuredData} sectioned={!!built}>
+  {built ? (
+    <>
+      {!firstIsHero && <h1 class="visually-hidden">{entry.title}</h1>}
+      {built.content === "before" && contentBlock && <div class="wrap narrow section"><div class="prose" set:html={contentBlock} /></div>}
+      <Sections sections={built.sections} />
+      {built.content === "after" && contentBlock && <div class="wrap narrow section"><div class="prose" set:html={contentBlock} /></div>}
+    </>
+  ) : (
   <article class:list={["entry", isPage ? "entry-page" : "entry-post"]}>
     <div class="wrap narrow">
       {!isPage && <p class="eyebrow">News</p>}
@@ -51,4 +65,5 @@ const structuredData = isPage
       )}
     </div>
   </article>
+  )}
 </BaseLayout>

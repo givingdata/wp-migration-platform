@@ -3,6 +3,7 @@ import "../styles/global.css";
 import { SITE } from "../lib/site";
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
+import { siteSettings } from "../lib/sections";
 import { buildImageSet } from "../lib/images";
 import { THEME, themeCss, googleFontsHref, warnOnce } from "../lib/theme";
 import { SITE_CONFIG, analyticsHead, analyticsBody } from "../lib/siteConfig";
@@ -18,11 +19,14 @@ interface Props {
   /** JSON-LD object(s) for this page. */
   structuredData?: object | object[];
   noindex?: boolean;
+  /** The page is built from sections (full-width bands, no top padding). */
+  sectioned?: boolean;
   /** Per-page SEO overrides (content.json / sections.json "seo"). */
   seo?: Seo | null;
 }
 
-const { title, description: pageDescription = SITE.tagline, image, imageType = "post", ogType = "website", structuredData, noindex: pageNoindex = false, seo = null } = Astro.props;
+const { title, description: pageDescription = SITE.tagline, image, imageType = "post", ogType = "website", structuredData, noindex: pageNoindex = false, seo = null, sectioned = false } = Astro.props;
+const header = siteSettings().header ?? {};
 // An SEO title (e.g. imported from Yoast) is used exactly as written; otherwise "Page | Site".
 const fullTitle = seo?.title || (title ? `${title} | ${SITE.name}` : SITE.name);
 const description = seo?.description || pageDescription;
@@ -76,7 +80,7 @@ const logo = THEME.logo;
   <body>
     {trackingBody && <Fragment set:html={trackingBody} />}
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
+    <header class:list={["site-header", header.style === "band" && "header-band"]}>
       <div class="wrap header-inner">
         <a class="brand" href="/">
           {logo && (
@@ -88,10 +92,11 @@ const logo = THEME.logo;
           {(!logo || logo.showName) && <span>{SITE.name}</span>}
         </a>
         <Nav />
+        {header.button && <a class="btn btn-primary header-button" href={header.button.href}>{header.button.label}</a>}
       </div>
     </header>
 
-    <main id="main">
+    <main id="main" class:list={[sectioned && "main-sectioned"]}>
       <slot />
     </main>
 

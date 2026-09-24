@@ -3,8 +3,11 @@
 import * as icons from "simple-icons";
 import { SITE } from "../lib/site";
 import { getContent, resolveMenuUrl } from "../lib/content";
+import { siteSettings } from "../lib/sections";
 
 const { text, menu, social } = getContent().footer;
+// Optional richer footer from sections.json: about text, address, contact emails, a note.
+const extra = siteSettings().footer;
 const links = menu.map((i) => ({ label: i.title, href: resolveMenuUrl(i.url) })).filter((l) => l.href);
 
 const NAMES: Record<string, string> = {
@@ -18,8 +21,24 @@ const socials = social.map((s) => {
 });
 ---
 
-<footer class="site-footer">
+<footer class:list={["site-footer", extra && "footer-rich"]}>
   <div class="wrap">
+    {extra && (
+      <div class="footer-cols">
+        <div class="footer-about">
+          <p class="footer-name">{SITE.name}</p>
+          {extra.about && <p>{extra.about}</p>}
+          {extra.note && <p class="footer-note">{extra.note}</p>}
+        </div>
+        {!!(extra.address?.length || extra.contacts?.length) && (
+          <div>
+            <p class="footer-heading">Contact</p>
+            {extra.address && <address>{extra.address.map((l, i) => <>{i > 0 && <br />}{l}</>)}</address>}
+            {extra.contacts && <ul class="footer-contacts">{extra.contacts.map((c) => <li>{c.label}: <a href={`mailto:${c.email}`}>{c.email}</a></li>)}</ul>}
+          </div>
+        )}
+      </div>
+    )}
     {text.map((t) => <p class="footer-text">{t}</p>)}
     <div class="footer-bottom">
       <p>© {new Date().getFullYear()} {SITE.name}</p>

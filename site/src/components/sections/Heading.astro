@@ -1,0 +1,12 @@
+---
+// Eyebrow + heading with an optional accent phrase (set in italics, as in most designs).
+interface Props { eyebrow?: string; title?: string; accent?: string; level?: 1 | 2; center?: boolean }
+const { eyebrow, title, accent, level = 2, center = false } = Astro.props;
+const Tag = level === 1 ? "h1" : "h2";
+---
+{(eyebrow || title) && (
+  <div class:list={["s-head", center && "s-center"]}>
+    {eyebrow && <p class="s-eyebrow">{eyebrow}</p>}
+    {title && <Tag class="s-title">{title}{accent && <> <em>{accent}</em></>}</Tag>}
+  </div>
+)}

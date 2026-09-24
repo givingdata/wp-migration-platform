@@ -1,0 +1,18 @@
+---
+import type { Text } from "../../lib/sections";
+import Heading from "./Heading.astro";
+import Buttons from "./Buttons.astro";
+interface Props { s: Text }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+  <div class:list={["wrap", s.image ? "s-split" : "s-narrow"]}>
+    <div>
+      <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
+      {(s.paragraphs ?? []).map((p) => <p>{p}</p>)}
+      {s.list && s.list.length > 0 && <ul class="s-tags">{s.list.map((t) => <li>{t}</li>)}</ul>}
+      <Buttons buttons={s.buttons} />
+    </div>
+    {s.image && <figure class="s-split-media"><img src={s.image.src} alt={s.image.alt ?? ""} loading="lazy" decoding="async" /></figure>}
+  </div>
+</section>

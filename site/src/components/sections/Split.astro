@@ -1,0 +1,24 @@
+---
+import type { Split } from "../../lib/sections";
+import Heading from "./Heading.astro";
+import Buttons from "./Buttons.astro";
+interface Props { s: Split }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+  <div class:list={["wrap", "s-split", s.reverse && "s-reverse"]}>
+    {s.image && (
+      <figure class="s-split-media">
+        <span class="s-backdrop" aria-hidden="true"></span>
+        <img src={s.image.src} alt={s.image.alt ?? ""} loading="lazy" decoding="async" />
+        {s.quote && <blockquote class="s-badge"><p>“{s.quote.text}”</p>{s.quote.by && <cite>{s.quote.by}</cite>}</blockquote>}
+      </figure>
+    )}
+    <div class="s-split-text">
+      <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
+      {(s.paragraphs ?? []).map((p) => <p>{p}</p>)}
+      {s.tags && s.tags.length > 0 && <ul class="s-tags">{s.tags.map((t) => <li>{t}</li>)}</ul>}
+      <Buttons buttons={s.buttons} />
+    </div>
+  </div>
+</section>

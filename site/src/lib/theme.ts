@@ -5,9 +5,11 @@ import config from "../../../config/theme.json";
 
 export const COLOR_TOKENS = [
   "bg", "surface", "surface-2", "text", "muted", "border", "accent", "accent-hover", "focus",
+  // Headings, and the contrasting "band" used by page sections (e.g. a dark call-to-action strip).
+  "heading", "band-bg", "band-text", "band-muted", "band-accent",
 ] as const;
 export const OTHER_TOKENS = [
-  "font-body", "font-heading", "heading-weight", "text-size", "radius", "wrap", "narrow",
+  "font-body", "font-heading", "heading-weight", "text-size", "radius", "wrap", "narrow", "button-radius",
 ] as const;
 
 type ColorToken = (typeof COLOR_TOKENS)[number];
@@ -20,7 +22,7 @@ const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const SERIF = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif';
 const BASE: Tokens = {
   "font-body": SANS, "font-heading": SERIF, "heading-weight": "600", "text-size": "1.0625rem",
-  radius: "10px", wrap: "72rem", narrow: "44rem",
+  radius: "10px", wrap: "72rem", narrow: "44rem", "button-radius": "999px",
 };
 
 export const PRESETS: Record<string, Preset> = {
@@ -29,10 +31,12 @@ export const PRESETS: Record<string, Preset> = {
     colors: {
       bg: "#fbfaf8", surface: "#ffffff", "surface-2": "#efece7", text: "#1c1b1f", muted: "#5d5a63",
       border: "#dedad3", accent: "#6b2d5c", "accent-hover": "#4f1f44", focus: "#1a5fb4",
+      heading: "#1c1b1f", "band-bg": "#3a1f35", "band-text": "#fbfaf8", "band-muted": "#dccbd8", "band-accent": "#f2c9e6",
     },
     darkColors: {
       bg: "#141316", surface: "#1d1c20", "surface-2": "#2a282e", text: "#f1eff3", muted: "#b3afb9",
       border: "#3a3740", accent: "#e0a9d1", "accent-hover": "#f2c9e6", focus: "#8cb8ff",
+      heading: "#f1eff3", "band-bg": "#2a2530", "band-text": "#f1eff3", "band-muted": "#c2bdc8", "band-accent": "#e0a9d1",
     },
     tokens: BASE,
   },
@@ -41,10 +45,12 @@ export const PRESETS: Record<string, Preset> = {
     colors: {
       bg: "#fffdf9", surface: "#ffffff", "surface-2": "#f5efe6", text: "#1f1d1a", muted: "#5c564d",
       border: "#e6ded2", accent: "#a63f1c", "accent-hover": "#7f2f14", focus: "#1a5fb4",
+      heading: "#1f1d1a", "band-bg": "#5a2512", "band-text": "#fffdf9", "band-muted": "#efd9cc", "band-accent": "#f8c2a8",
     },
     darkColors: {
       bg: "#171513", surface: "#211e1b", "surface-2": "#2d2925", text: "#f5f1ea", muted: "#bdb4a8",
       border: "#3d3832", accent: "#f4a27f", "accent-hover": "#f8c2a8", focus: "#8cb8ff",
+      heading: "#f5f1ea", "band-bg": "#2d2925", "band-text": "#f5f1ea", "band-muted": "#c9c1b6", "band-accent": "#f4a27f",
     },
     tokens: { ...BASE, "font-heading": SANS, "heading-weight": "700", radius: "16px" },
   },
@@ -53,10 +59,12 @@ export const PRESETS: Record<string, Preset> = {
     colors: {
       bg: "#ffffff", surface: "#ffffff", "surface-2": "#f2f2f0", text: "#111111", muted: "#555555",
       border: "#d9d9d6", accent: "#a3162b", "accent-hover": "#7d1020", focus: "#1a5fb4",
+      heading: "#111111", "band-bg": "#111111", "band-text": "#ffffff", "band-muted": "#c8c8c8", "band-accent": "#ff8a95",
     },
     darkColors: {
       bg: "#0f0f10", surface: "#18181a", "surface-2": "#242427", text: "#f2f2f2", muted: "#a9a9ad",
       border: "#333336", accent: "#ff8a95", "accent-hover": "#ffb3ba", focus: "#8cb8ff",
+      heading: "#f2f2f2", "band-bg": "#242427", "band-text": "#f2f2f2", "band-muted": "#b5b5b9", "band-accent": "#ff8a95",
     },
     tokens: { ...BASE, "heading-weight": "700", radius: "0px", narrow: "40rem" },
   },
@@ -65,10 +73,12 @@ export const PRESETS: Record<string, Preset> = {
     colors: {
       bg: "#f7f8fb", surface: "#ffffff", "surface-2": "#eceff5", text: "#0f172a", muted: "#475569",
       border: "#dbe1ea", accent: "#3730a3", "accent-hover": "#272178", focus: "#0e7490",
+      heading: "#0f172a", "band-bg": "#1e1b4b", "band-text": "#eef2ff", "band-muted": "#c7d2fe", "band-accent": "#a5b4fc",
     },
     darkColors: {
       bg: "#0b1020", surface: "#121a2e", "surface-2": "#1b2540", text: "#eef2ff", muted: "#a5b0c8",
       border: "#2a3552", accent: "#a5b4fc", "accent-hover": "#c7d2fe", focus: "#67e8f9",
+      heading: "#eef2ff", "band-bg": "#1b2540", "band-text": "#eef2ff", "band-muted": "#b3bdd3", "band-accent": "#a5b4fc",
     },
     tokens: { ...BASE, "font-heading": SANS, "heading-weight": "800", radius: "12px" },
   },
@@ -77,10 +87,12 @@ export const PRESETS: Record<string, Preset> = {
     colors: {
       bg: "#ffffff", surface: "#ffffff", "surface-2": "#f4f4f4", text: "#171717", muted: "#595959",
       border: "#e5e5e5", accent: "#171717", "accent-hover": "#404040", focus: "#1a5fb4",
+      heading: "#171717", "band-bg": "#171717", "band-text": "#fafafa", "band-muted": "#d4d4d4", "band-accent": "#fafafa",
     },
     darkColors: {
       bg: "#0a0a0a", surface: "#141414", "surface-2": "#1f1f1f", text: "#fafafa", muted: "#a3a3a3",
       border: "#2e2e2e", accent: "#fafafa", "accent-hover": "#d4d4d4", focus: "#8cb8ff",
+      heading: "#fafafa", "band-bg": "#1f1f1f", "band-text": "#fafafa", "band-muted": "#b0b0b0", "band-accent": "#fafafa",
     },
     tokens: { ...BASE, "font-heading": SANS, radius: "4px" },
   },
@@ -180,6 +192,7 @@ export function contrast(a: string, b: string): number | null {
 const PAIRS: [ColorToken, ColorToken][] = [
   ["text", "bg"], ["text", "surface"], ["muted", "bg"], ["muted", "surface"],
   ["accent", "bg"], ["accent", "surface"], ["accent-hover", "surface"], ["text", "surface-2"],
+  ["heading", "bg"], ["band-text", "band-bg"], ["band-muted", "band-bg"], ["band-accent", "band-bg"],
 ];
 
 /** Readability problems worth fixing before launch (text below WCAG AA 4.5:1). */
