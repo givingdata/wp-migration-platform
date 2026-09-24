@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import specs from "../../../config/design-specs.json";
 import { contentTypes, allCollections, typeForCollection } from "../../../lib/content-types.js";
+import { assignPaths, isFrontPage as isFront } from "../../../lib/routes.js";
 
 /** A content type key from config/design-specs.json ("post", "event", "announcement", …) or "page". */
 export type ContentType = string;
@@ -96,8 +97,6 @@ export interface SiteContent {
 export type RoutedEntry = Entry & { path: string };
 
 const COLLECTIONS: string[] = allCollections(TYPES);
-// Paths the site itself uses; content can't take them.
-const RESERVED = new Set(["", "index", "404", "rss.xml", "sitemap-index.xml", "robots.txt", ...LISTED_TYPES.map((t) => (t.listing as { path: string }).path)]);
 
 function resolveContentPath(): string | null {
   const candidates = [process.env.CONTENT_PATH, path.resolve(process.cwd(), "../content.json"), path.resolve(process.cwd(), "content.json")];
@@ -142,30 +141,17 @@ function load() {
   }
   content.pages = content.collections.pages;
 
-  // Assign unique paths. Pages keep their bare slug (/about); everything else too,
-  // unless it collides, in which case it is prefixed with its type (/event/about).
-  const taken = new Set(RESERVED);
-  const routed: RoutedEntry[] = [];
-  // Pages first (they keep bare slugs), then legacy types before newer ones so no existing link moves.
-  const order = ["pages", "exhibitions", "events", "posts", ...COLLECTIONS];
-  for (const collection of [...new Set(order)]) {
-    for (const entry of content.collections[collection] ?? []) {
-      if (isFrontPage(entry, content)) continue; // published at "/" instead
-      let p = entry.slug.replace(/^\/+|\/+$/g, "");
-      if (taken.has(p)) p = `${entry.type}/${p}`;
-      let n = 2;
-      while (taken.has(p)) p = `${entry.type}/${entry.slug}-${n++}`;
-      taken.add(p);
-      routed.push({ ...entry, path: p });
-    }
-  }
+  // Unique paths (lib/routes.js, shared with the Edit module); the homepage is built by index.astro.
+  const routed: RoutedEntry[] = assignPaths(content.collections, content.frontPage, TYPES)
+    .filter((r: { path: string | null }) => r.path !== null)
+    .map((r: { entry: Entry; path: string }) => ({ ...r.entry, path: r.path }));
 
   cache = { content, routed, source: file };
   return cache;
 }
 
 function isFrontPage(entry: Entry, content: SiteContent): boolean {
-  return !!content.frontPage && entry.type === "page" && (String(entry.wpId ?? "") === content.frontPage || entry.id === content.frontPage);
+  return entry.type === "page" && isFront(content.frontPage, "pages", entry);
 }
 
 /** The page WordPress used as its homepage, if any. */

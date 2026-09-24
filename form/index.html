@@ -117,6 +117,10 @@
     .entry-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
     .entry-list li { border-bottom: 1px solid var(--border); display: flex; gap: .75rem; align-items: center; justify-content: space-between; padding: .55rem 0; }
     .entry-list .meta { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+    .entry-list .path { display: block; color: var(--muted); font-size: .85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    .page-url { margin: -.5rem 0 1rem; font-size: .95rem; }
+    .page-url a, .note a { color: var(--accent); }
+    .page-url code { font-size: .9rem; background: var(--bg); padding: .1rem .35rem; border-radius: 4px; word-break: break-all; }
     .entry-list button.link { text-align: left; font-weight: 500; }
     button.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; font-weight: 500; }
     button.danger { background: transparent; border-color: var(--error); color: var(--error); }
@@ -248,7 +252,7 @@
       <div id="edit-browse">
         <div class="toolbar-row">
           <label class="visually-hidden" for="edit-search">Search</label>
-          <input type="search" id="edit-search" placeholder="Search by title" autocomplete="off">
+          <input type="search" id="edit-search" placeholder="Search by title or web address" autocomplete="off">
           <button type="button" class="secondary" id="show-trash">Deleted items</button>
         </div>
         <div id="browse-status" role="status" aria-live="polite" tabindex="-1"></div>
@@ -258,6 +262,7 @@
       <form id="edit-form" novalidate hidden>
         <p class="back-row"><button type="button" class="link" id="edit-back">← All content</button></p>
         <p class="eyebrow" id="edit-kind"></p>
+        <p class="page-url" id="edit-url"></p>
         <div id="edit-notes"></div>
 
         <div class="field">

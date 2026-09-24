@@ -94,7 +94,7 @@ export function initEdit({ config, specs, escapeHtml }) {
   function renderList() {
     const q = $("edit-search").value.trim().toLowerCase();
     const groups = Object.entries(listing.collections)
-      .map(([collection, items]) => [collection, items.filter((i) => !q || i.title.toLowerCase().includes(q))])
+      .map(([collection, items]) => [collection, items.filter((i) => !q || i.title.toLowerCase().includes(q) || (i.path || "").includes(q))])
       .filter(([, items]) => items.length);
     $("show-trash").textContent = `Deleted items${listing.trashCount ? ` (${listing.trashCount})` : ""}`;
     if (!groups.length) {
@@ -107,7 +107,10 @@ export function initEdit({ config, specs, escapeHtml }) {
           <h2>${escapeHtml(labelFor(collection))} <span class="optional">(${items.length})</span></h2>
           <ul class="entry-list">${items.map((i) => `
             <li>
-              <button type="button" class="link" data-open="${escapeHtml(collection)}" data-id="${escapeHtml(i.id)}">${escapeHtml(i.title)}</button>
+              <span>
+                <button type="button" class="link" data-open="${escapeHtml(collection)}" data-id="${escapeHtml(i.id)}">${escapeHtml(i.title)}</button>
+                ${i.path ? `<span class="path">${escapeHtml(i.path)}</span>` : ""}
+              </span>
               <span class="meta">${i.frontPage ? "Homepage" : escapeHtml(i.date || "")}</span>
             </li>`).join("")}
           </ul>
@@ -141,7 +144,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     FIELDS.forEach((f) => setError(f, ""));
     try {
       const data = await call("GET", entryPath(collection, id));
-      current = { collection, id, version: data.version, entry: data.entry, type: data.type, frontPage: data.frontPage, inMenu: data.inMenu };
+      current = { collection, id, version: data.version, entry: data.entry, type: data.type, frontPage: data.frontPage, inMenu: data.inMenu, path: data.path };
     } catch (e) {
       status($("browse-status"), "error", escapeHtml(e.message));
       return;
@@ -149,6 +152,11 @@ export function initEdit({ config, specs, escapeHtml }) {
     const { entry, type } = current;
     const fields = new Set(collection === "pages" ? [] : type.fields || []);
     $("edit-kind").textContent = collection === "pages" ? (current.frontPage ? "Homepage" : "Page") : type.label || collection;
+    // Show where this lives, so staff can check they opened the right one.
+    const live = current.path && config.siteUrl ? new URL(current.path, config.siteUrl).href : null;
+    $("edit-url").innerHTML = current.path
+      ? `Web address: <code>${escapeHtml(current.path)}</code>${live ? ` · <a href="${escapeHtml(live)}" target="_blank" rel="noopener">View on site ↗</a>` : ""}`
+      : "";
     editForm.querySelectorAll("[data-edit-field]").forEach((el) => {
       const name = el.dataset.editField;
       el.hidden = name === "imageAlt" ? !entry.image : !fields.has(name);

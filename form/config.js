@@ -5,6 +5,9 @@
 export default {
   siteName: "Your Organization",
 
+  // Public site address, for "View on site" links in Edit existing (optional).
+  siteUrl: null,
+
   // Worker base URL, no trailing slash. For local testing use the mock:
   //   node form/mock-worker.mjs   →   http://localhost:8787
   workerUrl: "http://localhost:8787",
