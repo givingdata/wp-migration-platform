@@ -10,6 +10,7 @@ export function initMenu({ call, escapeHtml }) {
   let targets = [];
   let dirty = false;
   let loading = null;
+  let locked = true; // top-level items fixed (design-specs menu.topLevel); the Worker enforces it too
 
   const knownPaths = () => new Set(["/", ...targets.map((t) => t.path)]);
   const setStatus = (kind, html) => {
@@ -26,6 +27,8 @@ export function initMenu({ call, escapeHtml }) {
       items = data.menu.map((i) => ({ ...i, children: i.children.map((c) => ({ ...c, children: [] })) }));
       version = data.version;
       targets = data.targets;
+      locked = data.topLevelLocked !== false;
+      $("menu-lock-note").hidden = !locked;
       dirty = false;
       fillTargets();
       render();
@@ -55,14 +58,23 @@ export function initMenu({ call, escapeHtml }) {
 
   function row(item, pos, siblings, isChild) {
     const [i, j] = pos;
+    if (locked && !isChild) {
+      return `<div class="menu-item fixed">
+        <strong>${escapeHtml(item.title)}</strong>
+        <span class="tools"><span class="lock" title="Part of the main menu bar">Menu bar item · fixed</span></span>
+        <span class="path">${escapeHtml(describe(item))}${item.children.length ? "" : " · no dropdown"}</span>
+      </div>`;
+    }
     const idx = isChild ? j : i;
     const key = isChild ? `${i}.${j}` : `${i}`;
     const tools = [
       `<button type="button" data-act="up" data-key="${key}" ${idx === 0 ? "disabled" : ""} aria-label="Move ${escapeHtml(item.title)} up">↑</button>`,
       `<button type="button" data-act="down" data-key="${key}" ${idx === siblings.length - 1 ? "disabled" : ""} aria-label="Move ${escapeHtml(item.title)} down">↓</button>`,
-      isChild
-        ? `<button type="button" data-act="out" data-key="${key}" title="Move out of the dropdown">⇤ Out</button>`
-        : `<button type="button" data-act="in" data-key="${key}" ${i === 0 || item.children.length ? "disabled" : ""} title="Move into the dropdown of the item above">⇥ Into dropdown above</button>`,
+      locked
+        ? ""
+        : isChild
+          ? `<button type="button" data-act="out" data-key="${key}" title="Move out of the dropdown">⇤ Out</button>`
+          : `<button type="button" data-act="in" data-key="${key}" ${i === 0 || item.children.length ? "disabled" : ""} title="Move into the dropdown of the item above">⇥ Into dropdown above</button>`,
       `<button type="button" data-act="remove" data-key="${key}">Remove</button>`,
     ].join("");
     return `<div class="menu-item${item.isNew ? " new" : ""}">
@@ -79,7 +91,9 @@ export function initMenu({ call, escapeHtml }) {
           ? `<ol aria-label="Under ${escapeHtml(item.title)}">${item.children.map((c, j) => `<li>${row(c, [i, j], item.children, true)}</li>`).join("")}</ol>`
           : ""}</li>`).join("")
       : '<li class="hint">The menu is empty.</li>';
-    $("menu-parent").innerHTML = '<option value="">Top level</option>' + items.map((m, i) => `<option value="${i}">Under “${escapeHtml(m.title)}”</option>`).join("");
+    // Locked: only into dropdowns that already exist (a new dropdown or top-level item changes the menu bar).
+    const places = items.map((m, i) => [m, i]).filter(([m]) => !locked || m.children.length);
+    $("menu-parent").innerHTML = (locked ? "" : '<option value="">Top level</option>') + places.map(([m, i]) => `<option value="${i}">Under “${escapeHtml(m.title)}”</option>`).join("");
     renderPreview();
     $("menu-save").disabled = !dirty;
     $("menu-reset").disabled = !dirty;
@@ -159,6 +173,7 @@ export function initMenu({ call, escapeHtml }) {
     if (!url) return err("Choose a page or type a web address.");
     if (!LINK.test(url)) return err("Web addresses start with https:// (or / for a page on this site).");
     if (!title) return err("Give it a name for the menu.");
+    if (locked && $("menu-parent").value === "") return err("Choose which dropdown it goes in.");
     const item = { title, url, path: path || url, children: [], isNew: true };
     const parent = $("menu-parent").value;
     if (parent === "") items.push(item);

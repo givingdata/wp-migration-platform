@@ -149,7 +149,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     FIELDS.forEach((f) => setError(f, ""));
     try {
       const data = await call("GET", entryPath(collection, id));
-      current = { collection, id, version: data.version, entry: data.entry, type: data.type, frontPage: data.frontPage, inMenu: data.inMenu, path: data.path };
+      current = { collection, id, version: data.version, entry: data.entry, type: data.type, frontPage: data.frontPage, inMenu: data.inMenu, path: data.path, menuBarLocked: data.inTopMenu && data.topLevelLocked };
     } catch (e) {
       status($("browse-status"), "error", escapeHtml(e.message));
       return;
@@ -174,9 +174,10 @@ export function initEdit({ config, specs, escapeHtml }) {
 
     const notes = [];
     if (current.frontPage) notes.push("This is the homepage. It can be changed but not deleted.");
-    if (current.inMenu) notes.push("This page is in the site menu. If you delete it, its menu link can be taken out at the same time.");
+    if (current.menuBarLocked) notes.push("This page is linked from the main menu bar, so it can be changed but not deleted here. To remove it, ask your web team to change the menu bar first.");
+    else if (current.inMenu) notes.push("This page is in the site menu. If you delete it, its menu link can be taken out at the same time.");
     $("edit-notes").innerHTML = notes.map((n) => `<p class="note">${escapeHtml(n)}</p>`).join("");
-    $("edit-delete").hidden = !!current.frontPage;
+    $("edit-delete").hidden = !!current.frontPage || !!current.menuBarLocked;
     $("edit-save").textContent = "Save changes";
 
     area.innerHTML = entry.content || "";

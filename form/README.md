@@ -91,9 +91,13 @@ npx wrangler pages deploy form --project-name cinderella-form
 
 **Menu**
 
-The site's main menu as a list: rename items in place, ↑ ↓ to reorder, **Into dropdown above** /
-**Out** to nest (one level), **Remove**, and **Add a link** (a page from the list, or any web
-address). Links to addresses with no page are flagged. A preview shows the result; nothing
+The site's main menu as a list. The **menu bar** (top-level items) is part of the design, so by
+default it's fixed: staff add, rename, reorder (↑ ↓) and remove the links *inside* existing
+dropdowns, and **Add a link** (a page from the list, or any web address) only offers existing
+dropdowns. Pages linked from the menu bar can't be deleted. The Worker enforces this too. For a
+client whose staff should manage the whole menu, set `"menu": { "topLevel": "editable" }` in
+`config/design-specs.json`; then top-level items can also be added, renamed, reordered, removed
+and nested (**Into dropdown above** / **Out**). Links to addresses with no page are flagged. A preview shows the result; nothing
 changes on the site until **Save menu** (one commit; **Undo my changes** reloads the saved menu).
 Once the menu has been edited here, `wordpress_export.py --site-info-only` keeps it rather than
 copying WordPress's menu again (`--overwrite-menu` to replace it).

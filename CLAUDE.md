@@ -53,7 +53,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 |---|---|
 | Bad change | `git revert <commit> && git push`, or **Rollback** in Pages/Workers → Deployments (`cd worker && npx wrangler rollback`) |
 | Remove/fix a published entry, add a page | Staff form → **Edit existing** / **New page** (or edit `content.json`, commit, push) |
-| Change the menu | Staff form → **Menu** (saved in `content.json` → `menu`) |
+| Change the menu | Staff form → **Menu**: staff edit links inside dropdowns; the menu bar is fixed (design) unless `"menu": { "topLevel": "editable" }` in `config/design-specs.json`. You can always edit `menu` in `content.json` directly |
 | Undo a delete | Staff form → Edit existing → **Deleted items → Put back** (entries wait in `trash.json`) |
 | Add, rename or hide a content type (e.g. exhibitions for an arts client) | Edit `contentTypes` in `config/design-specs.json`, push (`docs/CONTENT_TYPES.md`) |
 | Draft sections for a page from its existing content | In the client folder: `CLAUDE_API_KEY=… node ../../platform/scripts/draft-sections.mjs --pages /,how-to-help` → review `sections.draft.md`/`.json` → `--merge` into `sections.json`, preview, push |

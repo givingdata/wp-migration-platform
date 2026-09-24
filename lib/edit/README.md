@@ -34,6 +34,9 @@ await editor.saveMenu(newMenu, { version: m.version, by });
 - **Links don't break.** Edits never change an entry's slug; new pages get an address nothing
   else uses (including listing pages like /news/). Deleting a page can take its menu links out,
   and restoring it puts them back.
+- **The menu bar is locked** unless design-specs has `"menu": { "topLevel": "editable" }`:
+  top-level items (names, links, order) can't change, links only go into existing dropdowns,
+  and pages linked from the menu bar can't be deleted.
 - **Menus stay simple.** One level of dropdowns, every item named, links only to /paths,
   https:// or mailto:. Saving marks the menu as edited (`menuEditedAt`), so a WordPress re-import
   doesn't overwrite it.

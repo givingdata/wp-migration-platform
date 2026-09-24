@@ -158,6 +158,8 @@
     .menu-item .tools button { padding: .3rem .55rem; font-size: .85rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
     .menu-item .tools button:disabled { opacity: .35; cursor: default; }
     .menu-item.new input { border-color: var(--accent); }
+    .menu-item.fixed strong { flex: 1 1 12rem; padding: .45rem 0; }
+    .menu-item .lock { font-size: .8rem; color: var(--muted); border: 1px dashed var(--border); border-radius: 6px; padding: .2rem .5rem; }
     .menu-add { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
     .menu-add legend { padding: 0 .35rem; }
     .preview-h { font-size: 1rem; margin: 0 0 .5rem; color: var(--muted); }
@@ -377,6 +379,7 @@
 
     <section id="menu-mode" class="panel" role="tabpanel" aria-labelledby="tab-menu" hidden>
       <p class="hint" style="margin-top:0">The links across the top of every page. Items can have one level of dropdown links under them. Nothing changes on the site until you press <strong>Save menu</strong>.</p>
+      <p class="note" id="menu-lock-note" hidden>The main menu bar is part of the site's design, so its items are fixed here. You can add, rename, reorder and remove the links <em>inside</em> each dropdown. To change the menu bar itself, ask your web team.</p>
       <div id="menu-status" role="status" aria-live="polite" tabindex="-1"></div>
       <ol id="menu-list" class="menu-list" aria-label="Menu items"><li class="hint">Loading…</li></ol>
 

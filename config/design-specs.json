@@ -8,6 +8,7 @@
     "maxUploadBytes": 10485760,
     "acceptedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
   },
+  "menu": { "topLevel": "locked" },
   "contentTypes": {
     "post": {
       "label": "News",
