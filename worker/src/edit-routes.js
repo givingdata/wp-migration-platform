@@ -3,9 +3,12 @@
 //   GET    /entries                          everything on the site, by collection
 //   GET    /entries/:collection/:id          one entry + its version
 //   PUT    /entries/:collection/:id          { changes, version, by }    → commit
-//   DELETE /entries/:collection/:id          { version, reason, by }     → moved to trash.json
+//   DELETE /entries/:collection/:id          { version, reason, removeFromMenu, by } → moved to trash.json
+//   POST   /pages                            { fields, by }              → new page (text as written)
+//   GET    /menu                             the main menu + pages it can link to
+//   PUT    /menu                             { menu, version, by }       → commit
 //   GET    /trash                            deleted entries
-//   POST   /trash/:trashId/restore           { by }                      → back on the site
+//   POST   /trash/:trashId/restore           { by }                      → back on the site (and in the menu)
 //
 // Reads need the API key; changes also need the HMAC signature (like /submit).
 // Returns null for paths it doesn't handle.
@@ -60,9 +63,23 @@ export async function handleEditRoute(request, env, getEditor) {
     }
     if (method === "DELETE") {
       const body = await signedJson(request, env);
-      const result = await getEditor().remove(collection, id, { version: body.version, reason: body.reason, by: who(body) });
-      return { status: 200, body: { success: true, trashId: result.trashId, commit: result.commit } };
+      const result = await getEditor().remove(collection, id, { version: body.version, reason: body.reason, removeFromMenu: body.removeFromMenu === true, by: who(body) });
+      return { status: 200, body: { success: true, trashId: result.trashId, removedFromMenu: result.removedFromMenu, commit: result.commit } };
     }
+  }
+  if (pathname === "/pages" && method === "POST") {
+    const body = await signedJson(request, env);
+    const result = await getEditor().createPage(body.fields || {}, { by: who(body) });
+    return { status: 201, body: { success: true, collection: result.collection, entry: result.entry, path: result.path, commit: result.commit } };
+  }
+  if (pathname === "/menu" && method === "GET") {
+    requireApiKey(request, env);
+    return { status: 200, body: { success: true, ...(await getEditor().getMenu()) } };
+  }
+  if (pathname === "/menu" && method === "PUT") {
+    const body = await signedJson(request, env);
+    const result = await getEditor().saveMenu(body.menu, { version: body.version, by: who(body) });
+    return { status: 200, body: { success: true, version: result.version, commit: result.commit } };
   }
   if (pathname === "/trash" && method === "GET") {
     requireApiKey(request, env);
@@ -71,7 +88,7 @@ export async function handleEditRoute(request, env, getEditor) {
   if ((m = pathname.match(/^\/trash\/([0-9a-f-]{36})\/restore$/)) && method === "POST") {
     const body = await signedJson(request, env);
     const result = await getEditor().restore(m[1], { by: who(body) });
-    return { status: 200, body: { success: true, collection: result.collection, entry: result.entry, slugChanged: result.slugChanged, commit: result.commit } };
+    return { status: 200, body: { success: true, collection: result.collection, entry: result.entry, slugChanged: result.slugChanged, menuRestored: result.menuRestored, commit: result.commit } };
   }
   return null;
 }

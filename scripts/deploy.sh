@@ -193,7 +193,7 @@ done
 bold "Deploying staff form"
 form_tmp="$(mktemp -d)"
 trap 'rm -rf "$form_tmp" "$PAGES_CWD"' EXIT
-cp "$ROOT"/form/index.html "$ROOT"/form/form-handler.js "$ROOT"/form/edit.js "$ROOT"/form/signing.js "$form_tmp"/
+cp "$ROOT"/form/index.html "$ROOT"/form/form-handler.js "$ROOT"/form/edit.js "$ROOT"/form/menu.js "$ROOT"/form/signing.js "$form_tmp"/
 FORM_SITE_URL="https://$PAGES_PROJECT.pages.dev"
 [ -n "$SITE_DOMAIN" ] && FORM_SITE_URL="https://$SITE_DOMAIN"
 cat > "$form_tmp/config.js" <<JS

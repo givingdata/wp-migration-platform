@@ -109,6 +109,7 @@
     .modes { display: flex; gap: .5rem; margin: 0 0 1.25rem; }
     .modes button { background: transparent; color: var(--accent); }
     .modes button[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); }
+    @media (max-width: 34rem) { .modes button { padding: .6rem .8rem; flex: 1; } }
     .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
     .panel form { border: 0; padding: 0; background: none; }
     .toolbar-row { display: flex; gap: .5rem; margin-bottom: 1rem; }
@@ -144,6 +145,28 @@
     dialog::backdrop { background: rgba(0,0,0,.45); }
     dialog h2 { margin-top: 0; }
     dialog input { margin-bottom: 1rem; }
+    select { width: 100%; padding: .6rem .7rem; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    label.check { display: flex; gap: .5rem; align-items: center; font-weight: 500; margin: 0 0 1rem; }
+    label.check input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--accent); }
+    .menu-list, .menu-list ol { list-style: none; margin: 0; padding: 0; }
+    .menu-list { border-top: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .menu-list ol { margin-left: 1.75rem; border-left: 2px solid var(--border); padding-left: .75rem; }
+    .menu-item { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .5rem 0; border-bottom: 1px solid var(--border); }
+    .menu-item input { flex: 1 1 12rem; width: auto; padding: .45rem .6rem; }
+    .menu-item .path { flex-basis: 100%; order: 3; color: var(--muted); font-size: .85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    .menu-item .tools { display: flex; gap: .25rem; flex-wrap: wrap; }
+    .menu-item .tools button { padding: .3rem .55rem; font-size: .85rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+    .menu-item .tools button:disabled { opacity: .35; cursor: default; }
+    .menu-item.new input { border-color: var(--accent); }
+    .menu-add { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
+    .menu-add legend { padding: 0 .35rem; }
+    .preview-h { font-size: 1rem; margin: 0 0 .5rem; color: var(--muted); }
+    .menu-preview { background: var(--bg); border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1.25rem; }
+    .menu-preview > ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
+    .menu-preview ul ul { list-style: none; margin: .25rem 0 0; padding: .35rem .6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: .85rem; }
+    .menu-preview a, .menu-preview span { color: var(--text); text-decoration: none; font-weight: 600; }
+    .menu-preview ul ul a { font-weight: 400; }
+    .menu-preview .broken { color: var(--error); text-decoration: line-through; }
     .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   </style>
 </head>
@@ -156,6 +179,7 @@
       <div class="modes" role="tablist" aria-label="What do you want to do?">
         <button type="button" role="tab" id="tab-add" aria-selected="true" aria-controls="content-form">Add new</button>
         <button type="button" role="tab" id="tab-edit" aria-selected="false" aria-controls="edit-mode">Edit existing</button>
+        <button type="button" role="tab" id="tab-menu" aria-selected="false" aria-controls="menu-mode">Menu</button>
       </div>
     </header>
 
@@ -253,6 +277,7 @@
         <div class="toolbar-row">
           <label class="visually-hidden" for="edit-search">Search</label>
           <input type="search" id="edit-search" placeholder="Search by title or web address" autocomplete="off">
+          <button type="button" class="secondary" id="new-page">New page</button>
           <button type="button" class="secondary" id="show-trash">Deleted items</button>
         </div>
         <div id="browse-status" role="status" aria-live="polite" tabindex="-1"></div>
@@ -350,6 +375,46 @@
       </div>
     </section>
 
+    <section id="menu-mode" class="panel" role="tabpanel" aria-labelledby="tab-menu" hidden>
+      <p class="hint" style="margin-top:0">The links across the top of every page. Items can have one level of dropdown links under them. Nothing changes on the site until you press <strong>Save menu</strong>.</p>
+      <div id="menu-status" role="status" aria-live="polite" tabindex="-1"></div>
+      <ol id="menu-list" class="menu-list" aria-label="Menu items"><li class="hint">Loading…</li></ol>
+
+      <fieldset class="menu-add">
+        <legend>Add a link</legend>
+        <div class="row">
+          <div class="field">
+            <label for="menu-target">Page</label>
+            <select id="menu-target"><option value="">Choose a page…</option></select>
+          </div>
+          <div class="field">
+            <label for="menu-url">or a web address</label>
+            <input type="url" id="menu-url" placeholder="https://" maxlength="2000">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="menu-title">Name in the menu</label>
+            <input type="text" id="menu-title" maxlength="100">
+          </div>
+          <div class="field">
+            <label for="menu-parent">Where</label>
+            <select id="menu-parent"><option value="">Top level</option></select>
+          </div>
+        </div>
+        <p class="error-text" id="menu-add-error"></p>
+        <button type="button" class="secondary" id="menu-add">Add to menu</button>
+      </fieldset>
+
+      <h2 class="preview-h">Preview</h2>
+      <nav class="menu-preview" id="menu-preview" aria-label="Menu preview"></nav>
+
+      <div class="actions spread">
+        <button type="button" id="menu-save">Save menu</button>
+        <button type="button" class="secondary" id="menu-reset">Undo my changes</button>
+      </div>
+    </section>
+
     <dialog id="delete-dialog" aria-labelledby="delete-title">
       <form method="dialog">
         <h2 id="delete-title">Delete this?</h2>
@@ -357,6 +422,7 @@
         <p>It comes off the website within a few minutes. You can put it back from <strong>Deleted items</strong>.</p>
         <label for="delete-reason">Reason <span class="optional">(optional)</span></label>
         <input type="text" id="delete-reason" maxlength="500">
+        <label class="check" id="delete-menu-row" hidden><input type="checkbox" id="delete-menu" checked> Also take it out of the site menu</label>
         <div class="actions spread">
           <button value="cancel" class="secondary">Keep it</button>
           <button value="delete" class="danger" id="delete-confirm">Delete</button>

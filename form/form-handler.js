@@ -284,9 +284,18 @@ async function init() {
   if (!specs) specs = { contentTypes: FALLBACK_TYPES };
   $("type-options").innerHTML = Object.entries(specs.contentTypes)
     .map(([key, t], i) => `<label><input type="radio" name="type" value="${escapeHtml(key)}"${i === 0 ? " checked required" : ""}> ${escapeHtml(t.label || key)}</label>`)
-    .join("");
+    .join("") + '<label><input type="radio" name="type" value="" data-page> Page</label>';
   applyType();
-  initEdit({ config, specs, escapeHtml });
+  const edit = initEdit({ config, specs, escapeHtml });
+  // Pages are written in the page editor (Edit existing → New page), not through this form.
+  let lastType = currentType();
+  form.addEventListener("change", (e) => {
+    if (e.target.name !== "type") return;
+    if (e.target.dataset.page !== undefined) {
+      form.querySelector(`input[name="type"][value="${CSS.escape(lastType)}"]`).checked = true;
+      edit.openNewPage();
+    } else lastType = e.target.value;
+  });
 
   form.addEventListener("change", (e) => { if (e.target.name === "type") applyType(); });
   imageInput.addEventListener("change", () => handleFile(imageInput.files[0]));

@@ -16,6 +16,9 @@ await editor.update("pages", "103", { title: "About us" }, { version, by: "staff
 const { trashId } = await editor.remove("posts", "a1b2", { by, reason: "duplicate" });
 await editor.restore(trashId, { by });
 await editor.create("announcement", { title: "Office closed", date: "2026-10-05" });
+await editor.createPage({ title: "Volunteer FAQ", content: "<p>…</p>" }, { by });
+const m = await editor.getMenu();                    // { menu, version, targets }
+await editor.saveMenu(newMenu, { version: m.version, by });
 ```
 
 ## Rules it enforces
@@ -28,7 +31,12 @@ await editor.create("announcement", { title: "Office closed", date: "2026-10-05"
 - **Deletes are recoverable.** `remove()` moves the entry to `trash.json` (next to `content.json`)
   with who deleted it, when and why; `restore()` puts it back, with the same web address unless
   something else took it meanwhile. Images stay in R2. The homepage can't be deleted.
-- **Links don't break.** Edits never change an entry's slug.
+- **Links don't break.** Edits never change an entry's slug; new pages get an address nothing
+  else uses (including listing pages like /news/). Deleting a page can take its menu links out,
+  and restoring it puts them back.
+- **Menus stay simple.** One level of dropdowns, every item named, links only to /paths,
+  https:// or mailto:. Saving marks the menu as edited (`menuEditedAt`), so a WordPress re-import
+  doesn't overwrite it.
 - **Only known fields change**: title, summary, body, image description, and the date/time/
   location/author/link fields the entry's content type has (`config/design-specs.json`).
 - **HTML is cleaned** of scripts, event handlers and `javascript:` links (`sanitize.js`). It's a

@@ -10,7 +10,8 @@ has Claude tidy the text, and publishes it to the site.
 | `index.html` | Markup + styles (responsive, dark-mode aware, WCAG-oriented) |
 | `config.js` | Per-client settings: site name, Worker URL, API key |
 | `form-handler.js` | Add new: validation, image preview + crop guidance, submit/response handling |
-| `edit.js` | Edit existing: find, edit (simple editor or HTML), delete, Deleted items / put back |
+| `edit.js` | Edit existing: find, edit (simple editor or HTML), new pages, delete, Deleted items / put back |
+| `menu.js` | Menu: rename, reorder, dropdowns, add/remove links, preview, save |
 | `signing.js` | HMAC-SHA256 signing, identical scheme to `worker/src/auth.js` |
 | `mock-worker.mjs` | Local stand-in for the Worker (real auth check, fake publishing) |
 
@@ -81,8 +82,21 @@ npx wrangler pages deploy form --project-name cinderella-form
    source). Pasted text keeps paragraphs but not fonts. The web address never changes.
 3. **Save changes** commits only the fields that changed. If someone else changed it meanwhile,
    they're told and can reload it.
-4. **Delete…** asks for confirmation and an optional reason, then moves it to **Deleted items**,
-   where **Put back** restores it. The homepage can't be deleted.
+4. **Delete…** asks for confirmation and an optional reason (and, for a page in the menu, whether
+   to take its menu link out too), then moves it to **Deleted items**, where **Put back** restores
+   it, menu link included. The homepage can't be deleted.
+5. **New page** (also *Add new → Page*): title, summary and text in the same editor. Pages are
+   saved as written (Claude doesn't rewrite them); the address comes from the title. After
+   creating one, **add it to the menu** jumps to the Menu tab with the link filled in.
+
+**Menu**
+
+The site's main menu as a list: rename items in place, ↑ ↓ to reorder, **Into dropdown above** /
+**Out** to nest (one level), **Remove**, and **Add a link** (a page from the list, or any web
+address). Links to addresses with no page are flagged. A preview shows the result; nothing
+changes on the site until **Save menu** (one commit; **Undo my changes** reloads the saved menu).
+Once the menu has been edited here, `wordpress_export.py --site-info-only` keeps it rather than
+copying WordPress's menu again (`--overwrite-menu` to replace it).
 
 Changes are labelled with the staff member's email when the form is behind Cloudflare Access
 (the page reads `/cdn-cgi/access/get-identity`). `node form/mock-worker.mjs` supports editing

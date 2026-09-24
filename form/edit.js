@@ -2,6 +2,7 @@
 // (it goes to Deleted items) or put a deleted item back. Talks to the Worker's /entries
 // and /trash routes (worker/src/edit-routes.js); every change is signed like /submit.
 import { signedJson } from "./signing.js";
+import { initMenu } from "./menu.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const FIELDS = ["title", "description", "date", "endDate", "time", "location", "author", "linkUrl", "imageAlt"];
@@ -60,18 +61,22 @@ export function initEdit({ config, specs, escapeHtml }) {
 
   const entryPath = (collection, id) => `/entries/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`;
 
+  const menu = initMenu({ call, escapeHtml });
+
   // ---- Modes ---------------------------------------------------------------
 
   function setMode(mode) {
-    const editing = mode === "edit";
-    $("tab-add").setAttribute("aria-selected", String(!editing));
-    $("tab-edit").setAttribute("aria-selected", String(editing));
-    addForm.hidden = editing;
-    panel.hidden = !editing;
-    if (editing && !listing) loadList();
+    if (mode !== "menu" && !$("menu-mode").hidden && menu.dirty && !confirm("The menu has changes that aren't saved yet. Leave them for now? (They stay here until you reload the page.)")) return;
+    for (const [m, tab, el] of [["add", "tab-add", addForm], ["edit", "tab-edit", panel], ["menu", "tab-menu", $("menu-mode")]]) {
+      $(tab).setAttribute("aria-selected", String(m === mode));
+      el.hidden = m !== mode;
+    }
+    if (mode === "edit" && !listing) loadList();
+    if (mode === "menu") menu.show();
   }
   $("tab-add").addEventListener("click", () => setMode("add"));
   $("tab-edit").addEventListener("click", () => setMode("edit"));
+  $("tab-menu").addEventListener("click", () => setMode("menu"));
 
   function show(view) {
     $("edit-browse").hidden = view !== "browse";
@@ -169,9 +174,10 @@ export function initEdit({ config, specs, escapeHtml }) {
 
     const notes = [];
     if (current.frontPage) notes.push("This is the homepage. It can be changed but not deleted.");
-    if (current.inMenu) notes.push("This page is in the site menu; deleting it would leave a menu link that goes nowhere.");
+    if (current.inMenu) notes.push("This page is in the site menu. If you delete it, its menu link can be taken out at the same time.");
     $("edit-notes").innerHTML = notes.map((n) => `<p class="note">${escapeHtml(n)}</p>`).join("");
     $("edit-delete").hidden = !!current.frontPage;
+    $("edit-save").textContent = "Save changes";
 
     area.innerHTML = entry.content || "";
     htmlArea.value = entry.content || "";
@@ -182,6 +188,28 @@ export function initEdit({ config, specs, escapeHtml }) {
     show("edit");
     editForm.elements.title.focus();
   }
+  function openNewPage() {
+    setMode("edit");
+    status($("edit-status"), "", "");
+    status($("browse-status"), "", "");
+    FIELDS.forEach((f) => setError(f, ""));
+    current = { creating: true, collection: "pages", entry: {}, type: { fields: [] } };
+    $("edit-kind").textContent = "New page";
+    $("edit-url").textContent = "The web address is made from the title when you save.";
+    $("edit-notes").innerHTML = "";
+    editForm.querySelectorAll("[data-edit-field]").forEach((el) => { el.hidden = true; });
+    for (const f of FIELDS) if (editForm.elements[f]) editForm.elements[f].value = "";
+    area.innerHTML = "";
+    htmlArea.value = "";
+    setHtmlMode(false);
+    loadedHtml = area.innerHTML;
+    $("edit-delete").hidden = true;
+    $("edit-save").textContent = "Create page";
+    show("edit");
+    editForm.elements.title.focus();
+  }
+  $("new-page").addEventListener("click", openNewPage);
+
   $("edit-back").addEventListener("click", () => { status($("browse-status"), "", ""); show("browse"); loadList(); });
 
   // Simple editor: document.execCommand is old but is the one API every browser still
@@ -229,6 +257,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     e.preventDefault();
     if (!current) return;
     FIELDS.forEach((f) => setError(f, ""));
+    if (current.creating) return createPage();
     const changes = {};
     for (const f of FIELDS) {
       const input = editForm.elements[f];
@@ -261,22 +290,50 @@ export function initEdit({ config, specs, escapeHtml }) {
     }
   });
 
+  async function createPage() {
+    const title = editForm.elements.title.value.trim();
+    if (!title) return setError("title", "Please add a title.");
+    const btn = $("edit-save");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Creating…';
+    try {
+      const res = await call("POST", "/pages", { fields: { title, description: editForm.elements.description.value.trim(), content: contentHtml() } });
+      listing = null;
+      await openEntry("pages", res.entry.id);
+      status($("edit-status"), "success",
+        `<strong>Page created</strong> at <code>${escapeHtml(res.path)}</code>. It will be live in a few minutes. Visitors can only find it through links, so <button type="button" class="link" id="add-to-menu">add it to the menu</button>.`);
+      $("add-to-menu").addEventListener("click", () => { setMode("menu"); menu.prefill(res.entry.title, res.path); });
+    } catch (err) {
+      if (err.fields) for (const [f, m] of Object.entries(err.fields)) setError(f, m);
+      status($("edit-status"), "error", escapeHtml(err.message));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = current?.creating ? "Create page" : "Save changes";
+    }
+  }
+
   // ---- Delete --------------------------------------------------------------
 
   const dialog = $("delete-dialog");
   $("edit-delete").addEventListener("click", () => {
     $("delete-what").textContent = `“${current.entry.title}”`;
     $("delete-reason").value = "";
+    $("delete-menu-row").hidden = !current.inMenu;
+    $("delete-menu").checked = true;
     dialog.showModal();
   });
   dialog.addEventListener("close", async () => {
     if (dialog.returnValue !== "delete" || !current) return;
     try {
-      await call("DELETE", entryPath(current.collection, current.id), { version: current.version, reason: $("delete-reason").value.trim() || null });
+      const res = await call("DELETE", entryPath(current.collection, current.id), {
+        version: current.version,
+        reason: $("delete-reason").value.trim() || null,
+        removeFromMenu: current.inMenu && $("delete-menu").checked,
+      });
       listing = null;
       show("browse");
       await loadList();
-      status($("browse-status"), "success", `<strong>Deleted “${escapeHtml(current.entry.title)}”.</strong> It will be off the website in a few minutes. You can put it back from Deleted items.`);
+      status($("browse-status"), "success", `<strong>Deleted “${escapeHtml(current.entry.title)}”.</strong> It will be off the website in a few minutes${res.removedFromMenu ? " and out of the menu" : ""}. You can put it back from Deleted items.`);
       current = null;
     } catch (err) {
       status($("edit-status"), "error", escapeHtml(err.message));
@@ -314,11 +371,14 @@ export function initEdit({ config, specs, escapeHtml }) {
       const res = await call("POST", `/trash/${btn.dataset.restore}/restore`, {});
       await loadTrash();
       const moved = res.slugChanged ? ` Its old web address was taken meanwhile, so it is now at /${escapeHtml(res.entry.slug)}/.` : "";
-      status($("trash-status"), "success", `<strong>“${escapeHtml(res.entry.title)}” is back.</strong> The website will update in a few minutes.${moved}`);
+      const inMenu = res.menuRestored ? " Its menu link is back too." : "";
+      status($("trash-status"), "success", `<strong>“${escapeHtml(res.entry.title)}” is back.</strong> The website will update in a few minutes.${inMenu}${moved}`);
       listing = null;
     } catch (err) {
       btn.disabled = false;
       status($("trash-status"), "error", escapeHtml(err.message));
     }
   });
+
+  return { openNewPage };
 }

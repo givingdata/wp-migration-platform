@@ -670,6 +670,7 @@ def main(argv=None):
     mode.add_argument("--media-only", action="store_true", help="Re-mirror media for an existing --output file without re-fetching content")
     mode.add_argument("--site-info-only", action="store_true", help="Refresh only the menu, footer and homepage setting in an existing --output file")
     parser.add_argument("--force", action="store_true", help="Re-upload media even if the object already exists in R2")
+    parser.add_argument("--overwrite-menu", action="store_true", help="With --site-info-only: replace the menu even if staff have edited it on the new site")
     parser.add_argument("--include-external", action="store_true", help="Also mirror images hosted on other domains")
     parser.add_argument("--limit", type=int, help="Max items per post type (handy for test runs)")
     parser.add_argument("--env-file", default=".env", help="Path to .env with R2 credentials (default: .env)")
@@ -687,9 +688,15 @@ def main(argv=None):
         site_url = args.wordpress_url or data.get("siteUrl")
         if not site_url:
             parser.error("--wordpress-url is required (the export has no siteUrl)")
-        data.update(WordPressExporter(site_url, []).fetch_homepage_info())
+        info = WordPressExporter(site_url, []).fetch_homepage_info()
+        # Once staff edit the menu in the staff form (menuEditedAt), WordPress no longer owns it.
+        kept_menu = bool(data.get("menuEditedAt")) and not args.overwrite_menu
+        if kept_menu:
+            info.pop("menu", None)
+            log.warning("menu was edited on the new site (%s); keeping it. Use --overwrite-menu to replace it with WordPress's.", data["menuEditedAt"])
+        data.update(info)
         output.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"\n✓ Updated menu, footer and homepage setting in {output}")
+        print(f"\n✓ Updated {'footer and homepage setting (menu kept)' if kept_menu else 'menu, footer and homepage setting'} in {output}")
         return 0
 
     if args.media_only:

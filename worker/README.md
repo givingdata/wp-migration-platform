@@ -125,9 +125,12 @@ Cloudflare Access, recorded in the commit message and on the entry.
 | `GET /entries` | | Every page and entry by collection, plus `trashCount` |
 | `GET /entries/:collection/:id` | | `{ entry, version, type, frontPage, inMenu }` |
 | `PUT /entries/:collection/:id` | `{ changes, version, by }` | Saves the changed fields; 409 if the entry changed since `version`; 400 with `fields` for bad values |
-| `DELETE /entries/:collection/:id` | `{ version, reason, by }` | Moves it to `trash.json`; 409 for the homepage |
+| `DELETE /entries/:collection/:id` | `{ version, reason, removeFromMenu, by }` | Moves it to `trash.json` (and its menu links out, if asked); 409 for the homepage |
+| `POST /pages` | `{ fields: { title, description, content }, by }` | New page, text as written; returns `{ entry, path }` |
+| `GET /menu` | | `{ menu, version, targets }`: the menu with each link's address on this site, and the pages/listings it can link to |
+| `PUT /menu` | `{ menu, version, by }` | Replaces the menu (one level of dropdowns; links are /paths, https:// or mailto:); 409 if it changed since `version` |
 | `GET /trash` | | Deleted entries, newest first |
-| `POST /trash/:trashId/restore` | `{ by }` | Puts it back (`slugChanged` if its old address was taken) |
+| `POST /trash/:trashId/restore` | `{ by }` | Puts it back, with any menu links it had (`slugChanged` if its old address was taken) |
 
 ## Stored media layout (R2)
 

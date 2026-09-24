@@ -52,11 +52,12 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Situation | Command |
 |---|---|
 | Bad change | `git revert <commit> && git push`, or **Rollback** in Pages/Workers → Deployments (`cd worker && npx wrangler rollback`) |
-| Remove/fix a published entry | Staff form → **Edit existing** (or edit `content.json`, commit, push) |
+| Remove/fix a published entry, add a page | Staff form → **Edit existing** / **New page** (or edit `content.json`, commit, push) |
+| Change the menu | Staff form → **Menu** (saved in `content.json` → `menu`) |
 | Undo a delete | Staff form → Edit existing → **Deleted items → Put back** (entries wait in `trash.json`) |
 | Add, rename or hide a content type (e.g. exhibitions for an arts client) | Edit `contentTypes` in `config/design-specs.json`, push (`docs/CONTENT_TYPES.md`) |
 | Draft sections for a page from its existing content | In the client folder: `CLAUDE_API_KEY=… node ../../platform/scripts/draft-sections.mjs --pages /,how-to-help` → review `sections.draft.md`/`.json` → `--merge` into `sections.json`, preview, push |
-| Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push |
+| Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push. Keeps a menu staff edited in the form unless you add `--overwrite-menu` |
 | Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
 | Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
 | Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push |
