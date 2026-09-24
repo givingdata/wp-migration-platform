@@ -12,3 +12,6 @@ node_modules/
 dist/
 .astro/
 .wrangler/
+
+# Hand-off folder for instruction files from the cloud session (Mac mini only)
+access/

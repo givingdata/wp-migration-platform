@@ -60,7 +60,6 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 ### Rarely / never
 
 - `form/mock-worker.mjs`: local testing of form changes (`node form/mock-worker.mjs` + `python3 -m http.server 8080 -d form`)
-- `run-all-agents.sh`: obsolete (was for launching build agents); safe to delete
 
 ## Gotchas
 
