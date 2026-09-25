@@ -79,6 +79,35 @@ a future lightweight content platform or database: a new store implements `read`
 the form, dashboard and Claude routes below keep working. Still to do: a dashboard Edit page
 (can reuse the Worker routes), per-entry history ("restore an earlier version") from git.
 
+## Slack edits (built 2026-09-24; `docs/SLACK.md`)
+
+Staff post a request in their client's Slack channel, Claude drafts the change, and Approve
+commits it through the Edit module. Tested on Cinderella: edit a page's text, add a news item,
+remove a line. Progress shows as 👀 on the request and a thread message that updates as it works.
+
+Next (planned for 2026-09-25):
+
+1. **Images from Slack.** Today a message with a photo attached is ignored (it arrives as a
+   `file_share` message, and `worker/src/slack.js` only accepts plain text), and the drafting
+   rules forbid images. To add:
+   - the `files:read` scope (reinstall the app);
+   - accept messages with a photo, download it from Slack with the bot token, and run it
+     through the staff form's image pipeline (`storeImage` in `worker/src/cloudflare.js`);
+   - Claude picks the target entry and writes the image description (`imageAlt`);
+   - a preview of the photo on the Approve card;
+   - limits on file type and size, and a clear reply for anything that isn't a photo;
+   - if it's unclear which entry the photo belongs to (for example a photo with no text),
+     the bot asks instead of guessing.
+   Roughly half a day with tests.
+2. **`docs/SLACK.md` additions** (in "When it doesn't work"):
+   - The **Slack desktop app** may not show the bot's thread updates or the finished draft
+     while the web app does: press **⌘R** (Ctrl+R on Windows) to refresh, or use
+     **Help → Troubleshooting → Clear Cache and Restart**.
+   - Requests posted as a **reply in a thread** are ignored by design; post in the channel.
+3. **New bot token for Cinderella** before real staff use it: the current one was pasted into
+   a chat during setup. Reinstalling keeps the same token, so get a new one and update the
+   Worker secret `SLACK_BOT_TOKEN`.
+
 ## Future option: Claude edits the site
 
 Part of the original spec (staff update the site with Claude's help). Today Claude only
