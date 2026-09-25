@@ -131,12 +131,14 @@ class R2Uploader:
 
 
 class WordPressExporter:
-    def __init__(self, base_url, types, per_page=100, limit=None, timeout=30):
+    def __init__(self, base_url, types, per_page=100, limit=None, timeout=30, pages=None):
         self.base_url = base_url.rstrip("/")
         self.api_url = f"{self.base_url}/wp-json/wp/v2"
         self.types = types
         self.per_page = per_page
         self.limit = limit
+        # Only these pages ("/" = the homepage, else a page's path or slug); None = all pages.
+        self.pages = pages
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "wp-migration-platform/1.0 (+https://github.com/givingdata/wp-migration-platform)"
@@ -193,6 +195,37 @@ class WordPressExporter:
             if page >= total_pages:
                 break
             page += 1
+        return items
+
+    def fetch_pages(self, rest_base, front_page):
+        """Fetch only the pages listed in self.pages, by slug (the last part of a path)."""
+        items, seen = [], set()
+        for wanted in self.pages:
+            path = wanted.strip().strip("/")
+            if not path:
+                if not front_page:
+                    log.info("Homepage lists the latest posts (no static front page to fetch)")
+                    continue
+                url, params = f"{self.api_url}/{rest_base}/{front_page}", {"_embed": "1"}
+            else:
+                url, params = f"{self.api_url}/{rest_base}", {"slug": path.split("/")[-1], "_embed": "1"}
+            try:
+                resp = self.session.get(url, params=params, timeout=self.timeout)
+                resp.raise_for_status()
+                found = resp.json()
+            except (requests.RequestException, ValueError) as e:
+                log.warning("Could not fetch page '%s': %s", wanted, e)
+                continue
+            found = found if isinstance(found, list) else [found]
+            if path and len(found) > 1:
+                # Same slug under different parents: prefer the one whose link ends in the full path.
+                found = [f for f in found if urlparse(f.get("link") or "").path.strip("/").endswith(path)] or found[:1]
+            if not found:
+                log.warning("Page '%s' not found on %s", wanted, self.base_url)
+            for item in found[:1]:
+                if item.get("id") not in seen:
+                    seen.add(item.get("id"))
+                    items.append(item)
         return items
 
     # ---- Normalisation -------------------------------------------------
@@ -256,12 +289,17 @@ class WordPressExporter:
             "pages": [],
             "media": [],
         }
+        info = self.fetch_homepage_info()
         for post_type, rest_base in self.rest_bases().items():
             collection = self.collection_for(post_type)
-            items = [self.normalise(i, collection) for i in self.fetch_type(rest_base)]
+            if post_type == "page" and self.pages is not None:
+                raw = self.fetch_pages(rest_base, info.get("frontPage"))
+            else:
+                raw = self.fetch_type(rest_base)
+            items = [self.normalise(i, collection) for i in raw]
             data.setdefault(collection, []).extend(items)
             log.info("%s: %d items", collection, len(items))
-        data.update(self.fetch_homepage_info())
+        data.update(info)
         return data
 
     def fetch_homepage_info(self):
@@ -673,6 +711,7 @@ def main(argv=None):
     parser.add_argument("--overwrite-menu", action="store_true", help="With --site-info-only: replace the menu even if staff have edited it on the new site")
     parser.add_argument("--include-external", action="store_true", help="Also mirror images hosted on other domains")
     parser.add_argument("--limit", type=int, help="Max items per post type (handy for test runs)")
+    parser.add_argument("--pages", help='Only these pages, comma-separated: "/" for the homepage, else a page\'s path or slug (e.g. /,about-us,services)')
     parser.add_argument("--env-file", default=".env", help="Path to .env with R2 credentials (default: .env)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -720,7 +759,8 @@ def main(argv=None):
         if not args.wordpress_url:
             parser.error("--wordpress-url is required unless --media-only is used")
         types = [t.strip() for t in args.types.split(",") if t.strip()]
-        data = WordPressExporter(args.wordpress_url, types, limit=args.limit).export()
+        pages = [p.strip() for p in args.pages.split(",") if p.strip()] if args.pages else None
+        data = WordPressExporter(args.wordpress_url, types, limit=args.limit, pages=pages).export()
         site_url = args.wordpress_url
 
     if not args.skip_media:

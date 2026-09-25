@@ -77,6 +77,7 @@ python wordpress_export.py --wordpress-url https://thecinderellaproject.com --ou
 | `--force` | Re-upload even if the object already exists in R2 (otherwise existing keys are skipped) |
 | `--include-external` | Also mirror images hosted on other domains |
 | `--limit N` | Max items per type |
+| `--pages LIST` | Only these pages, comma-separated: `/` for the homepage, else a page's path or slug (e.g. `/,about-us`). Other types still follow `--types`/`--limit` |
 
 ### What gets mirrored
 
