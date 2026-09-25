@@ -65,6 +65,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |
+| Let staff request edits from Slack | `docs/SLACK.md` (`node scripts/slack-app-link.mjs --open` creates the Slack app) |
 
 ### Rarely / never
 

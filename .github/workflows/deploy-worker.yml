@@ -69,6 +69,21 @@ jobs:
             GITHUB_TOKEN
           command: deploy --var GITHUB_REPO:${{ github.repository }}
 
+      # Optional Slack bot (docs/SLACK.md). Kept out of the list above so
+      # clients without Slack don't need these secrets.
+      - name: Slack secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          for name in SLACK_SIGNING_SECRET SLACK_BOT_TOKEN; do
+            value="${!name}"
+            if [ -z "$value" ]; then echo "$name not set; skipping (Slack is optional)"; continue; fi
+            printf '%s' "$value" | npx wrangler secret put "$name"
+          done
+
       - name: Smoke test
         run: |
           url="${{ vars.WORKER_URL }}"

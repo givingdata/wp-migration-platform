@@ -16,12 +16,19 @@ R2_PUBLIC_URL = ""
 # Comma-separated origins allowed to call the Worker (the form's host)
 ALLOWED_ORIGINS = "http://localhost:8080"
 # CLAUDE_MODEL = "claude-opus-5"
+# Slack (optional, docs/SLACK.md). The bot only acts in these channels, for these staff.
+# SLACK_CHANNEL_IDS = ""
+# SLACK_STAFF_EMAILS = ""
+# SLACK_STAFF_DOMAINS = ""
+# SLACK_HOURLY_LIMIT = "20"
 
 # Secrets (set with `wrangler secret put <NAME>`, locally in .dev.vars):
-#   API_KEY            shared with the form (Bearer token)
-#   HMAC_SECRET        optional; defaults to API_KEY
-#   ANTHROPIC_API_KEY  (or CLAUDE_API_KEY)
-#   GITHUB_TOKEN       fine-grained token, Contents: read & write on GITHUB_REPO
+#   API_KEY               shared with the form (Bearer token)
+#   HMAC_SECRET           optional; defaults to API_KEY
+#   ANTHROPIC_API_KEY     (or CLAUDE_API_KEY)
+#   GITHUB_TOKEN          fine-grained token, Contents: read & write on GITHUB_REPO
+#   SLACK_SIGNING_SECRET  optional, Slack app → Basic Information (docs/SLACK.md)
+#   SLACK_BOT_TOKEN       optional, Slack app → OAuth & Permissions (xoxb-…)
 
 [[kv_namespaces]]
 binding = "CONTENT"
