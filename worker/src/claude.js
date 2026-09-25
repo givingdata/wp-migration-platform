@@ -1,7 +1,7 @@
 // Turns raw form input into a clean, site-ready content entry using Claude.
 import Anthropic from "@anthropic-ai/sdk";
 
-const DEFAULT_MODEL = "claude-opus-5";
+export const DEFAULT_MODEL = "claude-opus-5";
 
 // Structured-output schema: every property required, nullable where optional.
 function entrySchema() {
