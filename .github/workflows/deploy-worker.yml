@@ -67,7 +67,7 @@ jobs:
             API_KEY
             CLAUDE_API_KEY
             GITHUB_TOKEN
-          command: deploy --var GITHUB_REPO:${{ github.repository }}
+          command: deploy --var GITHUB_REPO:${{ github.repository }} --var SITE_URL:${{ vars.SITE_URL }}
 
       # Optional Slack bot (docs/SLACK.md). Kept out of the list above so
       # clients without Slack don't need these secrets.

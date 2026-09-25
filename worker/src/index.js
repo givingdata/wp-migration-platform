@@ -6,6 +6,7 @@
 //   GET  /specs         public design specs (content types, image rules) for the form
 //   GET  /health
 //   /entries, /trash    staff editing: see edit-routes.js
+//   /slack/*            staff ask for changes in Slack (off unless SLACK_SIGNING_SECRET): slack.js, slack-flow.js
 //
 // See worker/README.md for the full API contract.
 import specs from "../../config/design-specs.json" with { type: "json" };
@@ -14,6 +15,8 @@ import { structureContent, ClaudeError } from "./claude.js";
 import { storeImage, saveSubmission, getSubmission, listSubmissions } from "./cloudflare.js";
 import { editorFor, GitHubError } from "./content.js";
 import { handleEditRoute } from "./edit-routes.js";
+import { handleSlackRoute } from "./slack.js";
+import { slackHandlers } from "./slack-flow.js";
 import { contentTypes } from "../../lib/content-types.js";
 import { EditError, StaleError } from "../../lib/edit/index.js";
 
@@ -205,9 +208,18 @@ async function requireApiKey(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const { pathname } = url;
+
+    // Slack signs its requests and isn't a browser, so these skip the API key and CORS.
+    if (pathname.startsWith("/slack")) {
+      const slack = await handleSlackRoute(request, env, ctx, slackHandlers(env, () => editorFor(env))).catch((e) => {
+        console.error("slack route failed:", e.message);
+        return new Response(JSON.stringify({ ok: false }), { status: 500, headers: { "Content-Type": "application/json" } });
+      });
+      if (slack) return slack;
+    }
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 
