@@ -237,8 +237,16 @@ SITE_URL="${SITE_URL:-https://$PAGES_PROJECT.pages.dev}"
 bold "GitHub Actions configuration"
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1 && confirm "Set secrets and variables on $GITHUB_REPO with gh?"; then
   ask CLOUDFLARE_ACCOUNT_ID "Cloudflare account ID" "$(wrangler whoami 2>/dev/null | grep -Eo '[0-9a-f]{32}' | head -1)"
-  ask_secret CLOUDFLARE_API_TOKEN "Cloudflare API token for CI (Workers Scripts:Edit, Pages:Edit, KV:Edit, R2:Edit)"
-  gh secret set CLOUDFLARE_API_TOKEN -R "$GITHUB_REPO" --body "$CLOUDFLARE_API_TOKEN"
+  # The repo gets this client's own deploy-only token, never the setup token
+  # (CLOUDFLARE_API_TOKEN above), which can reach the whole account.
+  ask_secret CI_CLOUDFLARE_API_TOKEN "This client's deploy-only Cloudflare token (Account: Cloudflare Pages Edit + Workers Scripts Edit only; blank to skip)"
+  if [ -z "$CI_CLOUDFLARE_API_TOKEN" ]; then
+    warn "No deploy token: GitHub can't deploy until the repo has a CLOUDFLARE_API_TOKEN secret (docs/DEPLOYMENT_CHECKLIST.md step 2)"
+  elif [ "$CI_CLOUDFLARE_API_TOKEN" = "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    die "The deploy token is the setup token: create a separate deploy-only token for this client"
+  else
+    gh secret set CLOUDFLARE_API_TOKEN -R "$GITHUB_REPO" <<<"$CI_CLOUDFLARE_API_TOKEN"
+  fi
   gh secret set CLOUDFLARE_ACCOUNT_ID -R "$GITHUB_REPO" --body "$CLOUDFLARE_ACCOUNT_ID"
   gh secret set CLOUDFLARE_KV_NAMESPACE_ID -R "$GITHUB_REPO" --body "$KV_ID"
   gh secret set CLOUDFLARE_R2_BUCKET_NAME -R "$GITHUB_REPO" --body "$BUCKET"

@@ -73,6 +73,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 ## Gotchas
 
 - Re-running `deploy.sh` without `FORM_API_KEY=<saved key>` generates a **new** key; the form, the Worker and the GitHub secret must all match.
+- A client repo's `CLOUDFLARE_API_TOKEN` secret is that client's own deploy-only token (Pages Edit + Workers Scripts Edit), never the setup token: `deploy.sh` sets it from `CI_CLOUDFLARE_API_TOKEN` (ops: the `deploytoken` step). Worker/site deploys failing with a 10000 or 403 error mean the deploy token lacks a permission.
 - GitHub secrets can't start with `GITHUB_`: the Worker's repo token is the `CONTENT_REPO_TOKEN` secret and the form key is `FORM_API_KEY`.
 - The site's `/cdn-cgi/image` resizing only works on a custom domain with Image Transformations enabled; keep the `IMAGE_RESIZING` variable unset on `*.pages.dev`.
 - CI builds fail on purpose if `content.json` is missing (so sample data never ships).

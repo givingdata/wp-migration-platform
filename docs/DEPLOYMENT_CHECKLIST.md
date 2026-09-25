@@ -19,22 +19,34 @@ and the first content export. Commands run from the repo root unless noted.
 - [ ] `cd ../<client>-site && npm install` — do **all remaining steps in the client folder**
 - [ ] Edit `config/design-specs.json` if the client's design needs different aspect ratios, breakpoints or fields
 
-## 2. Cloudflare API token and login
+## 2. Cloudflare tokens and login
+
+Two tokens, kept apart: the **setup token** creates resources and stays on your machine; the
+client's **deploy token** is the only Cloudflare key that goes into the client's GitHub repo.
 
 - [ ] `cd worker && npx wrangler login` (for the setup script)
-- [ ] Create an API token for CI: **My Profile → API Tokens → Create Token → Custom**, permissions:
+- [ ] Setup token (once, shared by all clients; keep it off GitHub): **My Profile → API Tokens → Create Token → Custom**, permissions:
   - Account · Workers Scripts · Edit
   - Account · Cloudflare Pages · Edit
   - Account · Workers KV Storage · Edit
   - Account · Workers R2 Storage · Edit
   - Zone · DNS · Edit (only if linking a custom domain)
+- [ ] Deploy token (one per client): **Manage Account → Account API Tokens → Create Token → Custom**,
+      name `<client>-deploy`, this account only, permissions **nothing but**:
+  - Account · Cloudflare Pages · Edit
+  - Account · Workers Scripts · Edit
 - [ ] Note the **Account ID** (dashboard sidebar)
+
+> Cloudflare can't limit a token to one Worker or Pages project, so a deploy token can still deploy
+> over other clients' projects on the same account. It can't reach DNS, Access, R2/KV data, other
+> tokens or billing, and it can be revoked for one client without touching the others.
 
 ## 3. Create resources and first deploy
 
 ```bash
 CLIENT_SLUG=<client> SITE_NAME="<Site Name>" SITE_DOMAIN=<domain.org> \
-CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=<id> \
+CLOUDFLARE_API_TOKEN=<setup token> CLOUDFLARE_ACCOUNT_ID=<id> \
+CI_CLOUDFLARE_API_TOKEN=<deploy token> \
 bash scripts/deploy.sh
 ```
 
@@ -63,7 +75,7 @@ Skip if you let `deploy.sh` do it. Otherwise **Settings → Secrets and variable
 
 | Secret | Used by | Value |
 | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | all deploys | Token from step 2 |
+| `CLOUDFLARE_API_TOKEN` | all deploys | The client's **deploy token** from step 2 (never the setup token) |
 | `CLOUDFLARE_ACCOUNT_ID` | all deploys | Account ID |
 | `CLOUDFLARE_KV_NAMESPACE_ID` | deploy-worker (optional override) | From `wrangler.toml` |
 | `CLOUDFLARE_R2_BUCKET_NAME` | deploy-worker (optional override) | `<client>-media` |
