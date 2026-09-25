@@ -29,7 +29,9 @@ settings file with `~/Documents/1WP/ops/provision.mjs` (or the dashboard's **Set
 Staff submit the form → the Worker structures the text with Claude, resizes the image into R2 and commits to `content.json` → `rebuild.yml` deploys → live in a few minutes.
 The form's **Edit existing** mode changes or deletes existing pages and entries the same way, through the
 Edit module (`lib/edit/`): one commit per change, deletes go to `trash.json` and **Deleted items → Put back**
-restores them. `rebuild.yml` also rebuilds daily so announcements expire and events move to "past".
+restores them. Pages built from `sections.json` show up as **Designed pages**: staff change the text, links
+and pictures inside each section (not which sections there are or their order), saved to `sections.json`;
+Slack can change their text too. `rebuild.yml` also rebuilds daily so announcements expire and events move to "past".
 
 ### Changing the platform
 

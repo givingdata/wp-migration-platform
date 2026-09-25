@@ -1,12 +1,15 @@
 // "Edit existing" mode: find a page or entry, change it in a simple editor, delete it
-// (it goes to Deleted items) or put a deleted item back. Talks to the Worker's /entries
-// and /trash routes (worker/src/edit-routes.js); every change is signed like /submit.
-import { signedJson } from "./signing.js";
+// (it goes to Deleted items) or put a deleted item back. Designed pages (built from
+// sections.json) get a field per text, link and image in each section instead. Talks to the
+// Worker's /entries, /trash and /images routes (worker/src/edit-routes.js); every change is
+// signed like /submit.
+import { signedJson, signedMultipart } from "./signing.js";
 import { initMenu } from "./menu.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const FIELDS = ["title", "description", "date", "endDate", "time", "location", "author", "linkUrl", "imageAlt"];
 const PAGE_LABEL = "Pages";
+const DESIGNED = "designed";
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,7 +31,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     .catch(() => {});
 
   const labelFor = (collection) =>
-    collection === "pages" ? PAGE_LABEL : Object.values(specs?.contentTypes || {}).find((t) => t.collection === collection)?.listing?.title
+    collection === DESIGNED ? "Designed pages" : collection === "pages" ? PAGE_LABEL : Object.values(specs?.contentTypes || {}).find((t) => t.collection === collection)?.listing?.title
       || Object.values(specs?.contentTypes || {}).find((t) => t.collection === collection)?.label
       || collection.charAt(0).toUpperCase() + collection.slice(1);
 
@@ -116,7 +119,7 @@ export function initEdit({ config, specs, escapeHtml }) {
                 <button type="button" class="link" data-open="${escapeHtml(collection)}" data-id="${escapeHtml(i.id)}">${escapeHtml(i.title)}</button>
                 ${i.path ? `<span class="path">${escapeHtml(i.path)}</span>` : ""}
               </span>
-              <span class="meta">${i.frontPage ? "Homepage" : escapeHtml(i.date || "")}</span>
+              <span class="meta">${i.frontPage ? "Homepage" : i.designed ? "Designed page" : escapeHtml(i.date || "")}</span>
             </li>`).join("")}
           </ul>
         </div>`)
@@ -143,12 +146,32 @@ export function initEdit({ config, specs, escapeHtml }) {
     if (html) el.focus();
   }
 
+  // Show where this lives, so staff can check they opened the right one.
+  function showUrl(path) {
+    const live = path && config.siteUrl ? new URL(path, config.siteUrl).href : null;
+    $("edit-url").innerHTML = path
+      ? `Web address: <code>${escapeHtml(path)}</code>${live ? ` · <a href="${escapeHtml(live)}" target="_blank" rel="noopener">View on site ↗</a>` : ""}`
+      : "";
+  }
+
+  function showFields(designed) {
+    $("entry-fields").hidden = designed;
+    $("designed-fields").hidden = !designed;
+    if (!designed) $("designed-fields").innerHTML = "";
+  }
+
   async function openEntry(collection, id) {
     status($("edit-status"), "", "");
     status($("browse-status"), "", "");
     FIELDS.forEach((f) => setError(f, ""));
     try {
-      const data = await call("GET", entryPath(collection, id));
+      let data = await call("GET", entryPath(collection, id));
+      // A page shown on the site through its designed version: edit that instead.
+      if (data.designedPage) {
+        ({ collection, id } = data.designedPage);
+        data = await call("GET", entryPath(collection, id));
+      }
+      if (data.designed) return openDesigned(data);
       current = { collection, id, version: data.version, entry: data.entry, type: data.type, frontPage: data.frontPage, inMenu: data.inMenu, path: data.path, menuBarLocked: data.inTopMenu && data.topLevelLocked };
     } catch (e) {
       status($("browse-status"), "error", escapeHtml(e.message));
@@ -156,12 +179,9 @@ export function initEdit({ config, specs, escapeHtml }) {
     }
     const { entry, type } = current;
     const fields = new Set(collection === "pages" ? [] : type.fields || []);
+    showFields(false);
     $("edit-kind").textContent = collection === "pages" ? (current.frontPage ? "Homepage" : "Page") : type.label || collection;
-    // Show where this lives, so staff can check they opened the right one.
-    const live = current.path && config.siteUrl ? new URL(current.path, config.siteUrl).href : null;
-    $("edit-url").innerHTML = current.path
-      ? `Web address: <code>${escapeHtml(current.path)}</code>${live ? ` · <a href="${escapeHtml(live)}" target="_blank" rel="noopener">View on site ↗</a>` : ""}`
-      : "";
+    showUrl(current.path);
     editForm.querySelectorAll("[data-edit-field]").forEach((el) => {
       const name = el.dataset.editField;
       el.hidden = name === "imageAlt" ? !entry.image : !fields.has(name);
@@ -195,6 +215,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     status($("browse-status"), "", "");
     FIELDS.forEach((f) => setError(f, ""));
     current = { creating: true, collection: "pages", entry: {}, type: { fields: [] } };
+    showFields(false);
     $("edit-kind").textContent = "New page";
     $("edit-url").textContent = "The web address is made from the title when you save.";
     $("edit-notes").innerHTML = "";
@@ -210,6 +231,133 @@ export function initEdit({ config, specs, escapeHtml }) {
     editForm.elements.title.focus();
   }
   $("new-page").addEventListener("click", openNewPage);
+
+  // ---- Designed pages ------------------------------------------------------
+  // One field per text, link or image in each section. Sections themselves (which ones, their
+  // order and layout) are the web team's; the Worker refuses anything else.
+
+  const designedBox = $("designed-fields");
+
+  function slotField(slot, n) {
+    const id = `d-${n}`;
+    const attrs = `id="${id}" data-slot="${escapeHtml(slot.slot)}" aria-describedby="${id}-error"`;
+    const optional = slot.optional ? ' <span class="optional">(optional)</span>' : "";
+    let input;
+    if (slot.kind === "image") {
+      input = `
+        <div class="designed-image">
+          <img src="${escapeHtml(slot.value)}" alt="" data-preview="${id}">
+          <div class="tools">
+            <input type="hidden" ${attrs} value="${escapeHtml(slot.value)}">
+            <label class="visually-hidden" for="${id}-file">Replace ${escapeHtml(slot.label)}</label>
+            <input type="file" id="${id}-file" data-upload="${id}" accept="${escapeHtml((specs?.image?.acceptedMimeTypes || ["image/jpeg", "image/png", "image/webp"]).join(","))}">
+            <p class="hint">Choose a photo to replace this one. It's used at its own shape, not cropped.</p>
+          </div>
+        </div>`;
+      return `<div class="field"><span class="label">${escapeHtml(slot.label)}</span>${input}<p class="error-text" id="${id}-error"></p></div>`;
+    }
+    if (slot.kind === "textarea") input = `<textarea ${attrs} rows="3">${escapeHtml(slot.value)}</textarea>`;
+    else input = `<input type="${slot.kind === "email" ? "email" : "text"}" ${attrs} value="${escapeHtml(slot.value)}"${slot.kind === "url" ? ' placeholder="/page-on-this-site/ or https://…"' : ""}>`;
+    return `<div class="field"><label for="${id}">${escapeHtml(slot.label)}${optional}</label>${input}<p class="error-text" id="${id}-error"></p></div>`;
+  }
+
+  function renderDesigned() {
+    let n = 0;
+    designedBox.innerHTML = current.entry.sections
+      .filter((s) => s.slots.length)
+      .map((s) => `<fieldset class="designed-section"><legend>${escapeHtml(s.label)}</legend>${s.slots.map((slot) => slotField(slot, n++)).join("")}</fieldset>`)
+      .join("");
+    current.initial = Object.fromEntries(current.entry.sections.flatMap((s) => s.slots).map((s) => [s.slot, s.value]));
+  }
+
+  function openDesigned(data) {
+    current = { collection: DESIGNED, id: data.entry.id, version: data.version, entry: data.entry, type: data.type, designed: true, frontPage: data.frontPage, path: data.path };
+    $("edit-kind").textContent = data.frontPage ? "Homepage · designed page" : "Designed page";
+    showUrl(data.path);
+    $("edit-notes").innerHTML = `<p class="note">This page is built from designed sections. You can change the words, links and pictures in each section. To add, remove or move a section, ask your web team.</p>`;
+    $("edit-delete").hidden = true;
+    $("edit-save").textContent = "Save changes";
+    showFields(true);
+    renderDesigned();
+    show("edit");
+    designedBox.querySelector("input:not([type=hidden]), textarea")?.focus();
+  }
+
+  const slotInputs = () => [...designedBox.querySelectorAll("[data-slot]")];
+  const setSlotError = (el, message) => {
+    const err = $(`${el.id}-error`);
+    if (err) err.textContent = message || "";
+    message ? el.setAttribute("aria-invalid", "true") : el.removeAttribute("aria-invalid");
+  };
+
+  designedBox.addEventListener("input", (e) => {
+    const el = e.target.closest("[data-slot]");
+    if (el) el.closest(".field").classList.toggle("changed", el.value.trim() !== String(current.initial[el.dataset.slot] ?? "").trim());
+  });
+
+  designedBox.addEventListener("change", async (e) => {
+    const picker = e.target.closest("[data-upload]");
+    if (!picker?.files?.[0]) return;
+    const target = $(picker.dataset.upload);
+    const file = picker.files[0];
+    const max = specs?.image?.maxUploadBytes;
+    if (max && file.size > max) return setSlotError(target, `That image is too large (max ${Math.round(max / 1048576)} MB).`);
+    setSlotError(target, "");
+    const save = $("edit-save");
+    save.disabled = true;
+    picker.disabled = true;
+    const hint = picker.nextElementSibling;
+    const before = hint.textContent;
+    hint.textContent = "Uploading…";
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const { body, headers } = await signedMultipart(fd, config);
+      const res = await fetch(`${config.workerUrl}/images`, { method: "POST", headers, body });
+      const out = await res.json().catch(() => null);
+      if (!res.ok || !out?.success) throw new Error(out?.error || `The server answered ${res.status}`);
+      target.value = out.url;
+      designedBox.querySelector(`[data-preview="${target.id}"]`).src = out.url;
+      target.closest(".field").classList.add("changed");
+      hint.textContent = "Uploaded. Press Save changes to put it on the page.";
+    } catch (err) {
+      hint.textContent = before;
+      setSlotError(target, err instanceof TypeError ? "Couldn't reach the server. Check your connection and try again." : err.message);
+    } finally {
+      save.disabled = false;
+      picker.disabled = false;
+      picker.value = "";
+    }
+  });
+
+  async function saveDesigned() {
+    const changes = {};
+    for (const el of slotInputs()) {
+      setSlotError(el, "");
+      const value = el.value.trim();
+      if (value !== String(current.initial[el.dataset.slot] ?? "").trim()) changes[el.dataset.slot] = value;
+    }
+    if (!Object.keys(changes).length) return status($("edit-status"), "success", "No changes to save.");
+    const btn = $("edit-save");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Saving…';
+    try {
+      const res = await call("PUT", entryPath(DESIGNED, current.id), { changes, version: current.version });
+      current.version = res.version;
+      current.entry = res.entry;
+      renderDesigned();
+      status($("edit-status"), "success", "<strong>Saved.</strong> The website will update in a few minutes.");
+    } catch (err) {
+      const byslot = new Map(slotInputs().map((el) => [el.dataset.slot, el]));
+      for (const [slot, m] of Object.entries(err.fields || {})) if (byslot.has(slot)) setSlotError(byslot.get(slot), m);
+      const reload = err.status === 409 ? ' <button type="button" class="link" id="edit-reload">Reload it</button>' : "";
+      status($("edit-status"), "error", `${escapeHtml(err.message)}${reload}`);
+      $("edit-reload")?.addEventListener("click", () => openEntry(DESIGNED, current.id));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save changes";
+    }
+  }
 
   $("edit-back").addEventListener("click", () => { status($("browse-status"), "", ""); show("browse"); loadList(); });
 
@@ -259,6 +407,7 @@ export function initEdit({ config, specs, escapeHtml }) {
     if (!current) return;
     FIELDS.forEach((f) => setError(f, ""));
     if (current.creating) return createPage();
+    if (current.designed) return saveDesigned();
     const changes = {};
     for (const f of FIELDS) {
       const input = editForm.elements[f];

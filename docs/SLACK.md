@@ -7,6 +7,11 @@ the change and two buttons, **Approve** and **Cancel**, and the 👀 goes away. 
 change is saved to `content.json` (one commit, through the same Edit module as the staff form) and
 the site updates a few minutes later.
 
+Designed pages (built from `sections.json`, like the homepage) work too: the bot changes the words
+and links inside their sections and saves them to `sections.json`, with the same before/after and
+Approve. It never adds, removes or moves sections, or changes their pictures (use the staff form
+for pictures).
+
 What it does **not** do:
 
 - No deletes, no menu changes, no settings. Those stay in the staff form.

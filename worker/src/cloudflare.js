@@ -42,14 +42,14 @@ export async function storeImage(env, specs, typeSpec, contentId, file) {
   }
 
   const info = await env.IMAGES.info(new Blob([bytes]).stream());
-  const ratio = parseRatio(typeSpec.aspectRatio);
+  // No aspectRatio (images inside designed pages): resize only, keeping the image's shape.
+  const ratio = typeSpec.aspectRatio ? parseRatio(typeSpec.aspectRatio) : null;
   const quality = specs.image?.quality ?? 82;
   const variants = {};
 
   for (const width of targetWidths(specs, typeSpec, info.width)) {
-    const height = Math.round(width / ratio);
     const result = await env.IMAGES.input(new Blob([bytes]).stream())
-      .transform({ width, height, fit: "cover", gravity: typeSpec.crop === "center" ? "center" : "auto" })
+      .transform(ratio ? { width, height: Math.round(width / ratio), fit: "cover", gravity: typeSpec.crop === "center" ? "center" : "auto" } : { width, fit: "scale-down" })
       .output({ format: "image/webp", quality });
     const key = `${prefix}/${width}.webp`;
     await env.MEDIA.put(key, result.image(), { httpMetadata: { contentType: "image/webp", cacheControl } });

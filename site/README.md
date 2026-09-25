@@ -24,7 +24,7 @@ Collections read: `pages` plus one per content type (`posts`, `events`, `announc
 
 | Path | Source |
 | --- | --- |
-| `/` | The WordPress homepage or `sections.json` if there is one; otherwise a featured exhibition (if any) and a row per type marked `homepage`. Current announcements show in a banner on top |
+| `/` | The WordPress homepage or `sections.json` if there is one (staff edit its text and pictures in the form's Edit existing → Designed pages); otherwise a featured exhibition (if any) and a row per type marked `homepage`. Current announcements show in a banner on top |
 | `/news/`, `/events/`, `/announcements/`, … | One listing per content type (`src/pages/[listing].astro`); `upcoming` types split into current and past on `endDate` (or `date`) vs the build date |
 | `/<slug>/` | Every entry — `src/pages/[...slug].astro` picks the layout from its type's `layout` |
 | `/sitemap-index.xml`, `/robots.txt`, `/404.html` | Generated |

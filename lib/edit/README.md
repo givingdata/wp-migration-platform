@@ -19,6 +19,10 @@ await editor.create("announcement", { title: "Office closed", date: "2026-10-05"
 await editor.createPage({ title: "Volunteer FAQ", content: "<p>…</p>" }, { by });
 const m = await editor.getMenu();                    // { menu, version, targets }
 await editor.saveMenu(newMenu, { version: m.version, by });
+
+// Designed pages (sections.json): collection "designed", id = the page key ("index" = homepage)
+const d = await editor.get("designed", "index");     // entry.sections[i].slots: { slot, label, kind, value }
+await editor.update("designed", "index", { "0.title": "Welcome", "2.items.1.href": "/volunteer/" }, { version: d.version, by });
 ```
 
 ## Rules it enforces
@@ -40,6 +44,14 @@ await editor.saveMenu(newMenu, { version: m.version, by });
 - **Menus stay simple.** One level of dropdowns, every item named, links only to /paths,
   https:// or mailto:. Saving marks the menu as edited (`menuEditedAt`), so a WordPress re-import
   doesn't overwrite it.
+- **Designed pages keep their design.** Pages built from `sections.json` are listed as
+  `designed` (first, before other pages), and the migrated page at the same address is hidden
+  from staff unless the designed page also shows its content (`"content": "before"/"after"`);
+  opening that hidden page with `get()` returns `designedPage` so editors switch to it. Staff can
+  change the text, links and pictures inside each section (`sections.js` lists the slots per
+  section type), never which sections there are, their order or their type, and designed pages
+  can't be deleted. Values are plain text; links must be /paths, https://, mailto: or tel:.
+  Each save is one commit to `sections.json`.
 - **Only known fields change**: title, summary, body, image description, and the date/time/
   location/author/link fields the entry's content type has (`config/design-specs.json`).
 - **HTML is cleaned** of scripts, event handlers and `javascript:` links (`sanitize.js`). It's a
@@ -52,7 +64,7 @@ A store is where the content lives. The editor only needs two methods:
 
 ```js
 {
-  // Current data for the named files ("content.json", "trash.json"; null if missing),
+  // Current data for the named files ("content.json", "trash.json", "sections.json"; null if missing),
   // plus an opaque `head` identifying this version of the data.
   async read(files) → { files: { [name]: object | null }, head },
 

@@ -4,7 +4,7 @@
 //   node form/mock-worker.mjs            # http://localhost:8787, API key "dev-api-key"
 //   API_KEY=secret PORT=9000 node form/mock-worker.mjs
 //   MOCK_FAIL=commit node form/mock-worker.mjs   # simulate 202 "saved but not published"
-//   MOCK_CONTENT_DIR=/tmp/x node form/mock-worker.mjs  # "Edit existing" works on /tmp/x/content.json
+//   MOCK_CONTENT_DIR=/tmp/x node form/mock-worker.mjs  # "Edit existing" works on /tmp/x/content.json (+ sections.json)
 //
 // Edit existing uses the real Edit module on a local folder: by default a temporary copy of
 // the sample content, so nothing real changes.
@@ -19,7 +19,8 @@ import { fileStore } from "../lib/edit/stores/file.js";
 import { contentTypes } from "../lib/content-types.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const env = { API_KEY: process.env.API_KEY || "dev-api-key", HMAC_SECRET: process.env.HMAC_SECRET };
+// MEDIA: image uploads for designed pages are accepted and dropped (the URL won't load).
+const env = { API_KEY: process.env.API_KEY || "dev-api-key", HMAC_SECRET: process.env.HMAC_SECRET, MEDIA: { put: async () => {} } };
 const specs = JSON.parse(await readFile(new URL("../config/design-specs.json", import.meta.url), "utf8"));
 const enabled = Object.entries(contentTypes(specs)).filter(([, t]) => t.enabled).map(([k]) => k);
 

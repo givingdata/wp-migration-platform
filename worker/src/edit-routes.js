@@ -9,11 +9,17 @@
 //   PUT    /menu                             { menu, version, by }       → commit
 //   GET    /trash                            deleted entries
 //   POST   /trash/:trashId/restore           { by }                      → back on the site (and in the menu)
+//   POST   /images                           multipart "image"           → { url } for a designed page's image slot
+//
+// Designed pages (sections.json) use the same /entries routes with the collection "designed";
+// their changes are { slot: text } (see lib/edit/sections.js).
 //
 // Reads need the API key; changes also need the HMAC signature (like /submit).
 // Returns null for paths it doesn't handle.
 import { authenticate, AuthError, safeEqual } from "./auth.js";
 import { EditError } from "../../lib/edit/index.js";
+import { storeImage } from "./cloudflare.js";
+import specs from "../../config/design-specs.json" with { type: "json" };
 
 const MAX_BODY = 512 * 1024;
 
@@ -85,10 +91,33 @@ export async function handleEditRoute(request, env, getEditor) {
     requireApiKey(request, env);
     return { status: 200, body: { success: true, items: await getEditor().trash() } };
   }
+  if (pathname === "/images" && method === "POST") return uploadImage(request, env);
   if ((m = pathname.match(/^\/trash\/([0-9a-f-]{36})\/restore$/)) && method === "POST") {
     const body = await signedJson(request, env);
     const result = await getEditor().restore(m[1], { by: who(body) });
     return { status: 200, body: { success: true, collection: result.collection, entry: result.entry, slugChanged: result.slugChanged, menuRestored: result.menuRestored, commit: result.commit } };
   }
   return null;
+}
+
+// An image for a designed page: stored in R2 like form uploads, resized but not cropped
+// (sections decide their own shape). Nothing on the site changes until the page is saved.
+async function uploadImage(request, env) {
+  const limit = (specs.image?.maxUploadBytes ?? 10 * 1048576) + 65536;
+  if (Number(request.headers.get("Content-Length") || 0) > limit) throw new EditError("Image too large", 413);
+  const raw = await request.arrayBuffer();
+  if (raw.byteLength > limit) throw new EditError("Image too large", 413);
+  await authenticate(request, raw, env);
+  let file;
+  try {
+    const form = await new Request(request.url, { method: "POST", headers: { "Content-Type": request.headers.get("Content-Type") || "" }, body: raw }).formData();
+    file = form.get("image");
+  } catch {
+    throw new EditError("Send the image as multipart form data");
+  }
+  if (!(file instanceof File) || !file.size) throw new EditError("Choose an image to upload");
+  const accepted = specs.image?.acceptedMimeTypes || [];
+  if (accepted.length && !accepted.includes(file.type)) throw new EditError(`Use a ${accepted.map((t) => t.split("/")[1].toUpperCase()).join(", ")} image`, 415);
+  const media = await storeImage(env, specs, { aspectRatio: null, minWidth: 300, maxWidth: 1600 }, crypto.randomUUID(), file);
+  return { status: 201, body: { success: true, url: media.image, original: media.original } };
 }

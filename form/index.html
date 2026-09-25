@@ -169,6 +169,15 @@
     .menu-preview a, .menu-preview span { color: var(--text); text-decoration: none; font-weight: 600; }
     .menu-preview ul ul a { font-weight: 400; }
     .menu-preview .broken { color: var(--error); text-decoration: line-through; }
+    .designed-section { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin: 0 0 1rem; }
+    .designed-section legend { padding: 0 .35rem; color: var(--accent); }
+    .designed-section .field { margin-bottom: .9rem; }
+    .designed-section textarea { min-height: 5.5rem; }
+    .designed-image { display: flex; gap: .75rem; align-items: flex-start; flex-wrap: wrap; }
+    .designed-image img { width: 8rem; height: 5.5rem; object-fit: cover; border-radius: 6px; background: var(--bg); }
+    .designed-image .tools { flex: 1 1 12rem; }
+    .designed-image input[type="file"] { width: 100%; margin-top: .4rem; }
+    .field.changed input, .field.changed textarea { border-color: var(--accent); }
     .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   </style>
 </head>
@@ -292,6 +301,9 @@
         <p class="page-url" id="edit-url"></p>
         <div id="edit-notes"></div>
 
+        <div id="designed-fields" hidden></div>
+
+        <div id="entry-fields">
         <div class="field">
           <label for="e-title">Title</label>
           <input type="text" id="e-title" name="title" maxlength="200" required aria-describedby="e-title-hint e-title-error">
@@ -359,6 +371,7 @@
         <div class="field" data-edit-field="imageAlt" hidden>
           <label for="e-imageAlt">Image description <span class="optional">(for screen readers)</span></label>
           <input type="text" id="e-imageAlt" name="imageAlt" maxlength="300">
+        </div>
         </div>
 
         <div class="actions spread">

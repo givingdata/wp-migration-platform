@@ -244,3 +244,52 @@ test("Claude errors: malformed JSON and max_tokens", async () => {
   ctx.queue.push({ body: "{}", stop_reason: "max_tokens" });
   await assert.rejects(proposeEdit(ctx.env, ctx.editor, { text: "x" }), (e) => e.status === 413);
 });
+
+test("designed page: Claude changes text slots; approve writes sections.json through the Edit module", async () => {
+  const ctx = setup();
+  ctx.store.files()["sections.json"] = {
+    pages: { "/": { sections: [{ type: "hero", title: "Welcome", text: "Open 10–4", buttons: [{ label: "Visit", href: "/contact/" }], image: { src: "https://media.example/a.jpg", alt: "" } }] } },
+  };
+  const { collections } = await ctx.editor.list();
+  assert.deepEqual(collections.designed.map((d) => d.id), ["index"]);
+  assert.ok(!collections.pages.some((p) => p.id === "p1"), "the migrated homepage is hidden behind the designed one");
+
+  ctx.claude(
+    { action: "update", collection: "designed", id: "index", typeKey: null, reply: null, summary: "Update hours" },
+    { edits: [{ slot: "0.text", value: "Open 9–5" }, { slot: "0.title", value: "Welcome" }], summary: "Hours on the homepage now 9–5" },
+  );
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "Homepage hours are now 9–5", by: "Sam" });
+  assert.equal(out.kind, "proposal");
+  const p = out.proposal;
+  assert.equal(p.collection, "designed");
+  assert.deepEqual(p.changes, { "0.text": "Open 9–5" }, "unchanged slots dropped");
+  assert.deepEqual(p.before, { "0.text": "Open 10–4" });
+  assert.equal(p.path, "/");
+  assert.match(p.fieldLabels["0.text"], /Section 1 · Hero.*Intro text/);
+  // Images aren't offered to Claude; the index marks designed pages.
+  const slotEnum = ctx.requests[1].output_config.format.schema.properties.edits.items.properties.slot.enum;
+  assert.ok(!slotEnum.includes("0.image.src"));
+  assert.ok(slotEnum.includes("0.buttons.0.href"));
+  assert.ok(ctx.requests[0].messages[0].content.includes('"designed":true'));
+
+  const { blocks } = proposalBlocks(p);
+  assert.ok(JSON.stringify(blocks).includes("Open 10–4") && JSON.stringify(blocks).includes("Open 9–5"));
+
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  const saved = ctx.store.files()["sections.json"].pages["/"];
+  assert.equal(saved.sections[0].text, "Open 9–5");
+  assert.equal(saved.modifiedBy, "Sam");
+  assert.equal(ctx.store.files()["content.json"].pages[0].content, "<p>Hi</p>", "content.json untouched");
+});
+
+test("designed page: a request that needs a new section gets a reply, not a change", async () => {
+  const ctx = setup();
+  ctx.store.files()["sections.json"] = { pages: { "/": { sections: [{ type: "text", title: "Hi", paragraphs: ["One"] }] } } };
+  ctx.claude(
+    { action: "update", collection: "designed", id: "index", typeKey: null, reply: null, summary: "Add a section" },
+    { edits: [], summary: "No change" },
+  );
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "Add a new testimonials section to the homepage" });
+  assert.equal(out.kind, "reply");
+  assert.match(out.text, /not the layout or images/);
+});

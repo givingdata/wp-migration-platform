@@ -6,12 +6,14 @@
 // Approve / Cancel); only applyProposal(), run when someone clicks Approve, writes anything,
 // and it writes through the Edit module like every other change (one commit, version check).
 //
-// Deliberately narrow: change the text fields of an entry, add a news/event/announcement
-// entry, or add a page. No deletes, no menu, no settings, no slugs or images; anything else
-// gets a reply explaining what's possible. The Slack message is data, never instructions.
+// Deliberately narrow: change the text fields of an entry (or the words and links inside a
+// designed page's sections), add a news/event/announcement entry, or add a page. No deletes,
+// no menu, no settings, no slugs or images; anything else gets a reply explaining what's
+// possible. The Slack message is data, never instructions.
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
-import { EditError } from "../../lib/edit/index.js";
+import { EditError, DESIGNED } from "../../lib/edit/index.js";
+import { checkSlotChanges } from "../../lib/edit/sections.js";
 
 export const APPROVE_ACTION = "1wp_approve";
 export const CANCEL_ACTION = "1wp_cancel";
@@ -31,7 +33,7 @@ const TEXT_LIMITS = { title: 200, description: 1000, content: 200_000, time: 200
 const LABELS = { title: "Title", description: "Summary", content: "Text", imageAlt: "Image description", date: "Date", endDate: "End date", time: "Time", location: "Location", author: "Author", linkUrl: "Link" };
 
 const WHAT_I_CAN_DO =
-  "I can change the text of an existing page or entry (title, summary, body text, dates, time, location, link), add a news item, event or announcement, or add a new page. " +
+  "I can change the text of an existing page or entry (title, summary, body text, dates, time, location, link), the words and links on designed pages like the homepage, add a news item, event or announcement, or add a new page. " +
   "I can't delete anything or change the menu, images or site settings; ask your web team for those.";
 
 // ---------------------------------------------------------------------------------------
@@ -112,6 +114,23 @@ function updateSchema(fields) {
   return { type: "object", additionalProperties: false, required: Object.keys(props), properties: props };
 }
 
+// Designed pages: a new value per text slot (only slots that exist; no images).
+function designedSchema(slots) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["edits", "summary"],
+    properties: {
+      edits: {
+        type: "array",
+        description: "One item per value that changes: its slot id from the list and the complete new text (plain text, no HTML). Empty array if nothing changes.",
+        items: { type: "object", additionalProperties: false, required: ["slot", "value"], properties: { slot: { type: "string", enum: slots.map((s) => s.slot) }, value: { type: "string" } } },
+      },
+      summary: { type: "string", description: "One line describing the change" },
+    },
+  };
+}
+
 function createSchema(fields, isPage) {
   const props = {
     title: { type: "string", description: "Clean title in title case, no trailing punctuation" },
@@ -156,7 +175,7 @@ async function siteIndex(editor) {
   for (const [collection, entries] of Object.entries(collections)) {
     for (const e of entries.slice(0, MAX_PER_COLLECTION)) {
       if (index.length >= MAX_INDEX) break;
-      index.push({ collection, id: e.id, title: String(e.title).slice(0, 120), path: e.path, ...(e.date ? { date: e.date } : {}) });
+      index.push({ collection, id: e.id, title: String(e.title).slice(0, 120), path: e.path, ...(e.date ? { date: e.date } : {}), ...(e.designed ? { designed: true } : {}) });
     }
   }
   return index;
@@ -222,7 +241,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "First step: decide what the staff member wants. Pick the one existing entry from the site index that the request is about (update), " +
       "or the content type for a new entry (create), or a new page (createPage). Use 'reply' when the request is unclear, matches several entries, " +
       "asks to delete, hide, move or rename addresses, touches the menu, images or settings, or isn't a website change; then explain briefly what you can do.",
-    user: `Site index (collection, id, title, path, date):\n${JSON.stringify(index)}\n\nContent types that can be added:\n${JSON.stringify(types)}\n\nRequest from Slack:\n${slackMessage(message)}`,
+    user: `Site index (collection, id, title, path, date; designed = a page such as the homepage built from sections, whose headings, text, buttons and cards can be changed):\n${JSON.stringify(index)}\n\nContent types that can be added:\n${JSON.stringify(types)}\n\nRequest from Slack:\n${slackMessage(message)}`,
     schema: classifySchema(),
     maxTokens: 2000,
   });
@@ -237,6 +256,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       if (e instanceof EditError) return reply(`I couldn't find the page or entry you mean. ${WHAT_I_CAN_DO}`);
       throw e;
     }
+    if (opened.designed) return proposeDesigned(env, { choice, opened, message, base, progress });
     const { entry, type, version, path } = opened;
     const fields = allowedFields(type.key, type.fields);
     const current = Object.fromEntries(fields.map((f) => [f, entry[f] ?? null]));
@@ -307,6 +327,41 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
   }
 
   return reply(choice.reply);
+}
+
+// A designed page (sections.json): Claude picks the text slots to change and writes their new
+// text; the page's sections and images stay as they are.
+async function proposeDesigned(env, { choice, opened, message, base, progress }) {
+  const { entry, version, path } = opened;
+  const slots = entry.sections.flatMap((s) => s.slots.filter((x) => x.kind !== "image").map((x) => ({ ...x, section: s.label })));
+  if (!slots.length) return reply(`That page has no text I can change. ${WHAT_I_CAN_DO}`);
+  await progress?.(`Found “${String(entry.title ?? "").slice(0, 120)}”. Drafting the change…`);
+  const draft = await ask(env, {
+    task:
+      "Second step: this page is built from designed sections. Change only the text values the request is about, returning the complete new text for each. " +
+      "Sections, their order, and images can't change here; if the request needs that, return no edits.",
+    user: `Designed page “${entry.title}” (${path}); its text values (slot, section, label, value):\n${JSON.stringify(slots.map((x) => ({ slot: x.slot, section: x.section, label: x.label, value: x.value })))}\n\nRequest from Slack:\n${slackMessage(message)}`,
+    schema: designedSchema(slots),
+    maxTokens: 6000,
+  });
+  const bySlot = new Map(slots.map((x) => [x.slot, x]));
+  const changes = {};
+  for (const { slot, value } of draft.edits || []) {
+    const current = bySlot.get(slot);
+    if (current && typeof value === "string" && value.trim() !== current.value.trim()) changes[slot] = value.trim();
+  }
+  if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout or images. ${WHAT_I_CAN_DO}`);
+  const { errors } = checkSlotChanges(slots, changes);
+  if (Object.keys(errors).length) return reply(`I couldn't draft that: ${Object.entries(errors).map(([slot, e]) => `${bySlot.get(slot)?.label ?? slot}: ${e}`).join("; ")}.`);
+
+  const proposal = {
+    id: crypto.randomUUID(), op: "update", collection: DESIGNED, entryId: entry.id, typeKey: DESIGNED, typeLabel: "Designed page",
+    fieldLabels: Object.fromEntries(Object.keys(changes).map((slot) => [slot, `${bySlot.get(slot).section} › ${bySlot.get(slot).label}`])),
+    version, changes, before: Object.fromEntries(Object.keys(changes).map((slot) => [slot, bySlot.get(slot).value])),
+    title: entry.title, path, summary: draft.summary || choice.summary, ...base,
+  };
+  await save(env, proposal);
+  return { kind: "proposal", proposal };
 }
 
 // ---------------------------------------------------------------------------------------
