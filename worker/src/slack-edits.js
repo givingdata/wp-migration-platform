@@ -473,6 +473,11 @@ function changedParts(before, after) {
   while (start < a.length && start < b.length && a[start] === b[start]) start++;
   let end = 0;
   while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  // An added or removed paragraph leaves one side empty: show its unchanged neighbours for context.
+  if (start + end === a.length || start + end === b.length) {
+    if (start > 0) start--;
+    if (end > 0) end--;
+  }
   const part = (list) => [start > 0 ? "…" : null, ...list.slice(start, list.length - end), end > 0 ? "…" : null].filter((x) => x != null).join("\n\n");
   return [part(a), part(b)];
 }

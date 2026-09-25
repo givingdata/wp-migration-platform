@@ -18,6 +18,8 @@
     "scopes": {
       "bot": [
         "chat:write",
+        "groups:read",
+        "channels:read",
         "channels:history",
         "groups:history",
         "groups:write",
@@ -40,7 +42,6 @@
       "is_enabled": true,
       "request_url": "https://ROUTER_URL/slack/interactions"
     },
-    "org_deploy_enabled": false,
     "socket_mode_enabled": false,
     "token_rotation_enabled": false
   }

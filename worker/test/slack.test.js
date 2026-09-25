@@ -82,7 +82,7 @@ test("a staff message schedules onMessage once with the right fields", async () 
   const res = await handleSlackRoute(await slackRequest("/slack/events", eventBody(message)), s.env, s.ctx, s.handlers);
   assert.equal(res.status, 200);
   await s.flush();
-  assert.deepEqual(s.calls.messages, [{ eventId: "Ev1", teamId: "T1", channel: "C1", user: "U1", text: "change the opening hours", ts: message.ts }]);
+  assert.deepEqual(s.calls.messages, [{ eventId: "Ev1", teamId: "T1", channel: "C1", user: "U1", text: "change the opening hours", ts: message.ts, threadTs: null }]);
   assert.equal(s.kv.map.get("slack:event:Ev1"), "1");
   assert.deepEqual(s.kv.opts.get("slack:event:Ev1"), { expirationTtl: 3600 });
 });
@@ -106,11 +106,10 @@ test("without KV there is no dedupe but messages still flow", async () => {
   assert.equal(s.calls.messages.length, 1);
 });
 
-test("bot, subtype, thread-reply, empty and non-message events are ignored", async () => {
+test("bot, subtype, empty and non-message events are ignored", async () => {
   const cases = [
     { ...message, bot_id: "B1" },
     { ...message, subtype: "message_changed" },
-    { ...message, thread_ts: "1699999999.000100" },
     { ...message, text: "  " },
     { ...message, user: undefined },
     { ...message, type: "reaction_added" },
@@ -122,11 +121,12 @@ test("bot, subtype, thread-reply, empty and non-message events are ignored", asy
     await s.flush();
     assert.equal(s.calls.messages.length, 0, `case ${i}`);
   }
-  // A thread parent (thread_ts === ts) still counts.
+  // A thread parent (thread_ts === ts) is top level; a reply carries its thread for onMessage to judge.
   const s = setup();
   await handleSlackRoute(await slackRequest("/slack/events", eventBody({ ...message, thread_ts: message.ts })), s.env, s.ctx, s.handlers);
+  await handleSlackRoute(await slackRequest("/slack/events", eventBody({ ...message, ts: "1700000009.000100", thread_ts: message.ts }, { event_id: "EvR" })), s.env, s.ctx, s.handlers);
   await s.flush();
-  assert.equal(s.calls.messages.length, 1);
+  assert.deepEqual(s.calls.messages.map((m) => m.threadTs), [null, message.ts]);
 });
 
 test("handler errors are caught and logged, not thrown", async () => {

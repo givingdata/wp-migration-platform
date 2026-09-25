@@ -53,11 +53,10 @@ function later(ctx, label, fn) {
   ctx.waitUntil(Promise.resolve().then(fn).catch((e) => console.error(`slack ${label} failed:`, e?.message || e)));
 }
 
-/** A plain top-level human message: not a bot, edit, join, or thread reply. */
+/** A plain human message: not a bot, edit or join. Thread replies count; onMessage decides (answers to the bot's questions). */
 export function isStaffMessage(event) {
   return event?.type === "message" && !event.subtype && !event.bot_id && !!event.user &&
-    typeof event.text === "string" && event.text.trim() !== "" &&
-    (!event.thread_ts || event.thread_ts === event.ts);
+    typeof event.text === "string" && event.text.trim() !== "";
 }
 
 // True the first time an event_id is seen (records it). Without KV, always true.
@@ -89,7 +88,8 @@ async function handleEvents(raw, env, ctx, handlers) {
 /** What onMessage gets, from an event_callback body. */
 export function messageFromEvent(body) {
   const event = body.event;
-  return { eventId: body.event_id, teamId: body.team_id, channel: event.channel, user: event.user, text: event.text, ts: event.ts };
+  const threadTs = event.thread_ts && event.thread_ts !== event.ts ? event.thread_ts : null;
+  return { eventId: body.event_id, teamId: body.team_id, channel: event.channel, user: event.user, text: event.text, ts: event.ts, threadTs };
 }
 
 /** What onAction gets, from an interaction payload; null unless it's a button click. */

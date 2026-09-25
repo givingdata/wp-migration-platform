@@ -1,7 +1,7 @@
 name = "wp-migration-worker"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"] # router mode: lets this Worker call the 1wp-slack router on workers.dev (otherwise 404)
 
 [observability]
 enabled = true

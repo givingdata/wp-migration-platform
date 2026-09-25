@@ -57,7 +57,7 @@ function setup({ emails = { U1: "staff@example.org", U2: "stranger@gmail.com" } 
   const env = {
     GITHUB_TOKEN: "t", GITHUB_REPO: "o/r", CLAUDE_API_KEY: "a", SITE_NAME: "Test",
     SLACK_SIGNING_SECRET: SECRET, SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL_IDS: "C1", SLACK_STAFF_DOMAINS: "example.org",
-    CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) },
+    CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), delete: async (k) => void kv.delete(k) },
   };
   const slack = [];
   const reactions = [];
@@ -192,6 +192,64 @@ test("the change goes through when progress messages fail", async () => {
   await message(env);
   const draft = slack.find((m) => m.method === "chat.update" && m.blocks);
   assert.equal(buttons(draft).length, 2);
+});
+
+// A message with any text, ts and thread (thread replies carry thread_ts).
+const say = (env, text, { ts, threadTs, user = "U1", id = `Ev-${ts}` } = {}) =>
+  send(env, "/slack/events", JSON.stringify({ type: "event_callback", event_id: id, team_id: "T1",
+    event: { type: "message", channel: "C1", user, text, ts, ...(threadTs ? { thread_ts: threadTs } : {}) } }), "application/json");
+
+// Records what each Claude call was asked, so tests can see the request text.
+function recordClaude() {
+  const asked = [];
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith("https://api.anthropic.com/")) asked.push(init.body);
+    return fetch(url, init);
+  };
+  return asked;
+}
+
+const QUESTION = { action: "reply", collection: null, id: null, typeKey: null, reply: "Which page: Home or About?", summary: null };
+
+test("the bot remembers its question: an answer in the thread drafts the change", async () => {
+  const { env, slack, claude } = setup();
+  claude.unshift(QUESTION);
+  const asked = recordClaude();
+  await say(env, "Change the opening hours to 9–5 weekdays", { ts: "200.1" });
+  assert.equal(slack.at(-1).text, "Which page: Home or About?");
+
+  await say(env, "The contact page", { ts: "200.5", threadTs: "200.1" });
+  assert.equal(claude.length, 0, "the answer went to Claude");
+  assert.match(asked[1], /Change the opening hours to 9–5 weekdays/, "with the original request");
+  assert.match(asked[1], /Which page: Home or About\?/, "and the question");
+  assert.match(asked[1], /The contact page/);
+  assert.equal(buttons(slack.at(-1)).length, 2, "a before/after with Approve / Cancel");
+  assert.ok(slack.filter((m) => m.method === "chat.postMessage").every((m) => m.thread_ts === "200.1"), "all in the one thread");
+});
+
+test("other thread replies are ignored, and a question is answered once", async () => {
+  const { env, slack, claude } = setup();
+  await say(env, "Looks good to me", { ts: "300.5", threadTs: "300.1" });
+  assert.equal(slack.length, 0, "no question in that thread: nothing happens");
+
+  claude.unshift(QUESTION);
+  await say(env, "Change the hours", { ts: "301.1" });
+  await say(env, "The contact page", { ts: "301.5", threadTs: "301.1" });
+  const after = slack.length;
+  await say(env, "Thanks!", { ts: "301.9", threadTs: "301.1" });
+  assert.equal(slack.length, after, "the question was already answered");
+});
+
+test("the same person's next channel message also answers the question", async () => {
+  const { env, slack, claude } = setup();
+  claude.unshift(QUESTION);
+  const asked = recordClaude();
+  await say(env, "Change the opening hours to 9–5 weekdays", { ts: "400.1" });
+  await say(env, "The contact page", { ts: "400.9" });
+  assert.match(asked[1], /Change the opening hours[\s\S]*The contact page/);
+  assert.equal(buttons(slack.at(-1)).length, 2);
+  assert.equal(slack.filter((m) => m.method === "chat.postMessage").at(-1).thread_ts, "400.9", "reply under the new message");
 });
 
 test("Slack routes are off without a signing secret, and reject bad signatures", async () => {

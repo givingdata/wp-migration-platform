@@ -8,6 +8,10 @@
 // Progress messages and reactions are best effort: a failure there (e.g. the app lacks the
 // reactions:write scope) never stops the change itself.
 //
+// When the bot asks a question instead of drafting, it remembers the request (KV, a day) so the
+// answer carries it: a reply in that thread, or the same person's next channel message within
+// ASK_FOLLOWUP_SECONDS. Other thread replies are ignored, so staff can talk in threads.
+//
 // Nothing publishes without an Approve click, and Slack can't delete, change the menu or
 // settings. Commits carry the Slack user's email, like the staff form's.
 import { postMessage, updateMessage, slackApi, userEmail } from "./slack.js";
@@ -15,6 +19,37 @@ import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { proposeEdit, applyProposal, cancelProposal, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION } from "./slack-edits.js";
 
 const siteUrl = (env) => env.SITE_URL || null;
+
+const ASK_TTL = 86_400;
+const ASK_FOLLOWUP_SECONDS = 600;
+const askKey = (channel, thread) => `slack:ask:${channel}:${thread}`;
+const askUserKey = (channel, user) => `slack:ask-user:${channel}:${user}`;
+
+// The open question for a thread (or this person's latest), removed once read so it's answered once.
+async function takeQuestion(env, { channel, user, threadTs }) {
+  if (!env.CONTENT) return null;
+  const thread = threadTs || (await env.CONTENT.get(askUserKey(channel, user)));
+  if (!thread) return null;
+  const raw = await env.CONTENT.get(askKey(channel, thread));
+  if (!raw) return null;
+  await Promise.all([env.CONTENT.delete?.(askKey(channel, thread)), env.CONTENT.delete?.(askUserKey(channel, user))]);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function saveQuestion(env, { channel, user, thread, request, question }) {
+  if (!env.CONTENT) return;
+  await env.CONTENT.put(askKey(channel, thread), JSON.stringify({ request, question }), { expirationTtl: ASK_TTL });
+  await env.CONTENT.put(askUserKey(channel, user), thread, { expirationTtl: ASK_FOLLOWUP_SECONDS });
+}
+
+// The request Claude sees for an answer: the original, what the bot asked, and the reply.
+const withAnswer = (asked, answer) =>
+  `${asked.request}\n\n(You asked: "${asked.question}")\nTheir answer: ${answer}\n` +
+  "If the answer is really a new, unrelated request, handle that request instead.";
 
 // Slack calls that only show progress: log and carry on if they fail.
 const quietly = (p) => p.catch((e) => console.error("slack progress:", e?.message || e));
@@ -26,9 +61,13 @@ function friendly(e) {
 /** @param {() => object} getEditor */
 export function slackHandlers(env, getEditor) {
   return {
-    async onMessage({ channel, user, text, ts }) {
+    async onMessage({ channel, user, text, ts, threadTs }) {
       if (!channelAllowed(env, channel)) return;
-      const reply = (message) => postMessage(env, { channel, threadTs: ts, text: message });
+      const asked = await takeQuestion(env, { channel, user, threadTs });
+      if (threadTs && !asked) return; // a thread conversation, not an answer to the bot
+      const thread = threadTs || ts;
+      const reply = (message) => postMessage(env, { channel, threadTs: thread, text: message });
+      const request = asked ? withAnswer(asked, text) : text;
 
       const email = await userEmail(env, user);
       if (!isStaff(env, email)) return void (await reply("Only staff can request website changes here."));
@@ -39,9 +78,10 @@ export function slackHandlers(env, getEditor) {
       const working = await reply("Working on it… reading the site (this can take up to a minute).");
       const progress = (message) => quietly(updateMessage(env, { channel, ts: working, text: message }));
       try {
-        const result = await proposeEdit(env, getEditor(), { text, by: email, requestedBy: user, progress });
+        const result = await proposeEdit(env, getEditor(), { text: request, by: email, requestedBy: user, progress });
         const view = result.kind === "proposal" ? proposalBlocks(result.proposal, { siteUrl: siteUrl(env) }) : { text: result.text };
         await updateMessage(env, { channel, ts: working, ...view });
+        if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text }));
       } catch (e) {
         console.error("Slack draft failed", e.message);
         await updateMessage(env, { channel, ts: working, text: `⚠️ Couldn't draft that change: ${friendly(e)}` });

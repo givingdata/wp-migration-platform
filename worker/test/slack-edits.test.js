@@ -237,6 +237,20 @@ test("long HTML is truncated to fit Slack", () => {
   assert.ok(JSON.stringify(blocks).includes("Requested by Sam"));
 });
 
+test("an inserted paragraph shows its neighbours on both sides, not an empty before", () => {
+  const paras = ["Address", "General inquiries", "Referrals", "Volunteers"].map((t) => `<p>${t}</p>`);
+  const proposal = {
+    id: "0f6b0a52-6a2c-4a3e-9c55-2f3f4d0b1d12", op: "update", collection: "pages", entryId: "p3", typeKey: "page", typeLabel: "Page",
+    changes: { content: [paras[0], "<p>Phone: 604 555 5505</p>", ...paras.slice(1)].join("") }, before: { content: paras.join("") },
+    title: "Contact Us", path: "/contact/", summary: "Add phone", status: "pending",
+  };
+  const text = proposalBlocks(proposal).blocks.find((b) => b.text?.text.startsWith("*Text*")).text.text;
+  const [before, after] = text.split("_After:_");
+  assert.match(before, /Address[\s\S]*General inquiries/);
+  assert.doesNotMatch(before, /Referrals|Phone/);
+  assert.match(after, /Address[\s\S]*Phone: 604 555 5505[\s\S]*General inquiries/);
+});
+
 test("Claude errors: malformed JSON and max_tokens", async () => {
   const ctx = setup();
   ctx.claude("not json");

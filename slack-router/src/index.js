@@ -233,7 +233,7 @@ async function upsertClient(input, env) {
   let channel = existing?.channel;
   if (input.existingChannel && input.existingChannel !== channel) {
     const info = await slackDirect(env, "conversations.info", { channel: input.existingChannel });
-    if (!info.ok || !info.channel?.is_member) return json({ ok: false, error: `The bot can't see ${input.existingChannel}. Type /invite @1WP in that channel first.` }, 400);
+    if (!info.ok || !info.channel?.is_member) return json({ ok: false, error: `The bot can't see ${input.existingChannel} (${info.error || "not a member"}). Type /invite @1WP in that channel first.` }, 400);
     channel = input.existingChannel;
   }
   if (!channel) {

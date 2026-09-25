@@ -7,6 +7,10 @@ the change and two buttons, **Approve** and **Cancel**, and the 👀 goes away. 
 change is saved to `content.json` (one commit, through the same Edit module as the staff form) and
 the site updates a few minutes later.
 
+If the request is unclear, the bot asks a question instead. Answer it in the thread, or post the
+answer as your next message in the channel within 10 minutes; the bot remembers what you asked
+for and drafts the change. Other replies in threads are ignored, so staff can talk there freely.
+
 Designed pages (built from `sections.json`, like the homepage) work too: the bot changes the words
 and links inside their sections and saves them to `sections.json`, with the same before/after and
 Approve. It never adds, removes or moves sections, or changes their pictures (use the staff form
