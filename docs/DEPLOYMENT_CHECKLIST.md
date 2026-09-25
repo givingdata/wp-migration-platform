@@ -144,6 +144,15 @@ as Worker secrets on every deploy, so all three must be set.
 - [ ] Within ~3 minutes the event is on the live site with a square image; check its `srcset`
 - [ ] Remove the test entry: edit `content.json`, delete it, commit (the site redeploys)
 
+## 8b. Optional: edits from Slack
+
+Only if the client uses Slack and wants staff to ask for changes there. Full steps: `docs/SLACK.md`.
+
+- [ ] `node scripts/slack-app-link.mjs --open` → create the 1WP app in the client's workspace → Install
+- [ ] GitHub secrets `SLACK_SIGNING_SECRET` and `SLACK_BOT_TOKEN` (`gh secret set … -R <owner>/<client>-site`)
+- [ ] `/invite @1WP` in the channel; set `SLACK_CHANNEL_IDS` and `SLACK_STAFF_EMAILS` / `SLACK_STAFF_DOMAINS` in `worker/wrangler.toml`, push
+- [ ] Slack app → Event Subscriptions shows the request URL **Verified**; a test request → **Approve** → commit on `main`
+
 ## 9. Train client staff
 
 - [ ] Walk through one submission of each type together (15 minutes)
