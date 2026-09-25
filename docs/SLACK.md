@@ -14,9 +14,60 @@ What it does **not** do:
 - It only reads and answers in the channels you list, and only for the staff you list. Everyone
   else is ignored.
 
-Each client has its own Slack app, named 1WP, pointing at that client's Worker.
+All clients share **one** Slack app (1WP) in the FloMySite.com workspace (free plan). Each client's
+staff are regular members of that workspace, in a private channel named after their site. The
+shared **1wp-slack** router Worker (`slack-router/`, design in `slack-router/README.md`) receives
+every Slack request and forwards each client's to that client's Worker. Clients never install
+anything in their own Slack.
 
-## Set it up (about 15 minutes)
+## Add a client (shared app)
+
+In the client folder, on the Mac mini (the router's admin key is in `~/Documents/1WP/ops/.env.operator`):
+
+```bash
+node ../../platform/scripts/slack-add-client.mjs <client> --domain <their email domain> --push
+```
+
+(`--emails a@x.org,b@x.org` for individual people instead of, or as well as, a domain.) This:
+
+1. Creates the private channel `#<client>` with the bot in it, and adds you (the router's
+   `SUPPORT_EMAILS`) and any staff who are already in the workspace.
+2. Sets the client repo's `SLACK_ROUTER_KEY` GitHub secret.
+3. Fills in the Slack lines in `worker/wrangler.toml`, commits and pushes: **Deploy Worker** runs.
+
+**Then you:** invite their staff to the workspace (Slack → the workspace name → **Invite people**,
+their work emails). Slack has no invite API on the free plan. When each person joins, the bot adds
+them to their channel, if their email is on the client's staff list.
+
+The same command, run again, manages the client:
+
+| Task | Command (in the client folder) |
+|---|---|
+| Add a person / domain | `… <client> --emails new@x.org --push` (replaces the list; give the whole list) |
+| Remove someone from the channel | `… <client> --emails <list without them> --prune --push` (deactivating their Slack account is manual) |
+| Pause / resume | `… <client> --pause` / `--resume` |
+| New key (leak) | `… <client> --rotate-key --push` |
+| Remove the client | `… <client> --remove` (archives the channel; it can be unarchived) |
+| List clients | `… --list` |
+
+### The shared app and router (set up once)
+
+- Router: `slack-router/` → `npm install`, `npx wrangler deploy` (with the setup token from
+  `ops/.env.operator`). It's at https://1wp-slack.weathered-sun-5146.workers.dev. Its secrets:
+  `SLACK_SIGNING_SECRET` and `SLACK_BOT_TOKEN` (the app's, set in the Cloudflare dashboard →
+  Workers → 1wp-slack → Settings → Variables and Secrets), `ROUTER_SECRET` and `ADMIN_KEY`
+  (random; the admin key is also in `ops/.env.operator`).
+- Slack app: its settings are `slack-router/manifest.json` (App Manifest page on
+  https://api.slack.com/apps → the app). Request URLs point at the router, not a client Worker.
+- Logs: `cd slack-router && npx wrangler tail --format pretty`, and the client Worker's own tail.
+
+## Own Slack app per client (direct mode, older setup)
+
+The rest of this page is the older setup, where a client's Worker is its own Slack app's Request URL
+(`SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN` on that Worker). Use it only for a client that wants the
+bot in its own Slack workspace. Its app settings are `slack/manifest.json`.
+
+### Set it up (about 15 minutes)
 
 Run the commands in the **client folder** (e.g. `clients/<client>-site`). You need the Worker URL
 (the `WORKER_URL` variable that `deploy.sh` set, or the `https://….workers.dev` address it printed).

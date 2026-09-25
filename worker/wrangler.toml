@@ -17,6 +17,9 @@ R2_PUBLIC_URL = ""
 ALLOWED_ORIGINS = "http://localhost:8080"
 # CLAUDE_MODEL = "claude-opus-5"
 # Slack (optional, docs/SLACK.md). The bot only acts in these channels, for these staff.
+# scripts/slack-add-client.mjs fills these in for the shared 1WP app (router mode).
+# SLACK_CLIENT = ""
+# SLACK_ROUTER_URL = ""
 # SLACK_CHANNEL_IDS = ""
 # SLACK_STAFF_EMAILS = ""
 # SLACK_STAFF_DOMAINS = ""
@@ -27,8 +30,9 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 #   HMAC_SECRET           optional; defaults to API_KEY
 #   ANTHROPIC_API_KEY     (or CLAUDE_API_KEY)
 #   GITHUB_TOKEN          fine-grained token, Contents: read & write on GITHUB_REPO
-#   SLACK_SIGNING_SECRET  optional, Slack app → Basic Information (docs/SLACK.md)
-#   SLACK_BOT_TOKEN       optional, Slack app → OAuth & Permissions (xoxb-…)
+#   SLACK_ROUTER_KEY      optional, from scripts/slack-add-client.mjs (shared 1WP app)
+#   SLACK_SIGNING_SECRET  optional, only for a client's own Slack app (direct mode)
+#   SLACK_BOT_TOKEN       optional, only for a client's own Slack app (direct mode)
 
 [[kv_namespaces]]
 binding = "CONTENT"

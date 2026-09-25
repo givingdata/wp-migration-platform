@@ -242,3 +242,15 @@ test("userEmail returns null when the profile has no email", async () => {
     globalThis.fetch = orig;
   }
 });
+
+test("router mode: /slack/inbox is off without SLACK_ROUTER_KEY; direct routes off without SLACK_SIGNING_SECRET", async () => {
+  const s = setup();
+  const inbox = new Request("https://w.example/slack/inbox", { method: "POST", body: "{}" });
+  assert.equal((await handleSlackRoute(inbox, s.env, s.ctx, s.handlers)).status, 404);
+
+  const routerOnly = { SLACK_ROUTER_KEY: "k", SLACK_ROUTER_URL: "https://r.example", SLACK_CLIENT: "acme", CONTENT: s.kv };
+  const events = await slackRequest("/slack/events", eventBody(message));
+  assert.equal((await handleSlackRoute(events, routerOnly, s.ctx, s.handlers)).status, 404);
+  const unsigned = new Request("https://w.example/slack/inbox", { method: "POST", body: "{}" });
+  assert.equal((await handleSlackRoute(unsigned, routerOnly, s.ctx, s.handlers)).status, 401);
+});

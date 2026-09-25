@@ -1,0 +1,27 @@
+name = "1wp-slack"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+# Lets this Worker call client Workers' workers.dev URLs on the same account (free; otherwise error 1042).
+compatibility_flags = ["global_fetch_strictly_public"]
+
+[observability]
+enabled = true
+
+[vars]
+# Added to every client channel and never removed by prune (your own Slack login, for support).
+SUPPORT_EMAILS = "hello@flomysite.com"
+
+# No per-client settings here: clients live in KV (added by scripts/slack-add-client.mjs), so adding,
+# pausing or removing a client never redeploys this Worker.
+
+# Secrets (wrangler secret put <NAME>):
+#   SLACK_SIGNING_SECRET  the one 1WP app → Basic Information
+#   SLACK_BOT_TOKEN       the one 1WP app → OAuth & Permissions (xoxb-…)
+#   ROUTER_SECRET         random; each client's SLACK_ROUTER_KEY = HMAC(ROUTER_SECRET, client)
+#   ADMIN_KEY             random; setup machine only (Mac mini), for /admin/*
+
+# Keys: client:<name> → client record (JSON), channel:<C…> → client name,
+#       event:<id> (dedupe, 1 h), seen:<client>:<user> (who may be looked up, 30 days).
+[[kv_namespaces]]
+binding = "ROUTER"
+id = "8d4c56857b8c424dad80015886a08641"
