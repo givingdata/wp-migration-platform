@@ -27,7 +27,10 @@ if (flag("--help") || flag("-h")) {
 let workerUrl = value("--worker-url");
 if (!workerUrl) {
   try {
-    workerUrl = execFileSync("gh", ["variable", "get", "WORKER_URL"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    // Client repos also have an `upstream` remote, so name the repo (origin) explicitly.
+    const origin = execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const repo = origin.replace(/^.*github\.com[:/]/, "").replace(/\.git$/, "");
+    workerUrl = execFileSync("gh", ["variable", "get", "WORKER_URL", "-R", repo], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     // gh missing, not logged in, or the variable isn't set.
   }
