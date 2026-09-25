@@ -1,9 +1,11 @@
 # Slack: staff ask for edits in a channel
 
 Optional. Staff post a request in their Slack channel, for example *"change the Contact page hours
-to 9–5"*. The **1WP** bot replies in a thread with a before/after of the change and two buttons,
-**Approve** and **Cancel**. Only an approved change is saved to `content.json` (one commit, through
-the same Edit module as the staff form) and the site updates a few minutes later.
+to 9–5"*. The **1WP** bot puts 👀 on the message and answers in a thread ("Working on it…", then
+what it's doing), which can take up to a minute for a new article. It ends with a before/after of
+the change and two buttons, **Approve** and **Cancel**, and the 👀 goes away. Only an approved
+change is saved to `content.json` (one commit, through the same Edit module as the staff form) and
+the site updates a few minutes later.
 
 What it does **not** do:
 
@@ -134,7 +136,7 @@ to reinstall; the banner's link may do nothing, so use **Install App** → **Rei
 | **Socket Mode** | **Enable Socket Mode** switch **off**. (The "Enabled? Yes" column below it only lists what Socket Mode would affect.) When on, Slack never calls the Worker. |
 | **Event Subscriptions** | **Enable Events** on; Request URL `…/slack/events` **Verified**; **Subscribe to bot events** has `message.channels` and `message.groups` (others are harmless) |
 | **Interactivity & Shortcuts** | **Interactivity** on; Request URL `https://<worker>/slack/interactions` (not `/events`) |
-| **OAuth & Permissions** → **Bot Token Scopes** | `chat:write`, `channels:history`, `groups:history`, `users:read`, `users:read.email` |
+| **OAuth & Permissions** → **Bot Token Scopes** | `chat:write`, `channels:history`, `groups:history`, `users:read`, `users:read.email`, `reactions:write` (only for the 👀; without it the bot works but shows no 👀) |
 
 To check the installed permissions from the terminal (the token is read from the prompt):
 
@@ -152,7 +154,7 @@ Watch the Worker while you post in the channel: `cd worker && npx wrangler tail 
 | Nothing reaches the Worker when you post | **Socket Mode** is on, the Request URL isn't verified or saved, or events are off (see the table above). A request you send yourself (`curl -X POST https://<worker>/slack/events`) shows up and gets 401, so the Worker itself is fine. |
 | Log: `slack onMessage failed: Slack users.info: missing_scope` | `users:read` / `users:read.email` are missing: add them under **Bot Token Scopes**, reinstall. |
 | Requests reach the Worker but the bot says nothing, no error | The channel isn't in `SLACK_CHANNEL_IDS`, or the sender's Slack email isn't listed, or **Deploy Worker** didn't run after the change. |
-| Bot replies "working on it" and then nothing | Check the log for the Claude or GitHub error. |
+| 👀 or "Working on it…" and then nothing for over two minutes | Check the log for the Claude or GitHub error. The reply is in a **thread** under your message ("1 reply"), not in the channel itself. |
 | Slack: "This app is not configured to handle interactive responses" | **Interactivity** is off or has no Request URL (see the table above). |
 | "This is still a work in progress" | You're in the bot's **Messages** tab (a direct message). Post in the channel instead. |
 

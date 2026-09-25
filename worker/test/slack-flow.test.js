@@ -60,6 +60,7 @@ function setup({ emails = { U1: "staff@example.org", U2: "stranger@gmail.com" } 
     CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) },
   };
   const slack = [];
+  const reactions = [];
   const claude = [
     { action: "update", collection: "pages", id: "p2", typeKey: "page", reply: null, summary: "Change the opening hours" },
     { title: null, description: null, imageAlt: null, contentEdits: [{ find: "10–4, Tuesday to Saturday", replace: "9–5, weekdays" }], summary: "Opening hours now 9–5 weekdays" },
@@ -82,12 +83,12 @@ function setup({ emails = { U1: "staff@example.org", U2: "stranger@gmail.com" } 
         return new Response(JSON.stringify({ ok: true, user: { profile: { email: emails[user] } } }));
       }
       const body = JSON.parse(init.body);
-      slack.push({ method, ...body });
+      (method.startsWith("reactions.") ? reactions : slack).push({ method, ...body });
       return new Response(JSON.stringify({ ok: true, ts: `t${slack.length}` }));
     }
     throw new Error(`unexpected fetch ${u}`);
   };
-  return { gh, env, slack, claude };
+  return { gh, env, slack, reactions, claude };
 }
 
 async function slackRequest(path, raw, contentType) {
@@ -119,13 +120,16 @@ const click = (env, actionId, value, user = "U1") =>
 const buttons = (msg) => msg.blocks.flatMap((b) => b.elements || []).filter((e) => e.type === "button");
 
 test("a staff message becomes a before/after, and Approve publishes it", async () => {
-  const { gh, env, slack } = setup();
+  const { gh, env, slack, reactions } = setup();
   assert.equal((await message(env)).status, 200);
 
   assert.equal(slack[0].method, "chat.postMessage");
   assert.equal(slack[0].thread_ts, "100.1");
-  assert.equal(slack[0].text, "Working on it…");
-  const draft = slack[1];
+  assert.match(slack[0].text, /^Working on it…/);
+  assert.equal(slack[1].method, "chat.update", "progress between the Claude steps");
+  assert.match(slack[1].text, /Found “Contact”/);
+  assert.deepEqual(reactions.map((r) => r.method), ["reactions.add", "reactions.remove"], "👀 while drafting");
+  const draft = slack[2];
   assert.equal(draft.method, "chat.update");
   const [approve, cancel] = buttons(draft);
   assert.equal(approve.action_id, "1wp_approve");
@@ -133,6 +137,7 @@ test("a staff message becomes a before/after, and Approve publishes it", async (
   assert.equal(gh.commits.length, 0, "nothing is published before Approve");
 
   await click(env, "1wp_approve", approve.value);
+  assert.ok(slack.some((m) => m.method === "chat.postEphemeral" && /^Publishing/.test(m.text)));
   const page = JSON.parse(gh.files()["content.json"]).pages[0];
   assert.equal(page.content, CONTACT.replace("10–4, Tuesday to Saturday", "9–5, weekdays"));
   assert.equal(gh.commits.length, 1);
@@ -150,7 +155,7 @@ test("a staff message becomes a before/after, and Approve publishes it", async (
 test("Cancel publishes nothing", async () => {
   const { gh, env, slack } = setup();
   await message(env);
-  const [, cancel] = buttons(slack[1]);
+  const [, cancel] = buttons(slack[2]);
   await click(env, "1wp_cancel", cancel.value);
   assert.equal(gh.commits.length, 0);
   assert.equal(buttons(slack.at(-1)).length, 0);
@@ -168,13 +173,25 @@ test("non-staff, other channels and repeats get no draft", async () => {
   await message(env, { id: "Ev3" });
   await message(env, { id: "Ev3" });
   assert.equal(claude.length, 0, "the draft ran once");
-  assert.equal(slack.length, 3, "the repeat was ignored");
+  assert.equal(slack.length, 4, "the repeat was ignored");
 
   // A stranger can't approve a staff member's draft.
-  const [approve] = buttons(slack[2]);
+  const [approve] = buttons(slack[3]);
   await click(env, "1wp_approve", approve.value, "U2");
   assert.equal(gh.commits.length, 0);
   assert.match(slack.at(-1).text, /Only staff/);
+});
+
+test("the change goes through when progress messages fail", async () => {
+  const { env, slack } = setup();
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) =>
+    /reactions\.|chat\.update/.test(String(url)) && !JSON.parse(init.body).blocks
+      ? new Response(JSON.stringify({ ok: false, error: "missing_scope" }))
+      : fetch(url, init);
+  await message(env);
+  const draft = slack.find((m) => m.method === "chat.update" && m.blocks);
+  assert.equal(buttons(draft).length, 2);
 });
 
 test("Slack routes are off without a signing secret, and reject bad signatures", async () => {

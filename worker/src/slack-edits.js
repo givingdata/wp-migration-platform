@@ -207,10 +207,11 @@ function applyContentEdits(html, edits) {
  * Turn a Slack message into a proposed change, saved in KV until approved.
  * @param {object} env CLAUDE_API_KEY or ANTHROPIC_API_KEY, CLAUDE_MODEL, SITE_NAME, CONTENT (KV)
  * @param {object} editor createEditor(...) instance
- * @param {{ text: string, by?: string, requestedBy?: string }} request
+ * @param {{ text: string, by?: string, requestedBy?: string, progress?: (message: string) => Promise<unknown> }} request
+ *   progress, when given, is called with a short status line between the Claude steps.
  * @returns {Promise<{ kind: "proposal", proposal: object } | { kind: "reply", text: string }>}
  */
-export async function proposeEdit(env, editor, { text, by, requestedBy } = {}) {
+export async function proposeEdit(env, editor, { text, by, requestedBy, progress } = {}) {
   const message = String(text ?? "").trim().slice(0, MAX_TEXT);
   if (!message) return reply();
 
@@ -240,6 +241,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy } = {}) {
     const fields = allowedFields(type.key, type.fields);
     const current = Object.fromEntries(fields.map((f) => [f, entry[f] ?? null]));
     const contentLength = String(current.content ?? "").length;
+    await progress?.(`Found “${String(entry.title ?? "").slice(0, 120)}”. Drafting the change…`);
     const draft = await ask(env, {
       task:
         "Second step: draft the change to this entry. Change only what the request asks for. For the body, return small find/replace edits " +
@@ -279,6 +281,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy } = {}) {
     const isPage = choice.action === "createPage" || choice.typeKey === "page";
     const type = isPage ? { key: "page", label: "Page", fields: [] } : editor.types?.[choice.typeKey];
     if (!isPage && (!type?.enabled || type.key === "page")) return reply(`I can't add that kind of entry. ${WHAT_I_CAN_DO}`);
+    await progress?.(`Writing the new ${type.label.toLowerCase()}… (longer text can take up to a minute)`);
     const draft = await ask(env, {
       task: `Second step: write the new ${type.label.toLowerCase()} from the request. Fix typos and structure the body as clean HTML. Use null for anything not given.` + (type.prompt ? ` ${type.prompt}` : ""),
       user: `Today's date: ${new Date().toISOString().slice(0, 10)}\n\nRequest from Slack:\n${slackMessage(message)}`,
