@@ -411,7 +411,7 @@ export async function applyProposal(env, editor, proposalId, { by } = {}) {
     }
     Object.assign(proposal, {
       status: "applied", path: path ?? null, entryId: String(result.entry?.id ?? proposal.entryId),
-      commit: result.commit?.commitUrl ?? result.commit?.commitSha ?? null, decidedAt: new Date().toISOString(),
+      commit: result.commit?.commitUrl ?? result.commit?.commitSha ?? null, commitSha: result.commit?.commitSha ?? null, decidedAt: new Date().toISOString(),
     });
     await save(env, proposal);
     return { proposal, commit: proposal.commit, path: proposal.path };
@@ -535,13 +535,17 @@ export function proposalBlocks(proposal, { siteUrl } = {}) {
 export function resultBlocks(proposal, { status, by, error, siteUrl, path } = {}) {
   const link = pageLink(siteUrl, path ?? proposal.path);
   let line;
-  if (status === "applied") line = `✅ Published by ${who(by ?? proposal.decidedBy)}${link ? ` — <${link}|View page>` : ""}`;
+  const approved = `Approved by ${who(by ?? proposal.decidedBy)}`;
+  const view = link ? ` — <${link}|View page>` : "";
+  if (status === "applied") line = `✅ ${approved}. Going live in a few minutes…`;
+  else if (status === "live") line = `🟢 Live on the site. ${approved}${view}`;
+  else if (status === "deployFailed") line = `⚠️ ${approved} and saved, but the site didn't update. We're looking into it.`;
   else if (status === "cancelled") line = `✖️ Cancelled by ${who(by ?? proposal.decidedBy)}`;
   else line = `⚠️ ${esc(error || proposal.error || "Something went wrong; nothing was changed.")}`;
   const blocks = [
     section(`*${esc(heading(proposal))}*\n${esc(proposal.summary || "")}`),
     { type: "context", elements: [{ type: "mrkdwn", text: cut(line, SECTION_LIMIT) }] },
   ];
-  const plain = status === "applied" ? `Published: ${heading(proposal)}` : status === "cancelled" ? `Cancelled: ${heading(proposal)}` : `Failed: ${heading(proposal)}`;
-  return { text: plain, blocks };
+  const plain = { applied: "Approved", live: "Live", deployFailed: "Saved, site not updated", cancelled: "Cancelled" }[status] ?? "Failed";
+  return { text: `${plain}: ${heading(proposal)}`, blocks };
 }

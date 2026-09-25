@@ -3,7 +3,8 @@
 //   message in an allowed channel, from staff → 👀 on the message and "Working on it…" in a
 //   thread, updated as Claude drafts a change (slack-edits.js) → the thread shows before/after
 //   with Approve / Cancel, and the 👀 goes
-//   Approve (staff only) → "Publishing…" → the Edit module commits it → the site rebuilds
+//   Approve (staff only) → "Publishing…" → the Edit module commits it → "Going live in a few
+//   minutes…" → the site rebuilds and its workflow reports back (deploys.js) → "🟢 Live" or ⚠️
 //
 // Progress messages and reactions are best effort: a failure there (e.g. the app lacks the
 // reactions:write scope) never stops the change itself.
@@ -16,6 +17,7 @@
 // settings. Commits carry the Slack user's email, like the staff form's.
 import { postMessage, updateMessage, slackApi, userEmail } from "./slack.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
+import { rememberDeploy } from "./deploys.js";
 import { proposeEdit, applyProposal, cancelProposal, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION } from "./slack-edits.js";
 
 const siteUrl = (env) => env.SITE_URL || null;
@@ -113,6 +115,7 @@ export function slackHandlers(env, getEditor) {
       try {
         const { proposal, path } = await applyProposal(env, getEditor(), value, { by: email });
         await show(resultBlocks(proposal, { status: "applied", by: email, siteUrl: siteUrl(env), path }));
+        await quietly(rememberDeploy(env, { sha: proposal.commitSha, channel, messageTs, proposalId: proposal.id }));
       } catch (e) {
         console.error("Slack apply failed", e.message);
         // Already approved or cancelled (double click, or another person): leave the message as it is.
@@ -122,4 +125,12 @@ export function slackHandlers(env, getEditor) {
       }
     },
   };
+}
+
+/** The site deploy that includes an approved Slack change finished: update its message. */
+export async function onSiteDeployed(env, { channel, messageTs, proposalId }, status) {
+  const proposal = await getProposal(env, proposalId);
+  if (!proposal) return;
+  const view = resultBlocks(proposal, { status: status === "live" ? "live" : "deployFailed", siteUrl: siteUrl(env) });
+  await updateMessage(env, { channel, ts: messageTs, ...view });
 }

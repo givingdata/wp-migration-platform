@@ -14,17 +14,23 @@ afterEach(() => {
 function fakeGitHub(files) {
   let n = 0;
   const objects = {};
-  const put = (o) => ((objects[`sha${++n}`] = o), `sha${n}`);
+  const put = (o) => { const sha = (++n).toString(16).padStart(40, "0"); objects[sha] = o; return sha; }; // real-looking SHAs
   let head = put({ tree: put({ files: { ...files } }) });
   const commits = [];
+  const history = [head];
   return {
     commits,
+    head: () => head,
     files: () => objects[objects[head].tree].files,
     async handle(url, init) {
       const path = new URL(url).pathname.replace(/^\/repos\/o\/r/, "");
       const body = init.body ? JSON.parse(init.body) : null;
       const ok = (data) => new Response(JSON.stringify(data));
       if (path === "/git/ref/heads/main") return ok({ object: { sha: head } });
+      if (path.startsWith("/compare/")) {
+        const [base, to] = path.slice("/compare/".length).split("...");
+        return ok({ status: base === to ? "identical" : history.includes(base) && history.indexOf(base) < history.indexOf(to) ? "ahead" : "diverged" });
+      }
       if (path.startsWith("/git/commits/")) return ok({ tree: { sha: objects[path.split("/").pop()].tree } });
       if (path.startsWith("/contents/")) {
         const file = objects[objects[head].tree].files[path.slice("/contents/".length)];
@@ -42,6 +48,7 @@ function fakeGitHub(files) {
       }
       if (path === "/git/refs/heads/main") {
         head = body.sha;
+        history.push(head);
         return ok({});
       }
       return new Response(`unexpected ${path}`, { status: 500 });
@@ -57,7 +64,8 @@ function setup({ emails = { U1: "staff@example.org", U2: "stranger@gmail.com" } 
   const env = {
     GITHUB_TOKEN: "t", GITHUB_REPO: "o/r", CLAUDE_API_KEY: "a", SITE_NAME: "Test",
     SLACK_SIGNING_SECRET: SECRET, SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL_IDS: "C1", SLACK_STAFF_DOMAINS: "example.org",
-    CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), delete: async (k) => void kv.delete(k) },
+    CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), delete: async (k) => void kv.delete(k),
+      list: async ({ prefix }) => ({ keys: [...kv.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }) },
   };
   const slack = [];
   const reactions = [];
@@ -88,7 +96,7 @@ function setup({ emails = { U1: "staff@example.org", U2: "stranger@gmail.com" } 
     }
     throw new Error(`unexpected fetch ${u}`);
   };
-  return { gh, env, slack, reactions, claude };
+  return { gh, env, slack, reactions, claude, kv };
 }
 
 async function slackRequest(path, raw, contentType) {
@@ -250,6 +258,100 @@ test("the same person's next channel message also answers the question", async (
   assert.match(asked[1], /Change the opening hours[\s\S]*The contact page/);
   assert.equal(buttons(slack.at(-1)).length, 2);
   assert.equal(slack.filter((m) => m.method === "chat.postMessage").at(-1).thread_ts, "400.9", "reply under the new message");
+});
+
+// --- Site deploys report back → "Live" ---------------------------------------------------------
+
+// A stand-in for GitHub's OIDC signing key: tokens signed with it, its public half served as the JWKS.
+const oidcKey = await crypto.subtle.generateKey(
+  { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+const oidcJwk = { ...(await crypto.subtle.exportKey("jwk", oidcKey.publicKey)), kid: "test-kid", alg: "RS256", use: "sig" };
+const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const part = (obj) => b64url(new TextEncoder().encode(JSON.stringify(obj)));
+
+async function oidcToken(claims = {}, { key = oidcKey.privateKey } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const body = `${part({ alg: "RS256", kid: "test-kid", typ: "JWT" })}.${part({
+    iss: "https://token.actions.githubusercontent.com", aud: "1wp-deploy", repository: "o/r", exp: now + 300, nbf: now - 5, ...claims })}`;
+  return `${body}.${b64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(body)))}`;
+}
+
+// Serve the JWKS on top of setup()'s fakes.
+function serveJwks() {
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) =>
+    String(url) === "https://token.actions.githubusercontent.com/.well-known/jwks" ? new Response(JSON.stringify({ keys: [oidcJwk] })) : fetch(url, init);
+}
+
+const notify = async (env, body, token) =>
+  worker.fetch(new Request("https://w.example/deploy/notify", {
+    method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }), env, { waitUntil() {} });
+
+const statusLine = (msg) => msg.blocks.find((b) => b.type === "context").elements[0].text;
+
+async function approved(ctx, { id = "Ev1", ts = "100.1" } = {}) {
+  const before = ctx.slack.length;
+  await say(ctx.env, "Change the contact page hours to 9–5 weekdays", { ts, id });
+  const draft = ctx.slack.slice(before).find((m) => m.blocks && buttons(m).length);
+  await click(ctx.env, "1wp_approve", buttons(draft)[0].value);
+  return ctx.gh.head();
+}
+
+test("Approve says 'going live', and the deploy report turns it into Live", async () => {
+  const ctx = setup();
+  serveJwks();
+  const sha = await approved(ctx);
+  assert.match(statusLine(ctx.slack.at(-1)), /^✅ Approved by .*Going live in a few minutes/);
+
+  const res = await notify(ctx.env, { sha, status: "success" }, await oidcToken());
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, updated: 1 });
+  const live = ctx.slack.at(-1);
+  assert.equal(live.method, "chat.update");
+  assert.equal(live.ts, "t1", "the same Slack message");
+  assert.match(statusLine(live), /^🟢 Live on the site/);
+
+  assert.deepEqual(await (await notify(ctx.env, { sha, status: "success" }, await oidcToken())).json(), { ok: true, updated: 0 }, "reported once");
+});
+
+test("a failed build says so, and a later successful build that includes the change marks it Live", async () => {
+  const ctx = setup();
+  serveJwks();
+  const first = await approved(ctx);
+  await notify(ctx.env, { sha: first, status: "failure" }, await oidcToken());
+  assert.match(statusLine(ctx.slack.at(-1)), /site didn't update/);
+
+  // A second approved change; its build includes the first one.
+  ctx.claude.push(
+    { action: "update", collection: "pages", id: "p2", typeKey: "page", reply: null, summary: "Parking" },
+    { title: null, description: null, imageAlt: null, contentEdits: [{ find: "Parking is free.", replace: "Parking is $2." }], summary: "Parking now $2" },
+  );
+  const second = await approved(ctx, { id: "Ev2", ts: "100.2" });
+  assert.notEqual(first, second);
+  const res = await notify(ctx.env, { sha: second, status: "success" }, await oidcToken());
+  assert.deepEqual(await res.json(), { ok: true, updated: 2 }, "both changes are live");
+});
+
+test("deploy reports need GitHub's token for this repo", async () => {
+  const ctx = setup();
+  serveJwks();
+  const sha = await approved(ctx);
+  const other = await crypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+  const bad = {
+    "no token": undefined,
+    "another repo": await oidcToken({ repository: "someone/else" }),
+    "wrong audience": await oidcToken({ aud: "sts.amazonaws.com" }),
+    "expired": await oidcToken({ exp: Math.floor(Date.now() / 1000) - 600 }),
+    "not signed by GitHub": await oidcToken({}, { key: other.privateKey }),
+  };
+  const lastMessage = ctx.slack.length;
+  for (const [why, token] of Object.entries(bad)) {
+    assert.equal((await notify(ctx.env, { sha, status: "success" }, token)).status, 401, why);
+  }
+  assert.equal(ctx.slack.length, lastMessage, "Slack untouched");
+  assert.equal((await notify(ctx.env, { sha: "nope", status: "success" }, await oidcToken())).status, 400);
 });
 
 test("Slack routes are off without a signing secret, and reject bad signatures", async () => {

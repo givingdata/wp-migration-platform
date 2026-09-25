@@ -218,7 +218,10 @@ test("proposalBlocks: before → after and two buttons carrying the proposal id"
   assert.ok(!field.includes("<p"), "HTML is shown as text");
 
   const applied = resultBlocks(proposal, { status: "applied", by: "U123ABC", siteUrl: "https://museum.example", path: "/contact/" });
-  assert.ok(JSON.stringify(applied.blocks).includes("✅ Published by <@U123ABC> — <https://museum.example/contact/|View page>"));
+  assert.ok(JSON.stringify(applied.blocks).includes("✅ Approved by <@U123ABC>. Going live in a few minutes…"));
+  const live = resultBlocks(proposal, { status: "live", by: "U123ABC", siteUrl: "https://museum.example", path: "/contact/" });
+  assert.ok(JSON.stringify(live.blocks).includes("🟢 Live on the site. Approved by <@U123ABC> — <https://museum.example/contact/|View page>"));
+  assert.match(resultBlocks(proposal, { status: "deployFailed", by: "U123ABC" }).text, /^Saved, site not updated/);
   const failed = resultBlocks(proposal, { status: "failed", error: "Someone else changed <this>" });
   assert.ok(JSON.stringify(failed.blocks).includes("⚠️ Someone else changed &lt;this&gt;"));
 });

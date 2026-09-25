@@ -16,7 +16,8 @@ import { storeImage, saveSubmission, getSubmission, listSubmissions } from "./cl
 import { editorFor, GitHubError } from "./content.js";
 import { handleEditRoute } from "./edit-routes.js";
 import { handleSlackRoute } from "./slack.js";
-import { slackHandlers } from "./slack-flow.js";
+import { slackHandlers, onSiteDeployed } from "./slack-flow.js";
+import { handleDeployNotify, DeployAuthError } from "./deploys.js";
 import { contentTypes } from "../../lib/content-types.js";
 import { EditError, StaleError } from "../../lib/edit/index.js";
 
@@ -219,6 +220,15 @@ export default {
         return new Response(JSON.stringify({ ok: false }), { status: 500, headers: { "Content-Type": "application/json" } });
       });
       if (slack) return slack;
+    }
+
+    // The site workflow reports each deploy (GitHub OIDC token, not the API key): Slack shows "Live".
+    if (pathname === "/deploy/notify" && request.method === "POST") {
+      const res = await handleDeployNotify(request, env, (record, status) => onSiteDeployed(env, record, status)).catch((e) => {
+        if (!(e instanceof DeployAuthError)) console.error("deploy notify failed:", e.message);
+        return { status: e.status || 500, body: { ok: false, error: e instanceof DeployAuthError ? e.message : "Server error" } };
+      });
+      return new Response(JSON.stringify(res.body), { status: res.status, headers: { "Content-Type": "application/json" } });
     }
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });

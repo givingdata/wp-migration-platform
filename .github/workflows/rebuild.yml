@@ -17,6 +17,9 @@ jobs:
   site:
     # Only in client repos (scripts/deploy.sh sets this variable); the template never deploys.
     if: vars.CLOUDFLARE_PAGES_PROJECT != ''
+    permissions:
+      contents: read
+      id-token: write # _site.yml reports the deploy to the Worker
     uses: ./.github/workflows/_site.yml
     with:
       reason: ${{ github.event_name == 'workflow_dispatch' && 'Manual rebuild' || github.event_name == 'schedule' && 'Daily rebuild' || 'Content updated' }}

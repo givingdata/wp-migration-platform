@@ -5,7 +5,10 @@ to 9–5"*. The **1WP** bot puts 👀 on the message and answers in a thread ("W
 what it's doing), which can take up to a minute for a new article. It ends with a before/after of
 the change and two buttons, **Approve** and **Cancel**, and the 👀 goes away. Only an approved
 change is saved to `content.json` (one commit, through the same Edit module as the staff form) and
-the site updates a few minutes later.
+the site updates a few minutes later. The message then says *"Going live in a few minutes…"*, and
+changes to **🟢 Live on the site** once the deploy finishes (or ⚠️ if the build failed). The site
+workflow reports each deploy to the Worker (`POST /deploy/notify`, signed with GitHub's own OIDC
+token, so there's no secret to set up; it needs the repo's `WORKER_URL` variable).
 
 If the request is unclear, the bot asks a question instead. Answer it in the thread, or post the
 answer as your next message in the channel within 10 minutes; the bot remembers what you asked
