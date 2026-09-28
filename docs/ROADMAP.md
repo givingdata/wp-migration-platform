@@ -114,6 +114,32 @@ Next (planned for 2026-09-25):
    a chat during setup. Reinstalling keeps the same token, so get a new one and update the
    Worker secret `SLACK_BOT_TOKEN`.
 
+## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
+
+From a WordPress scan in the assessment tool, **Build preview** asks the dashboard on the Mac mini
+to copy 1–3 pages onto this platform and publish them at a private address on the
+`siteflo-previews` Pages project (noindex, kept 30 days). The build copies the site code, exports
+with `wordpress_export.py --pages`, applies a theme preset plus the prospect's brand
+(`ops/lib/brand.mjs`: logo, main colour, free fonts; photos shaded neutral with the optional
+`overlay` colour), and has Claude draft the homepage sections (`scripts/draft-sections.mjs`).
+
+Next:
+
+1. **Record each preview's Claude cost.** The homepage draft is the only Claude call (Claude
+   Opus 5, high effort; estimated $0.10–0.30 per preview, mostly output and thinking tokens).
+   `draft-sections.mjs` already prints its token counts; `preview.mjs` should read them into the
+   preview's record (`usage: { input, output, model, cost }`), priced from a small rate table
+   kept next to it. The assessor's preview card then shows "Claude: $0.14", and
+   `preview.mjs list` a running total, to confirm the estimate and decide whether previews stay
+   free for prospects.
+2. **Expiry cleanup and a "Preview by Siteflo" banner.** Delete branch deployments past
+   `expiresAt` (a scheduled `preview.mjs cleanup`), and mark every preview page as a preview.
+3. **Non-WordPress sites.** Previews work only where `/wp-json` answers; Wix, Squarespace and
+   others need their own scrapers.
+4. **Dashboard auto-start.** The dashboard runs by hand (`nohup`); a LaunchAgent would restart
+   it after a reboot, so the assessor's Build preview doesn't fail with "Can't reach the
+   dashboard".
+
 ## Future option: Claude edits the site
 
 Part of the original spec (staff update the site with Claude's help). Today Claude only
