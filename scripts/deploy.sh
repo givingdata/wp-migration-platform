@@ -49,11 +49,14 @@ confirm() { # confirm "Question" → 0 for yes (ASSUME_YES=1 answers yes)
 }
 
 wrangler() { (cd "$WORKER_DIR" && npx --no-install wrangler "$@"); }
-# Pages commands run from an empty directory: next to worker/wrangler.toml Wrangler
-# treats them as that Worker's, and in the repo root (an npm workspace) its app
-# detection fails.
+# Pages and account-level commands (whoami, KV, R2) run from an empty directory: next to
+# worker/wrangler.toml Wrangler reads that file first, and a new client's still has the
+# REPLACE_WITH_… placeholders this script fills in (newer Wrangler refuses them); in the repo
+# root (an npm workspace) its app detection fails. `wrangler` (the Worker's folder) is only
+# for deploying the Worker and its secrets, after wrangler.toml is filled in.
 PAGES_CWD="$(mktemp -d)"
-pages() { (cd "$PAGES_CWD" && "$WORKER_DIR/node_modules/.bin/wrangler" pages "$@"); }
+account() { (cd "$PAGES_CWD" && "$WORKER_DIR/node_modules/.bin/wrangler" "$@"); }
+pages() { account pages "$@"; }
 
 # ---- Prerequisites -----------------------------------------------------------
 
@@ -63,8 +66,8 @@ for cmd in node npm python3 openssl git; do
 done
 node -e 'process.exit(+process.versions.node.split(".")[0] >= 22 ? 0 : 1)' || die "Node 22+ is required"
 (cd "$WORKER_DIR" && npm ci --no-fund --no-audit >/dev/null)
-wrangler whoami >/dev/null 2>&1 || die "Not logged in to Cloudflare. Run: cd worker && npx wrangler login"
-info "wrangler $(wrangler --version | tail -1), logged in"
+account whoami >/dev/null 2>&1 || die "Not logged in to Cloudflare. Run: cd worker && npx wrangler login"
+info "wrangler $(account --version | tail -1), logged in"
 [ -n "$(git -C "$ROOT" remote get-url upstream 2>/dev/null)" ] || warn "No upstream remote: run this in a client repo made with scripts/new-client.sh, not the platform template"
 
 # ---- Settings ---------------------------------------------------------------
@@ -90,7 +93,7 @@ info "Worker: $WORKER_NAME | KV: $KV_TITLE | R2: $BUCKET | Pages: $PAGES_PROJECT
 
 bold "KV namespace"
 kv_id() {
-  wrangler kv namespace list 2>/dev/null | python3 -c '
+  account kv namespace list 2>/dev/null | python3 -c '
 import json, sys
 title = sys.argv[1]
 try:
@@ -102,7 +105,7 @@ print(next((n["id"] for n in data if n.get("title") == title), ""))
 }
 KV_ID="$(kv_id)"
 if [ -z "$KV_ID" ]; then
-  wrangler kv namespace create "$KV_TITLE" >/dev/null
+  account kv namespace create "$KV_TITLE" >/dev/null
   KV_ID="$(kv_id)"
   [ -n "$KV_ID" ] || die "Created KV namespace but could not read its id (check: npx wrangler kv namespace list)"
   info "Created $KV_TITLE ($KV_ID)"
@@ -113,7 +116,7 @@ fi
 # ---- R2 ---------------------------------------------------------------------
 
 bold "R2 bucket"
-if r2_out="$(wrangler r2 bucket create "$BUCKET" 2>&1)"; then
+if r2_out="$(account r2 bucket create "$BUCKET" 2>&1)"; then
   info "Created bucket $BUCKET"
 elif echo "$r2_out" | grep -qi "already exists"; then
   info "Using existing bucket $BUCKET"
@@ -122,8 +125,8 @@ else
 fi
 
 if [ -z "${R2_PUBLIC_URL:-}" ]; then
-  wrangler r2 bucket dev-url enable "$BUCKET" --force >/dev/null 2>&1 || true
-  R2_PUBLIC_URL="$(wrangler r2 bucket dev-url get "$BUCKET" 2>/dev/null | grep -Eo 'https://pub-[a-z0-9]+\.r2\.dev' | head -1 || true)"
+  account r2 bucket dev-url enable "$BUCKET" --force >/dev/null 2>&1 || true
+  R2_PUBLIC_URL="$(account r2 bucket dev-url get "$BUCKET" 2>/dev/null | grep -Eo 'https://pub-[a-z0-9]+\.r2\.dev' | head -1 || true)"
 fi
 if [ -n "$R2_PUBLIC_URL" ]; then
   info "Public media URL: $R2_PUBLIC_URL"
@@ -236,7 +239,7 @@ SITE_URL="${SITE_URL:-https://$PAGES_PROJECT.pages.dev}"
 
 bold "GitHub Actions configuration"
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1 && confirm "Set secrets and variables on $GITHUB_REPO with gh?"; then
-  ask CLOUDFLARE_ACCOUNT_ID "Cloudflare account ID" "$(wrangler whoami 2>/dev/null | grep -Eo '[0-9a-f]{32}' | head -1)"
+  ask CLOUDFLARE_ACCOUNT_ID "Cloudflare account ID" "$(account whoami 2>/dev/null | grep -Eo '[0-9a-f]{32}' | head -1)"
   # The repo gets this client's own deploy-only token, never the setup token
   # (CLOUDFLARE_API_TOKEN above), which can reach the whole account.
   ask_secret CI_CLOUDFLARE_API_TOKEN "This client's deploy-only Cloudflare token (Account: Cloudflare Pages Edit + Workers Scripts Edit only; blank to skip)"
