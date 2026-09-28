@@ -30,7 +30,7 @@ const header = siteSettings().header ?? {};
 // An SEO title (e.g. imported from Yoast) is used exactly as written; otherwise "Page | Site".
 const fullTitle = seo?.title || (title ? `${title} | ${SITE.name}` : SITE.name);
 const description = seo?.description || pageDescription;
-const noindex = pageNoindex || !!seo?.noindex;
+const noindex = pageNoindex || !!seo?.noindex || SITE_CONFIG.noindex;
 const canonical = seo?.canonical || new URL(Astro.url.pathname, Astro.site).href;
 const imageSrc = seo?.image || image;
 const shareImage = imageSrc

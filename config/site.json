@@ -1,5 +1,6 @@
 {
   "analytics": [],
   "searchConsole": null,
-  "shareImage": null
+  "shareImage": null,
+  "noindex": false
 }
