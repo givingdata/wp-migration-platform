@@ -269,12 +269,15 @@ fi
 # ---- Summary ----------------------------------------------------------------
 
 bold "Done"
+# Unattended runs (ASSUME_YES=1, e.g. ops/provision.mjs, which keeps the key in .env.deploy) don't
+# print the key: their output ends up in logs and dashboards.
+if [ "${ASSUME_YES:-}" = 1 ]; then KEY_LINE="(kept by the caller; not shown)"; else KEY_LINE="$FORM_API_KEY   (store it in your password manager)"; fi
 cat <<EOF
   Worker:        ${WORKER_URL:-see Cloudflare dashboard}
   Staff form:    $FORM_URL   (put it behind Cloudflare Access!)
   Site:          $SITE_URL   (first deploy happens in GitHub Actions)
   Media:         ${R2_PUBLIC_URL:-not public yet}
-  Form API key:  $FORM_API_KEY   (store it in your password manager)
+  Form API key:  $KEY_LINE
 
 Next:
   1. git add worker/wrangler.toml && git commit -m "Configure $CLIENT_SLUG resources" && git push
