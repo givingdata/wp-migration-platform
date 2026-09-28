@@ -22,6 +22,7 @@ on Cloudflare's free plan.
                            │ channel → client (KV), skips paused clients       │ drafts, Approve →
                            │                                                   │ Edit module commits
  Slack ◀──(bot token)───── 1wp-slack /api/<method> ◀──(signed with the client's key)──┘
+                          1wp-slack /files/download ◀──(signed; photos from the client's own channel only)
                            only chat/reaction calls in that client's own channel,
                            users.info only for people seen in that channel
 ```

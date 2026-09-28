@@ -25,7 +25,8 @@
         "groups:write",
         "users:read",
         "users:read.email",
-        "reactions:write"
+        "reactions:write",
+        "files:read"
       ]
     }
   },

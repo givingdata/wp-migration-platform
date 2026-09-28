@@ -13,9 +13,15 @@
 // answer carries it: a reply in that thread, or the same person's next channel message within
 // ASK_FOLLOWUP_SECONDS. Other thread replies are ignored, so staff can talk in threads.
 //
+// A photo posted with (or as) a request is downloaded after the staff check, shown to Claude as
+// a small copy, and stored like a staff-form upload once Claude has picked where it goes. The
+// remembered question keeps the photo, so "which page is this for?" can be answered in the thread.
+//
 // Nothing publishes without an Approve click, and Slack can't delete, change the menu or
 // settings. Commits carry the Slack user's email, like the staff form's.
-import { postMessage, updateMessage, slackApi, userEmail } from "./slack.js";
+import specs from "../../config/design-specs.json" with { type: "json" };
+import { postMessage, updateMessage, slackApi, userEmail, downloadFile, IMAGE_TYPES, MAX_FILE_BYTES } from "./slack.js";
+import { storeImage, previewForClaude } from "./cloudflare.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { rememberDeploy } from "./deploys.js";
 import { proposeEdit, applyProposal, cancelProposal, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION } from "./slack-edits.js";
@@ -42,9 +48,9 @@ async function takeQuestion(env, { channel, user, threadTs }) {
   }
 }
 
-async function saveQuestion(env, { channel, user, thread, request, question }) {
+async function saveQuestion(env, { channel, user, thread, request, question, photo }) {
   if (!env.CONTENT) return;
-  await env.CONTENT.put(askKey(channel, thread), JSON.stringify({ request, question }), { expirationTtl: ASK_TTL });
+  await env.CONTENT.put(askKey(channel, thread), JSON.stringify({ request, question, ...(photo ? { photo } : {}) }), { expirationTtl: ASK_TTL });
   await env.CONTENT.put(askUserKey(channel, user), thread, { expirationTtl: ASK_FOLLOWUP_SECONDS });
 }
 
@@ -60,10 +66,32 @@ function friendly(e) {
   return e?.status && e.status < 500 ? e.message : "Something went wrong on our side. Try again in a minute, or use the staff form.";
 }
 
+const TYPE_NAMES = IMAGE_TYPES.map((t) => t.split("/")[1].toUpperCase().replace("JPEG", "JPG")).join(", ");
+
+// Why a photo couldn't be used, in words staff can act on (download errors come from slack.js / the router).
+function photoProblem(e) {
+  const code = String(e?.message || "");
+  if (/missing_scope/.test(code)) return "I can't open photos yet: the Slack app needs permission to read files. Ask your web team.";
+  if (/unsupported_type|not_an_image/.test(code)) return `I can only use photos (${TYPE_NAMES}).`;
+  if (/too_large/.test(code)) return `That photo is too big; the limit is ${MAX_FILE_BYTES / 1048576} MB.`;
+  if (/not_your_file|file_not_found|bad_file/.test(code)) return "I couldn't find that photo any more. Please post it again.";
+  return "I couldn't download that photo. Please try posting it again.";
+}
+
+// Check what was posted: nothing, one usable photo, or a reason to say no.
+function pickPhoto(files) {
+  if (!files?.length) return { photo: null };
+  const photos = files.filter((f) => IMAGE_TYPES.includes(f.mimetype));
+  if (!photos.length) return { problem: `I can only use photos (${TYPE_NAMES}), not other files.` };
+  if (photos.length > 1) return { problem: "Please post one photo at a time, with a message saying where it goes." };
+  if (photos[0].size > MAX_FILE_BYTES) return { problem: `That photo is too big; the limit is ${MAX_FILE_BYTES / 1048576} MB.` };
+  return { photo: photos[0] };
+}
+
 /** @param {() => object} getEditor */
 export function slackHandlers(env, getEditor) {
   return {
-    async onMessage({ channel, user, text, ts, threadTs }) {
+    async onMessage({ channel, user, text, ts, threadTs, files }) {
       if (!channelAllowed(env, channel)) return;
       const asked = await takeQuestion(env, { channel, user, threadTs });
       if (threadTs && !asked) return; // a thread conversation, not an answer to the bot
@@ -73,6 +101,10 @@ export function slackHandlers(env, getEditor) {
 
       const email = await userEmail(env, user);
       if (!isStaff(env, email)) return void (await reply("Only staff can request website changes here."));
+      const picked = pickPhoto(files);
+      if (picked.problem) return void (await reply(picked.problem));
+      // A new photo wins; otherwise an answer keeps the photo from the question it answers.
+      const photo = picked.photo ?? asked?.photo ?? null;
       const rate = await takeRateLimit(env, user);
       if (!rate.ok) return void (await reply(`You've reached ${rate.limit} requests this hour. Try again later.`));
 
@@ -80,10 +112,23 @@ export function slackHandlers(env, getEditor) {
       const working = await reply("Working on it… reading the site (this can take up to a minute).");
       const progress = (message) => quietly(updateMessage(env, { channel, ts: working, text: message }));
       try {
-        const result = await proposeEdit(env, getEditor(), { text: request, by: email, requestedBy: user, progress });
+        let image, store;
+        if (photo) {
+          let file;
+          try {
+            file = await downloadFile(env, photo);
+          } catch (e) {
+            console.error("Slack photo download failed", e.message);
+            return void (await updateMessage(env, { channel, ts: working, text: `⚠️ ${photoProblem(e)}` }));
+          }
+          image = { name: file.name, preview: await previewForClaude(env, file.bytes, file.type) };
+          const upload = new File([file.bytes], file.name, { type: file.type });
+          store = (typeSpec, contentId) => storeImage(env, specs, typeSpec, `slack-${contentId}`, upload);
+        }
+        const result = await proposeEdit(env, getEditor(), { text: request, by: email, requestedBy: user, progress, image, storeImage: store });
         const view = result.kind === "proposal" ? proposalBlocks(result.proposal, { siteUrl: siteUrl(env) }) : { text: result.text };
         await updateMessage(env, { channel, ts: working, ...view });
-        if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text }));
+        if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text, photo }));
       } catch (e) {
         console.error("Slack draft failed", e.message);
         await updateMessage(env, { channel, ts: working, text: `⚠️ Couldn't draft that change: ${friendly(e)}` });

@@ -16,8 +16,17 @@ for and drafts the change. Other replies in threads are ignored, so staff can ta
 
 Designed pages (built from `sections.json`, like the homepage) work too: the bot changes the words
 and links inside their sections and saves them to `sections.json`, with the same before/after and
-Approve. It never adds, removes or moves sections, or changes their pictures (use the staff form
-for pictures).
+Approve. It never adds, removes or moves sections.
+
+**Photos.** Post a photo (JPG, PNG or WebP, up to 10 MB) with a message saying where it goes:
+*"Use this for the Grad Night event"*, *"Put this in the homepage banner"*, or *"New event: Grad
+Night, June 5… "* with the photo. Claude looks at a small copy of it, picks the place (the main
+photo of a news item, event or other entry that shows one, an image on a designed page, or a new
+entry) and writes the image description for screen readers. The photo is stored and resized like a
+staff-form upload, and the Approve card shows it (before and after). Post a photo without a message
+and the bot asks where it goes; answer in the thread, no need to post the photo again. One photo
+per message. Not yet: photos inside a page's text, and removing photos. Needs the `files:read`
+scope (see below).
 
 What it does **not** do:
 
@@ -199,7 +208,7 @@ to reinstall; the banner's link may do nothing, so use **Install App** → **Rei
 | **Socket Mode** | **Enable Socket Mode** switch **off**. (The "Enabled? Yes" column below it only lists what Socket Mode would affect.) When on, Slack never calls the Worker. |
 | **Event Subscriptions** | **Enable Events** on; Request URL `…/slack/events` **Verified**; **Subscribe to bot events** has `message.channels` and `message.groups` (others are harmless) |
 | **Interactivity & Shortcuts** | **Interactivity** on; Request URL `https://<worker>/slack/interactions` (not `/events`) |
-| **OAuth & Permissions** → **Bot Token Scopes** | `chat:write`, `channels:history`, `groups:history`, `users:read`, `users:read.email`, `reactions:write` (only for the 👀; without it the bot works but shows no 👀) |
+| **OAuth & Permissions** → **Bot Token Scopes** | `chat:write`, `channels:history`, `groups:history`, `users:read`, `users:read.email`, `reactions:write` (only for the 👀; without it the bot works but shows no 👀), `files:read` (photos; without it the bot answers photos with "needs permission to read files") |
 
 To check the installed permissions from the terminal (the token is read from the prompt):
 
@@ -220,6 +229,8 @@ Watch the Worker while you post in the channel: `cd worker && npx wrangler tail 
 | 👀 or "Working on it…" and then nothing for over two minutes | Check the log for the Claude or GitHub error. The reply is in a **thread** under your message ("1 reply"), not in the channel itself. |
 | Slack: "This app is not configured to handle interactive responses" | **Interactivity** is off or has no Request URL (see the table above). |
 | "This is still a work in progress" | You're in the bot's **Messages** tab (a direct message). Post in the channel instead. |
+| Bot: "I can't open photos yet: the Slack app needs permission to read files" | Add `files:read` under **Bot Token Scopes** and reinstall. |
+| Approve card shows the change but no picture | Slack couldn't load the image from the site's media address (`R2_PUBLIC_URL`); check the bucket's public access. The photo is still stored. |
 
 ## Changing or removing it
 
@@ -243,3 +254,7 @@ Watch the Worker while you post in the channel: `cd worker && npx wrangler tail 
   Claude cost.
 - The message text is sent to Slack's servers (as with any Slack message) and to Claude, to draft
   the change. Don't post passwords or private data in the channel.
+- Photos: the router hands a client only files posted in that client's channel (remembered for a
+  day), downloads them with the bot token itself, and passes on only JPG, PNG or WebP up to 10 MB.
+  A photo is stored in the site's media bucket when the bot drafts the change, before Approve, at an
+  unlisted address; a cancelled one stays there unused, like an unsaved staff-form upload.

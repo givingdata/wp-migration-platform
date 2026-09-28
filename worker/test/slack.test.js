@@ -254,3 +254,13 @@ test("router mode: /slack/inbox is off without SLACK_ROUTER_KEY; direct routes o
   const unsigned = new Request("https://w.example/slack/inbox", { method: "POST", body: "{}" });
   assert.equal((await handleSlackRoute(unsigned, routerOnly, s.ctx, s.handlers)).status, 401);
 });
+
+test("photo messages count as staff messages; edits and bots still don't; files carry no private URLs", async () => {
+  const { isStaffMessage, filesOf } = await import("../src/slack.js");
+  const photo = { id: "F0PHOTO1", name: "a.jpg", mimetype: "image/jpeg", size: 5, url_private: "https://files.slack.com/secret" };
+  assert.equal(isStaffMessage({ type: "message", subtype: "file_share", user: "U1", text: "", files: [photo] }), true);
+  assert.equal(isStaffMessage({ type: "message", subtype: "file_share", user: "U1", text: "" }), false, "no files, no text");
+  assert.equal(isStaffMessage({ type: "message", subtype: "message_changed", user: "U1", text: "x" }), false);
+  assert.equal(isStaffMessage({ type: "message", subtype: "file_share", bot_id: "B1", user: "U1", files: [photo] }), false);
+  assert.deepEqual(filesOf({ files: [photo, { id: "bad id" }] }), [{ id: "F0PHOTO1", name: "a.jpg", mimetype: "image/jpeg", size: 5 }]);
+});

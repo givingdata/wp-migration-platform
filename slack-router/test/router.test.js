@@ -234,3 +234,40 @@ test("remove: deletes the client and archives its channel", async () => {
   assert.equal(await env.ROUTER.get("client:acme"), null);
   assert.equal(await env.ROUTER.get("channel:C100"), null);
 });
+
+test("photos: forwarded with the message; only that client can download them, as image bytes", async () => {
+  await addAcme();
+  const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const fetchBefore = globalThis.fetch;
+  const downloads = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (new URL(url).host === "files.slack.com") {
+      downloads.push(init.headers?.Authorization);
+      return new Response(photo, { headers: { "Content-Type": "image/jpeg" } });
+    }
+    return fetchBefore(url, init);
+  };
+  slackAnswers["files.info"] = (b) => ({ ok: true, file: { id: b.file, name: "grad.jpg", mimetype: "image/jpeg", size: photo.length, url_private_download: `https://files.slack.com/files-pri/T1-${b.file}/download/grad.jpg` } });
+
+  const event = { type: "message", subtype: "file_share", channel: "C100", user: "U1", text: "", ts: "2.1",
+    files: [{ id: "F0PHOTO1", name: "grad.jpg", mimetype: "image/jpeg", size: photo.length, url_private: "https://files.slack.com/secret" }] };
+  await slackRequest("/slack/events", JSON.stringify({ type: "event_callback", team_id: "T1", event_id: "EvPhoto", event }));
+  await settle();
+  assert.equal(received.messages.length, 1, "a photo without text is forwarded");
+  assert.deepEqual(received.messages[0].files, [{ id: "F0PHOTO1", name: "grad.jpg", mimetype: "image/jpeg", size: photo.length }]);
+  assert.ok(!JSON.stringify(received.messages[0]).includes("secret"), "Slack's private file URL isn't passed on");
+
+  const { downloadFile } = await import("../../worker/src/slack.js");
+  const got = await downloadFile(clientEnv, { id: "F0PHOTO1", name: "grad.jpg" });
+  assert.deepEqual([...got.bytes], [...photo]);
+  assert.equal(got.type, "image/jpeg");
+  assert.deepEqual(downloads, ["Bearer xoxb-router"], "the router downloads with its own token");
+
+  // A file never posted in this client's channel, or a forged key: refused.
+  await assert.rejects(downloadFile(clientEnv, { id: "F0OTHER99" }), /not_your_file/);
+  await assert.rejects(downloadFile({ ...clientEnv, SLACK_ROUTER_KEY: "nope" }, { id: "F0PHOTO1" }), /bad_signature/);
+  // Not a photo (Slack says PDF): refused before downloading.
+  slackAnswers["files.info"] = (b) => ({ ok: true, file: { id: b.file, mimetype: "application/pdf", size: 10, url_private_download: "https://files.slack.com/x" } });
+  await assert.rejects(downloadFile(clientEnv, { id: "F0PHOTO1" }), /unsupported_type/);
+  assert.equal(downloads.length, 1);
+});

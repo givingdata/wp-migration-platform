@@ -310,3 +310,123 @@ test("designed page: a request that needs a new section gets a reply, not a chan
   assert.equal(out.kind, "reply");
   assert.match(out.text, /not the layout or images/);
 });
+
+// ---- photos ------------------------------------------------------------------------------------
+
+const PHOTO = { name: "grad.jpg", preview: { mediaType: "image/jpeg", data: "AAAA" } };
+const photoChoice = (over) => ({ action: "setImage", collection: null, id: null, slot: null, typeKey: null, imageAlt: "Graduates throwing their caps", reply: null, summary: "New photo", ...over });
+
+// storeImage fake: records what it was asked for and returns https variants like cloudflare.js.
+function fakeStore() {
+  const calls = [];
+  const storeImage = async (typeSpec, contentId) => {
+    calls.push({ typeSpec, contentId });
+    const at = `https://media.example/media/uploads/slack-${contentId}`;
+    return { image: `${at}/1200.webp`, images: [`${at}/600.webp`, `${at}/1200.webp`], variants: { 600: `${at}/600.webp`, 1200: `${at}/1200.webp` } };
+  };
+  return { calls, storeImage };
+}
+
+function withEvent() {
+  const content = base();
+  content.events = [{ id: "e1", slug: "grad-night", title: "Grad Night", date: "2026-06-05", content: "<p>x</p>", image: "https://media.example/old.webp", imageAlt: "Old" }];
+  return setup(content);
+}
+
+test("photo: Claude sees it, picks an event, describes it; approve sets the event's image", async () => {
+  const ctx = withEvent();
+  const store = fakeStore();
+  ctx.claude(photoChoice({ collection: "events", id: "e1", summary: "New photo for Grad Night" }));
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "Use this for Grad Night", by: "Sam", requestedBy: "U123ABC", image: PHOTO, storeImage: store.storeImage });
+  assert.equal(out.kind, "proposal");
+  const p = out.proposal;
+  assert.equal(p.op, "setImage");
+  assert.equal(p.entryId, "e1");
+  assert.equal(p.media.imageAlt, "Graduates throwing their caps");
+  assert.deepEqual(p.photo, { after: p.media.image, before: "https://media.example/old.webp", alt: "Graduates throwing their caps" });
+
+  // The photo goes to Claude before the text; only places that show a photo are offered.
+  const msg = ctx.requests[0].messages[0].content;
+  assert.equal(msg[0].type, "image");
+  assert.equal(msg[0].source.data, "AAAA");
+  assert.ok(msg[1].text.includes('"id":"e1"'));
+  assert.ok(!msg[1].text.includes('"id":"p2"'), "pages have no main photo, so they aren't offered");
+  // Stored with the event type's shape (square), once.
+  assert.equal(store.calls.length, 1);
+  assert.equal(store.calls[0].typeSpec.aspectRatio, "1:1");
+
+  // The Approve card shows before and after as images, not addresses.
+  const { blocks } = proposalBlocks(p);
+  const images = blocks.filter((b) => b.type === "image");
+  assert.deepEqual(images.map((b) => b.image_url), ["https://media.example/old.webp", p.media.image]);
+  assert.match(JSON.stringify(blocks), /New photo for event “Grad Night”/);
+
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  const saved = ctx.store.files()["content.json"].events[0];
+  assert.equal(saved.image, p.media.image);
+  assert.deepEqual(saved.imageVariants, p.media.imageVariants);
+  assert.equal(saved.imageAlt, "Graduates throwing their caps");
+  assert.equal(saved.title, "Grad Night");
+  await assert.rejects(applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" }), (e) => e.status === 409);
+});
+
+test("photo: a designed page's image slot gets the photo and its description", async () => {
+  const ctx = setup();
+  ctx.store.files()["sections.json"] = { pages: { "/": { sections: [{ type: "hero", title: "Welcome", image: { src: "https://media.example/a.jpg", alt: "" } }] } } };
+  const store = fakeStore();
+  ctx.claude(photoChoice({ collection: "designed", id: "index", slot: "0.image.src", summary: "New homepage banner" }));
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "Put this in the homepage banner", by: "Sam", image: PHOTO, storeImage: store.storeImage });
+  const p = out.proposal;
+  assert.equal(p.collection, "designed");
+  assert.deepEqual(Object.keys(p.changes).sort(), ["0.image.alt", "0.image.src"]);
+  assert.equal(p.changes["0.image.alt"], "Graduates throwing their caps");
+  assert.equal(store.calls[0].typeSpec.aspectRatio, null, "designed images are resized, not cropped");
+  assert.ok(ctx.requests[0].messages[0].content[1].text.includes('"slot":"0.image.src"'), "image slots are offered");
+
+  const text = JSON.stringify(proposalBlocks(p).blocks);
+  assert.ok(!text.includes("› Image*"), "the image address isn't listed as a text change");
+  assert.ok(text.includes("Image description"), "its description is");
+  assert.equal(proposalBlocks(p).blocks.filter((b) => b.type === "image").length, 2);
+
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  const hero = ctx.store.files()["sections.json"].pages["/"].sections[0];
+  assert.equal(hero.image.src, p.photo.after);
+  assert.equal(hero.image.alt, "Graduates throwing their caps");
+});
+
+test("photo: a new news item with the photo; stored under the entry's own id", async () => {
+  const ctx = setup();
+  const store = fakeStore();
+  ctx.claude(
+    photoChoice({ action: "create", typeKey: "post", summary: "Add news" }),
+    { title: "Class of 2026", description: "We celebrated.", content: "<p>We celebrated.</p>", date: "2026-06-06", author: null, summary: "News: Class of 2026" },
+  );
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "News: we celebrated the class of 2026 on June 6", by: "Sam", image: PHOTO, storeImage: store.storeImage });
+  const p = out.proposal;
+  assert.equal(p.op, "create");
+  assert.equal(store.calls[0].contentId, p.entryId);
+  assert.equal(store.calls[0].typeSpec.aspectRatio, "16:9");
+  assert.equal(typeof ctx.requests[1].messages[0].content, "string", "the second step is text only");
+  assert.match(ctx.requests[1].system, /photo comes with it/);
+
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  const post = ctx.store.files()["content.json"].posts.find((x) => x.id === p.entryId);
+  assert.equal(post.title, "Class of 2026");
+  assert.equal(post.image, p.media.image);
+  assert.equal(post.imageAlt, "Graduates throwing their caps");
+});
+
+test("photo: unclear, or a page without a main photo → a reply, and nothing is stored", async () => {
+  const ctx = setup();
+  const store = fakeStore();
+  ctx.claude(photoChoice({ action: "reply", reply: "Which page should this photo go on?" }));
+  const unclear = await proposeEdit(ctx.env, ctx.editor, { text: "", by: "Sam", image: PHOTO, storeImage: store.storeImage });
+  assert.deepEqual(unclear, { kind: "reply", text: "Which page should this photo go on?" });
+  assert.match(ctx.requests[0].messages[0].content[1].text, /\(no message\)/);
+
+  ctx.claude(photoChoice({ collection: "pages", id: "p2" }));
+  const page = await proposeEdit(ctx.env, ctx.editor, { text: "Photo for the contact page", by: "Sam", image: PHOTO, storeImage: store.storeImage });
+  assert.equal(page.kind, "reply");
+  assert.match(page.text, /doesn't show a main photo/);
+  assert.equal(store.calls.length, 0);
+});

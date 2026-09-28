@@ -17,6 +17,10 @@
 // handlers run in ctx.waitUntil and the response goes back straight away. Messages are deduped on
 // event_id in KV because Slack retries anything it thinks was slow.
 //
+// Photos: a message with files attached (subtype "file_share") passes through with the files'
+// id, type and size; downloadFile() fetches one (via the router, which holds the bot token and
+// only hands out files posted in the client's own channel). Needs the files:read scope.
+//
 // Also: small Web API helpers (slackApi, postMessage, updateMessage, userEmail).
 // No content logic here: drafting, approving and committing changes live in the handlers.
 // Never logs message text or tokens.
@@ -27,6 +31,11 @@ const EVENT_TTL = 3600;
 const USER_TTL = 86400;
 
 const encoder = new TextEncoder();
+
+// Photos staff can post: the staff form's rules (config/design-specs.json → image).
+export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const MAX_FILE_BYTES = 10 * 1048576;
+const MAX_FILES = 5;
 
 export class SlackError extends Error {
   constructor(message, status = 502) {
@@ -53,10 +62,23 @@ function later(ctx, label, fn) {
   ctx.waitUntil(Promise.resolve().then(fn).catch((e) => console.error(`slack ${label} failed:`, e?.message || e)));
 }
 
-/** A plain human message: not a bot, edit or join. Thread replies count; onMessage decides (answers to the bot's questions). */
+/**
+ * A plain human message: not a bot, edit or join. A message with files (subtype file_share)
+ * counts, even without text. Thread replies count; onMessage decides (answers to the bot's questions).
+ */
 export function isStaffMessage(event) {
-  return event?.type === "message" && !event.subtype && !event.bot_id && !!event.user &&
-    typeof event.text === "string" && event.text.trim() !== "";
+  if (event?.type !== "message" || event.bot_id || !event.user) return false;
+  if (event.subtype && event.subtype !== "file_share") return false;
+  const hasText = typeof event.text === "string" && event.text.trim() !== "";
+  return hasText || (Array.isArray(event.files) && event.files.length > 0);
+}
+
+/** The files on a message: id, name, type and size only (never Slack's private URLs). */
+export function filesOf(event) {
+  return (Array.isArray(event?.files) ? event.files : [])
+    .filter((f) => f && typeof f.id === "string" && /^F[A-Z0-9]{4,}$/.test(f.id))
+    .slice(0, MAX_FILES)
+    .map((f) => ({ id: f.id, name: String(f.name || "photo").slice(0, 200), mimetype: String(f.mimetype || ""), size: Number(f.size) || 0 }));
 }
 
 // True the first time an event_id is seen (records it). Without KV, always true.
@@ -89,7 +111,11 @@ async function handleEvents(raw, env, ctx, handlers) {
 export function messageFromEvent(body) {
   const event = body.event;
   const threadTs = event.thread_ts && event.thread_ts !== event.ts ? event.thread_ts : null;
-  return { eventId: body.event_id, teamId: body.team_id, channel: event.channel, user: event.user, text: event.text, ts: event.ts, threadTs };
+  const files = filesOf(event);
+  return {
+    eventId: body.event_id, teamId: body.team_id, channel: event.channel, user: event.user,
+    text: typeof event.text === "string" ? event.text : "", ts: event.ts, threadTs, ...(files.length ? { files } : {}),
+  };
 }
 
 /** What onAction gets, from an interaction payload; null unless it's a button click. */
@@ -193,7 +219,7 @@ export async function handleSlackRoute(request, env, ctx, handlers) {
 }
 
 // Read methods only accept form-encoded bodies; write methods take JSON.
-const FORM_METHODS = new Set(["users.info", "users.list", "users.lookupByEmail", "conversations.info", "conversations.members"]);
+const FORM_METHODS = new Set(["users.info", "users.list", "users.lookupByEmail", "conversations.info", "conversations.members", "files.info"]);
 
 async function parse(res, method) {
   try {
@@ -262,4 +288,45 @@ export async function userEmail(env, userId) {
   const lower = email.toLowerCase();
   if (env.CONTENT) await env.CONTENT.put(key, lower, { expirationTtl: USER_TTL });
   return lower;
+}
+
+/**
+ * Download a photo posted as `file` ({ id }) with the bot token: files.info, then its private
+ * download URL. Only JPEG, PNG or WebP up to MAX_FILE_BYTES. Returns { bytes, type, name }.
+ * Used directly in direct mode and by the router; clients in router mode use downloadFile().
+ */
+export async function fetchSlackFile(env, fileId) {
+  const info = await slackDirect(env, "files.info", { file: fileId });
+  if (!info?.ok) throw new SlackError(`Slack files.info: ${info?.error || "failed"}`, info?.error === "missing_scope" ? 500 : 404);
+  const f = info.file || {};
+  if (!IMAGE_TYPES.includes(f.mimetype)) throw new SlackError("unsupported_type", 415);
+  if (Number(f.size) > MAX_FILE_BYTES) throw new SlackError("too_large", 413);
+  const url = f.url_private_download || f.url_private;
+  if (typeof url !== "string" || !/^https:\/\/files\.slack\.com\//.test(url)) throw new SlackError("no_download_url", 502);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` } });
+  if (!res.ok) throw new SlackError(`Slack file download: HTTP ${res.status}`, 502);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  // Slack answers a failed download with its sign-in page (HTML), not an error status.
+  if (bytes.length > MAX_FILE_BYTES) throw new SlackError("too_large", 413);
+  if (!IMAGE_TYPES.includes((res.headers.get("Content-Type") || "").split(";")[0].trim())) throw new SlackError("not_an_image", 502);
+  return { bytes, type: f.mimetype, name: String(f.name || "photo") };
+}
+
+/** A photo posted in this client's channel: { bytes, type, name }. Router mode asks the router. */
+export async function downloadFile(env, file) {
+  if (!routed(env)) return fetchSlackFile(env, file.id);
+  const bytes = encoder.encode(JSON.stringify({ file: file.id }));
+  const res = await fetch(`${env.SLACK_ROUTER_URL.replace(/\/+$/, "")}/files/download`, {
+    method: "POST",
+    headers: await routerHeaders(env.SLACK_ROUTER_KEY, env.SLACK_CLIENT, bytes),
+    body: bytes,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new SlackError(err.error || `router file download: HTTP ${res.status}`, res.status);
+  }
+  const type = (res.headers.get("Content-Type") || "").split(";")[0].trim();
+  const out = new Uint8Array(await res.arrayBuffer());
+  if (!IMAGE_TYPES.includes(type) || out.length > MAX_FILE_BYTES) throw new SlackError("not_an_image", 502);
+  return { bytes: out, type, name: file.name || "photo" };
 }

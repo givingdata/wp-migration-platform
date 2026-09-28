@@ -98,18 +98,13 @@ router as the first client (that move also gives it a new bot token, item 3 belo
 
 Next (planned for 2026-09-25):
 
-1. **Images from Slack.** Today a message with a photo attached is ignored (it arrives as a
-   `file_share` message, and `worker/src/slack.js` only accepts plain text), and the drafting
-   rules forbid images. To add:
-   - the `files:read` scope (reinstall the app);
-   - accept messages with a photo, download it from Slack with the bot token, and run it
-     through the staff form's image pipeline (`storeImage` in `worker/src/cloudflare.js`);
-   - Claude picks the target entry and writes the image description (`imageAlt`);
-   - a preview of the photo on the Approve card;
-   - limits on file type and size, and a clear reply for anything that isn't a photo;
-   - if it's unclear which entry the photo belongs to (for example a photo with no text),
-     the bot asks instead of guessing.
-   Roughly half a day with tests.
+1. **Images from Slack (built 2026-09-28; `docs/SLACK.md` → Photos).** A photo posted with a
+   message becomes the main photo of an entry, an image on a designed page, or a new entry with
+   its photo; Claude sees a small copy to choose the place and write the description; stored and
+   resized like staff-form uploads; the Approve card shows it. The router forwards `file_share`
+   messages and serves `/files/download` for the client's own channel only; `lib/edit` gained
+   `setImage()` (images must be under the site's `R2_PUBLIC_URL`). Needs `files:read` (reinstall).
+   Next: photos inside body text, removing a photo, several photos at once (a gallery).
 2. **`docs/SLACK.md` additions** (in "When it doesn't work"):
    - The **Slack desktop app** may not show the bot's thread updates or the finished draft
      while the web app does: press **⌘R** (Ctrl+R on Windows) to refresh, or use

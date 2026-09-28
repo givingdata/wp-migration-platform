@@ -9,10 +9,12 @@ the dashboard, a Claude connector (MCP) and the central admin are meant to use i
 import { createEditor } from "./lib/edit/index.js";
 import { githubStore } from "./lib/edit/stores/github.js";
 
-const editor = createEditor({ specs, store: githubStore({ repo: "givingdata/cinderella-site", token }) });
+const editor = createEditor({ specs, store: githubStore({ repo: "givingdata/cinderella-site", token }), mediaBase: env.R2_PUBLIC_URL });
 await editor.list();                                  // { collections: { pages: [...], posts: [...] }, trashCount }
 const { entry, version } = await editor.get("pages", "103");
 await editor.update("pages", "103", { title: "About us" }, { version, by: "staff@example.org" });
+// New main image (already stored + resized in R2); with createEditor({ mediaBase: R2_PUBLIC_URL }) only images there are accepted
+await editor.setImage("events", "e1", { image, images, imageVariants, imageAlt }, { version, by });
 const { trashId } = await editor.remove("posts", "a1b2", { by, reason: "duplicate" });
 await editor.restore(trashId, { by });
 await editor.create("announcement", { title: "Office closed", date: "2026-10-05" });

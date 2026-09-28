@@ -5,6 +5,8 @@
 //   POST /slack/interactions    Slack-signed. Approve/Cancel click → its channel's client
 //   POST /api/<method>          client-signed. The client Worker's only way to call Slack: a few
 //                               methods, in its own channel only
+//   POST /files/download        client-signed { file }. A photo posted in the client's own channel
+//                               (recorded when the message was forwarded), as image bytes
 //   GET  /admin/clients         ADMIN_KEY. List clients
 //   POST /admin/clients         ADMIN_KEY. Add or update a client (creates its private channel)
 //   POST /admin/clients/remove  ADMIN_KEY. Remove a client and archive its channel
@@ -14,7 +16,7 @@
 // only Slack secrets. Never logs message text, emails or tokens.
 import {
   verifySlackSignature, isStaffMessage, messageFromEvent, actionFromPayload,
-  routerHeaders, verifyRouterRequest, slackDirect, slackApi, SlackError,
+  routerHeaders, verifyRouterRequest, slackDirect, slackApi, fetchSlackFile, SlackError,
 } from "../../worker/src/slack.js";
 import { isStaff } from "../../worker/src/slack-access.js";
 import { toHex, safeEqual } from "../../worker/src/auth.js";
@@ -22,6 +24,7 @@ import { toHex, safeEqual } from "../../worker/src/auth.js";
 const MAX_BODY = 256 * 1024;
 const EVENT_TTL = 3600;
 const SEEN_USER_TTL = 30 * 86400;
+const FILE_TTL = 86400; // a photo can be used for a day (the bot's questions also last a day)
 
 // Web API methods a client may call. Value: the body field holding the channel (null = none).
 const ALLOWED = {
@@ -130,7 +133,10 @@ async function events(raw, env, ctx) {
       const client = await clientForChannel(env, event.channel);
       if (!client) return; // not a client channel, or paused
       await markSeen(env, client.client, event.user);
-      await forward(env, client, "message", messageFromEvent(body));
+      const message = messageFromEvent(body);
+      // Photos in this message may be downloaded by this client only.
+      for (const f of message.files || []) await env.ROUTER.put(`file:${f.id}`, client.client, { expirationTtl: FILE_TTL });
+      await forward(env, client, "message", message);
     });
   }
   return json({ ok: true });
@@ -157,11 +163,18 @@ function interactions(raw, env, ctx) {
 
 // ---- client → Slack (POST /api/<method>) --------------------------------------------------------
 
-async function clientApi(request, bytes, env, method) {
+// The client signing this request: { client } or { error } (unknown_client covers paused ones).
+async function signedClient(request, bytes, env) {
   const name = request.headers.get("x-1wp-client") || "";
   const client = /^[a-z0-9-]{1,40}$/.test(name) ? await getClient(env, name) : null;
-  if (!client || client.paused) return json({ ok: false, error: "unknown_client" }, 401);
-  if (!(await verifyRouterRequest(await clientKey(env, name, client.keyVersion), request, bytes))) return json({ ok: false, error: "bad_signature" }, 401);
+  if (!client || client.paused) return { error: "unknown_client" };
+  return (await verifyRouterRequest(await clientKey(env, name, client.keyVersion), request, bytes)) ? { client } : { error: "bad_signature" };
+}
+
+async function clientApi(request, bytes, env, method) {
+  const { client, error } = await signedClient(request, bytes, env);
+  if (!client) return json({ ok: false, error }, 401);
+  const name = client.client;
 
   if (!Object.hasOwn(ALLOWED, method)) return json({ ok: false, error: "method_not_allowed" }, 403);
   let body;
@@ -174,6 +187,22 @@ async function clientApi(request, bytes, env, method) {
   if (method === "users.info" && !(await env.ROUTER.get(`seen:${name}:${body?.user}`))) return json({ ok: false, error: "unknown_user" }, 403);
 
   return json(await slackDirect(env, method, body));
+}
+
+// A photo from the client's own channel, streamed back as image bytes.
+async function clientFile(request, bytes, env) {
+  const { client, error } = await signedClient(request, bytes, env);
+  if (!client) return json({ ok: false, error }, 401);
+  let file;
+  try {
+    file = JSON.parse(decoder.decode(bytes) || "{}").file;
+  } catch {
+    return json({ ok: false, error: "bad_json" }, 400);
+  }
+  if (typeof file !== "string" || !/^F[A-Z0-9]{4,}$/.test(file)) return json({ ok: false, error: "bad_file" }, 400);
+  if ((await env.ROUTER.get(`file:${file}`)) !== client.client) return json({ ok: false, error: "not_your_file" }, 403);
+  const { bytes: out, type } = await fetchSlackFile(env, file);
+  return new Response(out, { headers: { "Content-Type": type, "Cache-Control": "no-store" } });
 }
 
 // ---- setup (/admin/*, ADMIN_KEY) ----------------------------------------------------------------
@@ -311,6 +340,7 @@ export default {
         return pathname === "/slack/events" ? await events(raw, env, ctx) : interactions(raw, env, ctx);
       }
       if (pathname.startsWith("/api/")) return await clientApi(request, bytes, env, pathname.slice("/api/".length));
+      if (pathname === "/files/download") return await clientFile(request, bytes, env);
       return json({ ok: false }, 404);
     } catch (e) {
       console.error("router failed:", e?.message || e);

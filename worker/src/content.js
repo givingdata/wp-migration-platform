@@ -14,5 +14,6 @@ export function editorFor(env) {
     paths: { ...(env.CONTENT_PATH ? { "content.json": env.CONTENT_PATH } : {}), ...(env.SECTIONS_PATH ? { "sections.json": env.SECTIONS_PATH } : {}) },
     userAgent: "wp-migration-platform-worker",
   });
-  return createEditor({ store, specs });
+  // Images set through the editor (Slack photos) must live in this site's own R2 bucket.
+  return createEditor({ store, specs, mediaBase: env.R2_PUBLIC_URL || null });
 }

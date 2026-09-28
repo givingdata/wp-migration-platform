@@ -361,3 +361,90 @@ test("Slack routes are off without a signing secret, and reject bad signatures",
   const off = { ...env, SLACK_SIGNING_SECRET: undefined };
   assert.equal((await worker.fetch(new Request("https://w.example/slack/events", { method: "POST", body: "{}" }), off, { waitUntil() {} })).status, 404);
 });
+
+// ---- photos (direct mode: this Worker downloads with its own bot token) --------------------------
+
+const PHOTO_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9, 9]);
+
+function photoSetup() {
+  const ctx = setup();
+  const files = ctx.gh.files();
+  const content = JSON.parse(files["content.json"]);
+  content.events = [{ id: "e1", slug: "grad-night", title: "Grad Night", date: "2026-06-05", content: "<p>x</p>" }];
+  files["content.json"] = JSON.stringify(content);
+  const stored = new Map();
+  Object.assign(ctx.env, { R2_PUBLIC_URL: "https://media.example", MEDIA: { put: async (k, v) => void stored.set(k, v) } });
+  ctx.claude.length = 0;
+  const downloads = [];
+  const infos = [];
+  const inner = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u === "https://slack.com/api/files.info") {
+      const file = new URLSearchParams(init.body).get("file");
+      infos.push(file);
+      const pdf = file === "F0PDF0001";
+      return Response.json({ ok: true, file: { id: file, name: pdf ? "x.pdf" : "grad.jpg", mimetype: pdf ? "application/pdf" : "image/jpeg", size: PHOTO_BYTES.length, url_private_download: `https://files.slack.com/files-pri/T1-${file}/download/grad.jpg` } });
+    }
+    if (u.startsWith("https://files.slack.com/")) {
+      downloads.push(init.headers?.Authorization);
+      return new Response(PHOTO_BYTES, { headers: { "Content-Type": "image/jpeg" } });
+    }
+    return inner(url, init);
+  };
+  return { ...ctx, stored, downloads, infos };
+}
+
+const photoMessage = (env, { text = "Use this for Grad Night", id = "EvP1", files = [{ id: "F0PHOTO1", name: "grad.jpg", mimetype: "image/jpeg", size: PHOTO_BYTES.length }], thread } = {}) =>
+  send(env, "/slack/events", JSON.stringify({ type: "event_callback", event_id: id, team_id: "T1", event: {
+    type: "message", ...(files ? { subtype: "file_share", files } : {}), channel: "C1", user: "U1", text, ts: thread ? "101.1" : "100.1", ...(thread ? { thread_ts: thread } : {}),
+  } }), "application/json");
+
+const choice = (over) => ({ action: "setImage", collection: "events", id: "e1", slot: null, typeKey: null, imageAlt: "Students celebrating", reply: null, summary: "New photo for Grad Night", ...over });
+
+test("photo: staff post a photo → stored, shown on the Approve card, and Approve sets the event's image", async () => {
+  const { gh, env, slack, claude, stored, downloads } = photoSetup();
+  claude.push(choice());
+  await photoMessage(env);
+
+  assert.deepEqual(downloads, ["Bearer xoxb-test"]);
+  assert.equal(stored.size, 1, "stored once (no Images binding here: the original only)");
+  const [key] = stored.keys();
+  assert.match(key, /^media\/uploads\/slack-[0-9a-f-]{36}\/original\.jpg$/);
+  const draft = slack.find((m) => m.method === "chat.update" && m.blocks);
+  const images = draft.blocks.filter((b) => b.type === "image");
+  assert.equal(images.length, 1);
+  assert.equal(images[0].image_url, `https://media.example/${key}`);
+  assert.equal(gh.commits.length, 0);
+
+  const [approve] = buttons(draft);
+  await click(env, "1wp_approve", approve.value);
+  const event = JSON.parse(gh.files()["content.json"]).events[0];
+  assert.equal(event.image, `https://media.example/${key}`);
+  assert.equal(event.imageAlt, "Students celebrating");
+  assert.match(gh.commits[0], /new image for event "Grad Night" \(by staff@example.org\)/);
+});
+
+test("photo: other files get a polite no, without downloading or asking Claude", async () => {
+  const { env, slack, claude, downloads, infos } = photoSetup();
+  await photoMessage(env, { files: [{ id: "F0PDF0001", name: "x.pdf", mimetype: "application/pdf", size: 10 }] });
+  assert.match(slack.at(-1).text, /I can only use photos/);
+  await photoMessage(env, { id: "EvP2", files: [{ id: "F0A0001", mimetype: "image/jpeg", size: 5 }, { id: "F0B0001", mimetype: "image/png", size: 5 }] });
+  assert.match(slack.at(-1).text, /one photo at a time/);
+  assert.equal(downloads.length + infos.length + claude.length, 0);
+});
+
+test("photo without a message: the bot asks where; the answer in the thread reuses the photo", async () => {
+  const { gh, env, slack, claude, infos } = photoSetup();
+  claude.push(choice({ action: "reply", collection: null, id: null, reply: "Which event or page is this photo for?" }));
+  await photoMessage(env, { text: "" });
+  assert.equal(slack.at(-1).text, "Which event or page is this photo for?");
+
+  claude.push(choice());
+  await photoMessage(env, { id: "EvP3", text: "Grad Night", files: null, thread: "100.1" });
+  assert.deepEqual(infos, ["F0PHOTO1", "F0PHOTO1"], "downloaded again for the answer");
+  const draft = slack.findLast((m) => m.method === "chat.update" && m.blocks);
+  assert.ok(draft.blocks.some((b) => b.type === "image"));
+  await click(env, "1wp_approve", buttons(draft)[0].value);
+  assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
+});
