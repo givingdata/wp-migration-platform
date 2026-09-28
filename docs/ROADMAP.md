@@ -86,7 +86,7 @@ commits it through the Edit module. Tested on Cinderella: edit a page's text, ad
 remove a line. Progress shows as 👀 on the request and a thread message that updates as it works.
 
 **Shared app (built 2026-09-25):** all clients now go in one free Slack workspace (FloMySite.com)
-as regular members, one private channel per client, served by one 1WP app through the
+as regular members, one private channel per client, served by one SiteFlo app through the
 `slack-router/` Worker (1wp-slack). Adding a client is `scripts/slack-add-client.mjs`; the only
 manual step is inviting their staff to the workspace. Cinderella moves from its own app setup to the
 router as the first client (that move also gives it a new bot token, item 3 below).

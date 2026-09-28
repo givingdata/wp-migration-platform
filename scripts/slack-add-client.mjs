@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Connects this client to the shared 1WP Slack app (the 1wp-slack router, slack-router/README.md).
+// Connects this client to the shared SiteFlo Slack app (the 1wp-slack router, slack-router/README.md).
 // Run in the client folder on the setup machine. Safe to re-run: it updates the client.
 //
 //   node ../../platform/scripts/slack-add-client.mjs <client> [options]
@@ -148,7 +148,7 @@ if (toml !== before || flag("--rotate-key")) {
   if (flag("--push")) {
     if (toml !== before) {
       execFileSync("git", ["add", tomlPath]);
-      execFileSync("git", ["commit", "-m", `Slack: connect ${client} to the shared 1WP app`], { stdio: "inherit" });
+      execFileSync("git", ["commit", "-m", `Slack: connect ${client} to the shared SiteFlo app`], { stdio: "inherit" });
       execFileSync("git", ["push"], { stdio: "inherit" });
     } else {
       execFileSync("gh", ["workflow", "run", "deploy-worker.yml", "-R", repo()], { stdio: "inherit" });

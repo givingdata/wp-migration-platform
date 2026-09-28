@@ -1,4 +1,4 @@
-# 1wp-slack: one Slack app for every client (scaffold)
+# 1wp-slack: one Slack app for every client (the SiteFlo app) (scaffold)
 
 Status: **deployed 2026-09-25** at https://1wp-slack.weathered-sun-5146.workers.dev. How to use it:
 `docs/SLACK.md`. Tests: `npm test` here (end to end with the client Worker's real `slack.js`).
@@ -7,7 +7,7 @@ Status: **deployed 2026-09-25** at https://1wp-slack.weathered-sun-5146.workers.
 
 All clients live in one **free** Slack workspace (FloMySite.com). Each client's staff are regular
 members, in a private channel named after their site. The free plan allows at most **10 apps**,
-so "one 1WP app per client" stops at 10 clients. Instead there is **one** 1WP app, and a small
+so "one SiteFlo app per client" stops at 10 clients. Instead there is **one** SiteFlo app, and a small
 Worker in front of the client Workers decides which client a message belongs to.
 
 Clients are **records in the router's KV** (Cloudflare's key-value store), not lines in its
@@ -35,7 +35,7 @@ key lets someone post only in that client's channel.
 ## Setup, onboarding, management
 
 **Once, ever**
-1. Create the 1WP app from `manifest.json` (`ROUTER_URL` filled in), or move the existing
+1. Create the SiteFlo app from `manifest.json` (`ROUTER_URL` filled in), or move the existing
    Cinderella app to it (below). New compared with today: `groups:write` (create private channels,
    add people) and the `team_join` event (someone joined the workspace).
 2. Create the router's KV namespace, set its four secrets, and deploy it.

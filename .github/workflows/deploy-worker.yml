@@ -79,7 +79,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_ROUTER_KEY: ${{ secrets.SLACK_ROUTER_KEY }}
         run: |
-          # Router mode (shared 1WP app) needs only SLACK_ROUTER_KEY; direct mode the other two.
+          # Router mode (shared SiteFlo app) needs only SLACK_ROUTER_KEY; direct mode the other two.
           for name in SLACK_ROUTER_KEY SLACK_SIGNING_SECRET SLACK_BOT_TOKEN; do
             value="${!name}"
             if [ -z "$value" ]; then echo "$name not set; skipping (Slack is optional)"; continue; fi

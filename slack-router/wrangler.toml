@@ -15,8 +15,8 @@ SUPPORT_EMAILS = "hello@flomysite.com"
 # pausing or removing a client never redeploys this Worker.
 
 # Secrets (wrangler secret put <NAME>):
-#   SLACK_SIGNING_SECRET  the one 1WP app → Basic Information
-#   SLACK_BOT_TOKEN       the one 1WP app → OAuth & Permissions (xoxb-…)
+#   SLACK_SIGNING_SECRET  the one SiteFlo app → Basic Information
+#   SLACK_BOT_TOKEN       the one SiteFlo app → OAuth & Permissions (xoxb-…)
 #   ROUTER_SECRET         random; each client's SLACK_ROUTER_KEY = HMAC(ROUTER_SECRET, client)
 #   ADMIN_KEY             random; setup machine only (Mac mini), for /admin/*
 

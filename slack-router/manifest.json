@@ -4,13 +4,13 @@
     "minor_version": 1
   },
   "display_information": {
-    "name": "1WP",
+    "name": "SiteFlo",
     "description": "Ask for website changes in Slack; nothing is published until you approve it.",
     "background_color": "#1f2937"
   },
   "features": {
     "bot_user": {
-      "display_name": "1WP",
+      "display_name": "SiteFlo",
       "always_online": true
     }
   },

@@ -1,7 +1,7 @@
 # Slack: staff ask for edits in a channel
 
 Optional. Staff post a request in their Slack channel, for example *"change the Contact page hours
-to 9–5"*. The **1WP** bot puts 👀 on the message and answers in a thread ("Working on it…", then
+to 9–5"*. The **SiteFlo** bot puts 👀 on the message and answers in a thread ("Working on it…", then
 what it's doing), which can take up to a minute for a new article. It ends with a before/after of
 the change and two buttons, **Approve** and **Cancel**, and the 👀 goes away. Only an approved
 change is saved to `content.json` (one commit, through the same Edit module as the staff form) and
@@ -26,7 +26,7 @@ What it does **not** do:
 - It only reads and answers in the channels you list, and only for the staff you list. Everyone
   else is ignored.
 
-All clients share **one** Slack app (1WP) in the FloMySite.com workspace (free plan). Each client's
+All clients share **one** Slack app (SiteFlo) in the FloMySite.com workspace (free plan). Each client's
 staff are regular members of that workspace, in a private channel named after their site. The
 shared **1wp-slack** router Worker (`slack-router/`, design in `slack-router/README.md`) receives
 every Slack request and forwards each client's to that client's Worker. Clients never install
@@ -121,8 +121,8 @@ Your new app's page has an address like `https://api.slack.com/apps/A0123ABCD/ge
 `A0123ABCD` part is the **app ID**; the links below use it. All your apps: https://api.slack.com/apps
 (the app menu can list the same app twice; same ID, same app).
 
-The bot's name in Slack is the app's name (**1WP** unless you changed it while creating it). Use that
-name wherever this guide says `@1WP`.
+The bot's name in Slack is the app's name (**SiteFlo** unless you changed it while creating it). Use that
+name wherever this guide says `@SiteFlo`.
 
 ### 2. Install it and copy the two keys
 
@@ -151,7 +151,7 @@ secrets just skip that step.
 
 ### 4. Choose the channel and staff, then push
 
-- In Slack, open the channel and type `/invite @1WP` (the bot only sees channels it's in; private
+- In Slack, open the channel and type `/invite @SiteFlo` (the bot only sees channels it's in; private
   channels work too). If Slack finds no match, use the bot's actual name, or click the channel name
   → **Integrations** → **Add an App**. Slackbot's "talk it out with just yourself" note in a new
   channel doesn't matter.
