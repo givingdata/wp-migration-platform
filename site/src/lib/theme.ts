@@ -8,6 +8,9 @@ export const COLOR_TOKENS = [
   // Headings, and the contrasting "band" used by page sections (e.g. a dark call-to-action strip).
   "heading", "band-bg", "band-text", "band-muted", "band-accent",
 ] as const;
+// Optional colours: not in presets; unset, the site falls back to another token.
+// "overlay" shades photos under text (hero, quote); it defaults to band-bg.
+export const OPTIONAL_COLOR_TOKENS = ["overlay"] as const;
 export const OTHER_TOKENS = [
   "font-body", "font-heading", "heading-weight", "text-size", "radius", "wrap", "narrow", "button-radius",
 ] as const;
@@ -126,8 +129,8 @@ function resolve(cfg: ThemeConfig) {
   const colors = cfg.colors ?? {};
   const darkColors = cfg.darkColors ?? {};
   const tokens = cfg.tokens ?? {};
-  checkValues("colors", colors, COLOR_TOKENS);
-  checkValues("darkColors", darkColors, COLOR_TOKENS);
+  checkValues("colors", colors, [...COLOR_TOKENS, ...OPTIONAL_COLOR_TOKENS]);
+  checkValues("darkColors", darkColors, [...COLOR_TOKENS, ...OPTIONAL_COLOR_TOKENS]);
   checkValues("tokens", tokens, OTHER_TOKENS);
 
   const fonts = cfg.googleFonts ?? [];

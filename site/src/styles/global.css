@@ -171,7 +171,7 @@ h3 { font-size: 1.25rem; }
 /* Hero: full-width photo, dark gradient, text bottom-left, stats bottom-right */
 .s-hero { position: relative; min-height: min(88vh, 46rem); display: flex; align-items: flex-end; background: var(--band-bg); color: var(--band-text); overflow: hidden; }
 .s-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
-.s-hero-shade { position: absolute; inset: 0; background: linear-gradient(to top, color-mix(in srgb, var(--band-bg) 96%, black) 0%, color-mix(in srgb, var(--band-bg) 75%, transparent) 45%, transparent 100%); }
+.s-hero-shade { position: absolute; inset: 0; background: linear-gradient(to top, color-mix(in srgb, var(--overlay, var(--band-bg)) 96%, black) 0%, color-mix(in srgb, var(--overlay, var(--band-bg)) 75%, transparent) 45%, transparent 100%); }
 .s-hero-inner { position: relative; width: 100%; display: grid; gap: 2rem; align-items: end; padding-block: 7rem 3.5rem; }
 @media (min-width: 52rem) { .s-hero-inner { grid-template-columns: 1.4fr 1fr; } }
 .s-hero .s-eyebrow { color: var(--band-accent); }
@@ -252,7 +252,7 @@ h3 { font-size: 1.25rem; }
 /* Quote banner */
 .s-quote { position: relative; overflow: hidden; background: var(--band-bg); padding-block: clamp(4rem, 10vw, 7rem); text-align: center; }
 .s-quote img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.s-quote-shade { position: absolute; inset: 0; background: color-mix(in srgb, var(--band-bg) 72%, transparent); }
+.s-quote-shade { position: absolute; inset: 0; background: color-mix(in srgb, var(--overlay, var(--band-bg)) 72%, transparent); }
 .s-quote blockquote { position: relative; margin: 0 auto; max-width: 48rem; }
 .s-quote p { font-family: var(--font-heading); font-weight: var(--heading-weight); font-size: clamp(1.5rem, 3.2vw, 2.3rem); line-height: 1.35; color: var(--band-text); margin: 0; }
 .s-quote cite { display: block; margin-top: 1.25rem; font-style: normal; color: var(--band-muted); }

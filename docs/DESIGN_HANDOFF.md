@@ -39,6 +39,7 @@ file maps straight onto the site. The build rejects names it doesn't know.
 | `accent` | Links, eyebrow labels, hovered card titles, blockquote rule |
 | `accent-hover` | Links on hover |
 | `focus` | Keyboard focus outline (must stand out against `bg` and `surface`) |
+| `overlay` | Optional. Shade over photos with text on them (homepage hero, quote). Defaults to the band colour; set a neutral dark (e.g. `#111111`) to keep photos' own colours |
 
 Supply both modes. If the client doesn't want dark mode, say so and we set `"darkMode": false`.
 
