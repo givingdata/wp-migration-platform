@@ -69,6 +69,11 @@ the steps for growing without rebuilding what exists.
    Touches: `config/design-specs.json`, `form/` (labels and fields), `worker/src/claude.js`
    (prompt per type), `worker/src/github.js`, `site/src/lib/content.ts`, the
    `exhibitions`/`events` pages and layouts, and the export's type mapping.
+5. **Minimum TLS 1.2 on every domain.** Cloudflare zones default to accepting TLS 1.0 and
+   1.1, which are outdated. Set **SSL/TLS → Edge Certificates → Minimum TLS Version → TLS 1.2**
+   on flomysite.com (the SiteFlo site; still accepts 1.0 as of 2026-09-28) and on each client
+   domain when it moves to the platform. Add it to `docs/DEPLOYMENT_CHECKLIST.md` (go-live
+   step), or set it from `ops/provision.mjs` once its token can edit zone settings.
 
 ## Edit module (built 2026-09-24)
 
