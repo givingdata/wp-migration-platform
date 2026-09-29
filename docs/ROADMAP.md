@@ -113,6 +113,24 @@ Next (planned for 2026-09-25):
 3. **New bot token for Cinderella** before real staff use it: the current one was pasted into
    a chat during setup. Reinstalling keeps the same token, so get a new one and update the
    Worker secret `SLACK_BOT_TOKEN`.
+4. **Visitor numbers in Slack (built 2026-09-29; `worker/src/analytics.js`).** Staff ask "how many
+   visits this month?" and Claude answers from the numbers only. Sources: `cloudflare` (Web
+   Analytics, cookieless; needs a read-only Account Analytics key; no backfill) and `sample`
+   (labelled made-up numbers, used on the demo). Next: test the Cloudflare source on live data
+   (flomysite.com), then turn it on per client at go-live.
+5. **Option: Google Analytics (GA4) as a source.** For clients who already use GA4 or want its
+   reports. The site can already load the GA4 tag (`analytics` in `config/site.json`); this adds:
+   - A `ga4` source in `analytics.js` using the GA4 Data API (`runReport`: sessions, page views,
+     top pages, traffic sources, countries, devices), mapped to the same shape, so the Slack
+     answers don't change.
+   - Access through a Google Cloud service account given **Viewer** on the client's GA4
+     property: `GA4_PROPERTY_ID` var and a `GA4_SERVICE_ACCOUNT` secret (the Worker signs its
+     own token with Web Crypto; no Google SDK). One service account for all clients.
+   - **Cookie consent.** GA sets cookies, so sites using it need a consent banner (Quebec's
+     Law 25, GDPR for EU visitors) with GA's consent mode; Cloudflare Web Analytics doesn't.
+     Build the banner into the platform, shown only when a cookie-setting provider is on.
+   - Note for clients: GA and Cloudflare count differently (GA sessions vs Cloudflare visits,
+     and ad blockers stop GA more often), so their numbers won't match exactly.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 
