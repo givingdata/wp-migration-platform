@@ -141,6 +141,14 @@ Next (planned for 2026-09-25):
    variable (for example `America/Vancouver`), or days are counted in UTC. `ops/provision.mjs` and
    the dashboard's **Set up clients** page don't set it yet: add a time zone field (default from
    the client's location) and write it into `worker/wrangler.toml`.
+8. **SEO title and description from Slack (planned 2026-09-29).** Today the bot can't edit an
+   entry's `seo` block. Without one, the `<title>` and meta description come from the title and
+   Summary (or the start of the body), so ordinary text edits change them as a side effect. With
+   one (for example imported from Yoast), text edits don't reach the meta tags, and there's no
+   way to change them from Slack. Add `seo.title` and `seo.description` to `update` proposals in
+   `worker/src/slack-edits.js`, with length limits (about 60 and 160 characters), before/after on
+   the Approve card, and a prompt rule to use them only when staff ask about how the page appears
+   in search or when shared. Keep `noindex`, `canonical` and the share image off-limits.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 
@@ -208,6 +216,28 @@ How to choose them:
 
 Possible first step: summarise past assessor scans by client type to decide which three
 templates to find first.
+
+## Uptime monitoring (planned 2026-09-29)
+
+Cloudflare's own uptime checks (Health Checks, Load Balancing monitors) need a paid plan on
+each domain, so build a small monitor instead:
+
+1. **A Worker on a Cron Trigger (free), every 5 minutes**, checks each client's site, staff
+   form and Worker, and posts to Slack #siteflo when something fails and again when it
+   recovers (no repeat alerts while it stays down).
+2. **Check for the likely problems, not only downtime:**
+   - the page answers 200 and contains an expected marker (the site name or a footer string),
+     which catches a broken deploy that still serves a page;
+   - the staff form still redirects to the Cloudflare Access login (a 200 means the lock is off);
+   - SSL certificate and domain registration expiry, warned 14 days ahead.
+3. **Client list from ops** (`ops/clients/<slug>.json`), so new clients are covered
+   automatically; later from the central admin (Phase 3).
+4. **Outside check for Cloudflare-wide outages:** a Worker can't report that Cloudflare itself
+   is down, so add a free external monitor (e.g. UptimeRobot, 50 monitors at 5-minute checks)
+   on flomysite.com and a few key client sites.
+
+Real downtime on Pages is rare; a bad deploy, a lock that came off, or an expired domain is the
+more realistic risk, which is why the checks look at content and settings as well as status.
 
 ## Future option: Claude edits the site
 
