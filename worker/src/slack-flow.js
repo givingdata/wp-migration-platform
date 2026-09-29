@@ -17,6 +17,10 @@
 // a small copy, and stored like a staff-form upload once Claude has picked where it goes. The
 // remembered question keeps the photo, so "which page is this for?" can be answered in the thread.
 //
+// A request deleted by its author takes the bot's thread with it: the bot deletes its own replies
+// there (people can't delete an app's messages), cancels a proposal still waiting for Approve and
+// forgets an open question. A change already published stays live; git keeps its history.
+//
 // Nothing publishes without an Approve click, and Slack can't delete, change the menu or
 // settings. Commits carry the Slack user's email, like the staff form's.
 import specs from "../../config/design-specs.json" with { type: "json" };
@@ -88,6 +92,17 @@ function pickPhoto(files) {
   return { photo: photos[0] };
 }
 
+// The proposal ids on a bot message's Approve / Cancel buttons.
+function proposalIds(message) {
+  const ids = new Set();
+  for (const block of message.blocks || []) {
+    for (const el of block.type === "actions" ? block.elements || [] : []) {
+      if ([APPROVE_ACTION, CANCEL_ACTION].includes(el.action_id) && typeof el.value === "string") ids.add(el.value);
+    }
+  }
+  return [...ids];
+}
+
 /** @param {() => object} getEditor */
 export function slackHandlers(env, getEditor) {
   return {
@@ -134,6 +149,22 @@ export function slackHandlers(env, getEditor) {
         await updateMessage(env, { channel, ts: working, text: `⚠️ Couldn't draft that change: ${friendly(e)}` });
       } finally {
         await quietly(slackApi(env, "reactions.remove", { channel, timestamp: ts, name: "eyes" }));
+      }
+    },
+
+    async onDeleted({ channel, ts }) {
+      if (!channelAllowed(env, channel)) return;
+      await quietly(env.CONTENT?.delete?.(askKey(channel, ts)) ?? Promise.resolve());
+      const data = await slackApi(env, "conversations.replies", { channel, ts, limit: 200 });
+      const replies = (data?.messages || []).filter((m) => m.ts !== ts && m.bot_id);
+      for (const m of replies) {
+        // A proposal still waiting for Approve can't be published from a deleted thread.
+        for (const id of proposalIds(m)) {
+          const proposal = await getProposal(env, id);
+          if (proposal?.status === "pending") await cancelProposal(env, id, { by: "request deleted" }).catch(() => {});
+        }
+        // Slack refuses other apps' messages (cant_delete_message); that's fine.
+        await quietly(slackApi(env, "chat.delete", { channel, ts: m.ts }));
       }
     },
 

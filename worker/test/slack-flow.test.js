@@ -448,3 +448,34 @@ test("photo without a message: the bot asks where; the answer in the thread reus
   await click(env, "1wp_approve", buttons(draft)[0].value);
   assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
 });
+
+test("deleting a request deletes the bot's thread replies and cancels its proposal", async () => {
+  const { gh, env, slack } = setup();
+  await message(env);
+  const draft = slack[2];
+  const [approve] = buttons(draft);
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith("/conversations.replies")) {
+      const q = new URLSearchParams(init.body);
+      assert.equal(q.get("ts"), "100.1");
+      return new Response(JSON.stringify({ ok: true, messages: [
+        { ts: "100.1", user: "U1", text: "(deleted)" },
+        { ts: "t1", bot_id: "B1", blocks: draft.blocks },
+        { ts: "100.5", user: "U1", text: "a person's reply stays" },
+      ] }));
+    }
+    return fetch(url, init);
+  };
+  const deleted = (id, event) => send(env, "/slack/events", JSON.stringify({ type: "event_callback", event_id: id, team_id: "T1", event }), "application/json");
+  await deleted("Ev9", { type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "100.1", hidden: true, previous_message: { user: "U1", ts: "100.1", text: "x" } });
+
+  const deletes = slack.filter((m) => m.method === "chat.delete");
+  assert.deepEqual(deletes.map((m) => m.ts), ["t1"], "only the bot's reply is deleted");
+  await click(env, "1wp_approve", approve.value);
+  assert.equal(gh.commits.length, 0, "a deleted request's proposal can't be published");
+
+  // A parent with replies becomes a tombstone (message_changed) instead; same clean-up.
+  await deleted("Ev10", { type: "message", subtype: "message_changed", channel: "C1", message: { subtype: "tombstone", ts: "100.1" }, previous_message: { user: "U1", ts: "100.1" } });
+  assert.equal(slack.filter((m) => m.method === "chat.delete").length, 2);
+});

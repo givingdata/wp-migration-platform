@@ -40,7 +40,7 @@ const people = [
 
 beforeEach(() => {
   env = { SLACK_SIGNING_SECRET: SIGNING, SLACK_BOT_TOKEN: "xoxb-router", ROUTER_SECRET: "router-secret", ADMIN_KEY: "admin", SUPPORT_EMAILS: "hello@flomysite.com", ROUTER: fakeKV() };
-  received = { messages: [], actions: [] };
+  received = { messages: [], actions: [], deleted: [] };
   slackCalls = [];
   slackAnswers = {
     "conversations.create": () => ({ ok: true, channel: { id: "C100" } }),
@@ -64,7 +64,7 @@ beforeEach(() => {
     }
     const request = new Request(url, init);
     if (u.origin === CLIENT_URL) {
-      const handlers = { onMessage: async (m) => void received.messages.push(m), onAction: async (a) => void received.actions.push(a) };
+      const handlers = { onMessage: async (m) => void received.messages.push(m), onAction: async (a) => void received.actions.push(a), onDeleted: async (d) => void received.deleted.push(d) };
       return (await handleSlackRoute(request, clientEnv, clientCtx, handlers)) || new Response("no", { status: 404 });
     }
     if (u.origin === ROUTER) return router.fetch(request, env, routerCtx);
@@ -270,4 +270,22 @@ test("photos: forwarded with the message; only that client can download them, as
   slackAnswers["files.info"] = (b) => ({ ok: true, file: { id: b.file, mimetype: "application/pdf", size: 10, url_private_download: "https://files.slack.com/x" } });
   await assert.rejects(downloadFile(clientEnv, { id: "F0PHOTO1" }), /unsupported_type/);
   assert.equal(downloads.length, 1);
+});
+
+test("a deleted request reaches its client, which may read and delete in its own channel only", async () => {
+  await addAcme();
+  const deleted = (channel, previous = { user: "U1", ts: "1.1" }) =>
+    JSON.stringify({ type: "event_callback", team_id: "T1", event_id: `Ev-del-${Math.random()}`, event: { type: "message", subtype: "message_deleted", channel, deleted_ts: "1.1", hidden: true, previous_message: previous } });
+  await slackRequest("/slack/events", deleted("C100"));
+  await slackRequest("/slack/events", deleted("C999"));
+  await slackRequest("/slack/events", deleted("C100", { bot_id: "B1", ts: "1.1" }));
+  await settle();
+  assert.deepEqual(received.deleted, [{ channel: "C100", ts: "1.1" }], "own channel, people's messages only");
+  assert.equal(received.messages.length, 0, "a deletion isn't a request");
+
+  await slackApi(clientEnv, "conversations.replies", { channel: "C100", ts: "1.1" });
+  await slackApi(clientEnv, "chat.delete", { channel: "C100", ts: "2.2" });
+  assert.deepEqual(slackCalls.slice(-2).map((c) => c.method), ["conversations.replies", "chat.delete"]);
+  await assert.rejects(slackApi(clientEnv, "chat.delete", { channel: "C999", ts: "2.2" }), /not_your_channel/);
+  await assert.rejects(slackApi(clientEnv, "conversations.replies", { channel: "C999", ts: "1.1" }), /not_your_channel/);
 });

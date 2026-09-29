@@ -1,6 +1,6 @@
 // 1wp-slack: the one Slack app for every client (see ../README.md).
 //
-//   POST /slack/events          Slack-signed. message → its channel's client; team_join → add the
+//   POST /slack/events          Slack-signed. message (or a deleted request) → its channel's client; team_join → add the
 //                               new member to their client's channel (matched on staff email/domain)
 //   POST /slack/interactions    Slack-signed. Approve/Cancel click → its channel's client
 //   POST /api/<method>          client-signed. The client Worker's only way to call Slack: a few
@@ -15,7 +15,7 @@
 // records, so adding, pausing or removing one never redeploys this Worker. This Worker holds the
 // only Slack secrets. Never logs message text, emails or tokens.
 import {
-  verifySlackSignature, isStaffMessage, messageFromEvent, actionFromPayload,
+  verifySlackSignature, isStaffMessage, messageFromEvent, actionFromPayload, deletedFromEvent,
   routerHeaders, verifyRouterRequest, slackDirect, slackApi, fetchSlackFile, SlackError,
 } from "../../worker/src/slack.js";
 import { isStaff } from "../../worker/src/slack-access.js";
@@ -30,6 +30,8 @@ const FILE_TTL = 86400; // a photo can be used for a day (the bot's questions al
 const ALLOWED = {
   "chat.postMessage": "channel",
   "chat.update": "channel",
+  "chat.delete": "channel", // Slack only lets the bot delete its own messages
+  "conversations.replies": "channel",
   "chat.postEphemeral": "channel",
   "reactions.add": "channel",
   "reactions.remove": "channel",
@@ -137,6 +139,13 @@ async function events(raw, env, ctx) {
       // Photos in this message may be downloaded by this client only.
       for (const f of message.files || []) await env.ROUTER.put(`file:${f.id}`, client.client, { expirationTtl: FILE_TTL });
       await forward(env, client, "message", message);
+    });
+  } else if (deletedFromEvent(event)) {
+    // Someone deleted their request: the client removes its replies in that thread.
+    later(ctx, "deleted", async () => {
+      const deleted = deletedFromEvent(event);
+      const client = await clientForChannel(env, deleted.channel);
+      if (client) await forward(env, client, "deleted", deleted);
     });
   }
   return json({ ok: true });

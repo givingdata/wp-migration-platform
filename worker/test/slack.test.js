@@ -264,3 +264,14 @@ test("photo messages count as staff messages; edits and bots still don't; files 
   assert.equal(isStaffMessage({ type: "message", subtype: "file_share", bot_id: "B1", user: "U1", files: [photo] }), false);
   assert.deepEqual(filesOf({ files: [photo, { id: "bad id" }] }), [{ id: "F0PHOTO1", name: "a.jpg", mimetype: "image/jpeg", size: 5 }]);
 });
+
+test("deletedFromEvent: people's top-level messages only", async () => {
+  const { deletedFromEvent } = await import("../src/slack.js");
+  const prev = { user: "U1", ts: "1.1" };
+  assert.deepEqual(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "1.1", previous_message: prev }), { channel: "C1", ts: "1.1" });
+  assert.deepEqual(deletedFromEvent({ type: "message", subtype: "message_changed", channel: "C1", message: { subtype: "tombstone", ts: "1.1" }, previous_message: prev }), { channel: "C1", ts: "1.1" });
+  assert.equal(deletedFromEvent({ type: "message", subtype: "message_changed", channel: "C1", message: { ts: "1.1", text: "edited" }, previous_message: prev }), null, "an edit");
+  assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "1.1", previous_message: { bot_id: "B1", ts: "1.1" } }), null, "the bot's own message");
+  assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "2.2", previous_message: { user: "U1", ts: "2.2", thread_ts: "1.1" } }), null, "a thread reply");
+  assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "x", previous_message: prev }), null);
+});

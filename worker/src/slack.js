@@ -73,6 +73,23 @@ export function isStaffMessage(event) {
   return hasText || (Array.isArray(event.files) && event.files.length > 0);
 }
 
+/**
+ * A person deleted a top-level message: { channel, ts }, else null. Slack sends subtype
+ * message_deleted, or (when the message had thread replies) message_changed to a "tombstone".
+ * Only people's messages count; thread replies don't (the bot's thread belongs to the top message).
+ */
+export function deletedFromEvent(event) {
+  if (event?.type !== "message") return null;
+  const before = event.previous_message;
+  let ts = null;
+  if (event.subtype === "message_deleted") ts = event.deleted_ts;
+  else if (event.subtype === "message_changed" && event.message?.subtype === "tombstone") ts = event.message.ts;
+  if (!ts || typeof event.channel !== "string" || !/^\d+\.\d+$/.test(String(ts))) return null;
+  if (!before?.user || before.bot_id) return null;
+  if (before.thread_ts && before.thread_ts !== ts) return null;
+  return { channel: event.channel, ts: String(ts) };
+}
+
 /** The files on a message: id, name, type and size only (never Slack's private URLs). */
 export function filesOf(event) {
   return (Array.isArray(event?.files) ? event.files : [])
@@ -104,6 +121,8 @@ async function handleEvents(raw, env, ctx, handlers) {
   if (!(await firstSighting(env, body.event_id))) return json({ ok: true });
 
   if (isStaffMessage(body.event)) later(ctx, "onMessage", () => handlers.onMessage(messageFromEvent(body)));
+  const deleted = deletedFromEvent(body.event);
+  if (deleted && handlers.onDeleted) later(ctx, "onDeleted", () => handlers.onDeleted(deleted));
   return json({ ok: true });
 }
 
@@ -174,6 +193,8 @@ async function handleInbox(bytes, env, ctx, handlers) {
     if (await firstSighting(env, body.data.eventId)) later(ctx, "onMessage", () => handlers.onMessage(body.data));
   } else if (body?.kind === "action" && body.data?.channel) {
     later(ctx, "onAction", () => handlers.onAction(body.data));
+  } else if (body?.kind === "deleted" && body.data?.channel && body.data?.ts) {
+    if (handlers.onDeleted) later(ctx, "onDeleted", () => handlers.onDeleted({ channel: body.data.channel, ts: body.data.ts }));
   } else {
     return json({ ok: false, error: "Unknown kind" }, 400);
   }
@@ -184,7 +205,7 @@ async function handleInbox(bytes, env, ctx, handlers) {
  * Routes POST /slack/events and /slack/interactions (direct mode, SLACK_SIGNING_SECRET) and
  * POST /slack/inbox (router mode, SLACK_ROUTER_KEY). Returns a Response, or null for any other
  * path. 404 for a /slack/* route whose mode isn't configured.
- * handlers: { onMessage(msg): Promise<void>, onAction(act): Promise<void> }
+ * handlers: { onMessage(msg), onAction(act), onDeleted?({ channel, ts }) }, each returning a Promise
  */
 export async function handleSlackRoute(request, env, ctx, handlers) {
   const { pathname } = new URL(request.url);
@@ -219,7 +240,7 @@ export async function handleSlackRoute(request, env, ctx, handlers) {
 }
 
 // Read methods only accept form-encoded bodies; write methods take JSON.
-const FORM_METHODS = new Set(["users.info", "users.list", "users.lookupByEmail", "conversations.info", "conversations.members", "files.info"]);
+const FORM_METHODS = new Set(["users.info", "users.list", "users.lookupByEmail", "conversations.info", "conversations.members", "conversations.replies", "files.info"]);
 
 async function parse(res, method) {
   try {
