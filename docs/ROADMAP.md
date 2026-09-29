@@ -149,6 +149,14 @@ Next (planned for 2026-09-25):
    `worker/src/slack-edits.js`, with length limits (about 60 and 160 characters), before/after on
    the Approve card, and a prompt rule to use them only when staff ask about how the page appears
    in search or when shared. Keep `noindex`, `canonical` and the share image off-limits.
+9. **Show a page's images in Slack (planned 2026-09-29).** Today the bot only shows a site image
+   on the Approve card of a photo change ("Before"); asking "what photos are on the About page?"
+   gets the "what I can do" reply, and its own links don't unfurl. Add a `show` action in
+   `worker/src/slack-edits.js` that replies with the page's images as Slack image blocks, each
+   with its place (main photo, or section › slot on designed pages) and alt text. Reuse the
+   photo flow's index of image places and the Approve card's image blocks (URLs under
+   `R2_PUBLIC_URL`). Read-only, so no Approve step; it helps staff see what's there before
+   asking for a photo change.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 
