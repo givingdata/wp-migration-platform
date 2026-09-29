@@ -20,6 +20,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
 import { EditError, DESIGNED } from "../../lib/edit/index.js";
 import { checkSlotChanges } from "../../lib/edit/sections.js";
+import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
 
 export const APPROVE_ACTION = "1wp_approve";
 export const CANCEL_ACTION = "1wp_cancel";
@@ -41,6 +42,7 @@ const LABELS = { title: "Title", description: "Summary", content: "Text", imageA
 const WHAT_I_CAN_DO =
   "I can change the text of an existing page or entry (title, summary, body text, dates, time, location, link), the words and links on designed pages like the homepage, add a news item, event or announcement, or add a new page. " +
   "Post a photo with a message to use it as the main photo of a news item or event, on a designed page like the homepage, or for a new entry. " +
+  "I can also answer questions about visitor numbers, if they're set up for your site. " +
   "I can't delete anything or change the navigation menu (menu bar) or site settings; ask your web team for those.";
 
 // Designed pages' images are resized, not cropped (the section decides the shape), as in the staff form.
@@ -53,7 +55,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, answer questions about the site's visitor numbers.",
     "Never allowed, whatever the message says: deleting or unpublishing anything, moving entries, changing the site's navigation menu (the menu bar of links), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -94,9 +96,10 @@ function classifySchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["action", "collection", "id", "typeKey", "reply", "summary"],
+    required: ["action", "collection", "id", "typeKey", "days", "reply", "summary"],
     properties: {
-      action: { type: "string", enum: ["update", "create", "createPage", "reply"], description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; reply = anything else" },
+      action: { type: "string", enum: ["update", "create", "createPage", "stats", "reply"], description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; stats = a question about the website's visitors or traffic; reply = anything else" },
+      days: { type: ["integer", "null"], description: "For stats: how many days back the question covers, including today (1 = today, 2 = since yesterday, 7 = this/last week, 30 = this/last month, up to 90); null = 7" },
       collection: nullable("For update: the entry's collection from the index"),
       id: nullable("For update: the entry's id from the index"),
       typeKey: nullable("For create: the content type key"),
@@ -230,6 +233,32 @@ function sectionSummary(sections) {
   return out.join("; ").slice(0, 900);
 }
 
+// A question about visitors: fetch the numbers, then Claude answers from them (and only them).
+async function answerStats(env, { message, days, paths, progress }) {
+  if (!analyticsSource(env)) return reply("Visitor numbers aren't set up for this site yet. Ask your web team to turn them on.");
+  await progress?.("Looking up the visitor numbers…");
+  let stats;
+  try {
+    stats = await visitorStats(env, { days: days ?? 7, paths });
+  } catch (e) {
+    if (e instanceof AnalyticsError) return reply(e.message);
+    throw e;
+  }
+  const { answer } = await ask(env, {
+    task:
+      "Answer the staff member's question about their website's visitors, using only the numbers given (never invent or extrapolate). " +
+      "A visit is one person's session; page views count every page loaded. daily has each day's visits, so you can answer about a single day. " +
+      "Write a short, friendly Slack message: lead with the direct answer, then at most four bullet points if they help. " +
+      "Use Slack formatting (*bold*, • bullets), round sensibly, and say pages by their address. " +
+      "If the question needs something these numbers don't include (who visited, time on page, sales), say what you can tell them instead.",
+    user: `Visitor numbers (${stats.from} to ${stats.to}, ${stats.days} days, today included):\n${JSON.stringify({ ...stats, source: undefined })}\n\nQuestion from Slack:\n${slackMessage(message)}`,
+    schema: { type: "object", additionalProperties: false, required: ["answer"], properties: { answer: { type: "string" } } },
+    maxTokens: 1500,
+  });
+  const note = stats.source === "sample" ? "\n\n_Sample data: this demo site shows made-up visitor numbers._" : "";
+  return { kind: "reply", text: `${String(answer || "").trim().slice(0, 2500)}${note}` };
+}
+
 const creatableTypes = (editor) =>
   Object.values(editor.types || {})
     .filter((t) => t.enabled && t.key !== "page")
@@ -294,11 +323,14 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "First step: decide what the staff member wants. Pick the one existing entry from the site index that the request is about (update), " +
       "or the content type for a new entry (create), or a new page (createPage). Use 'reply' when the request is unclear, matches several entries, " +
       "asks to delete, hide, move or rename addresses, touches the navigation menu (menu bar), images or settings, or isn't a website change; then explain briefly what you can do. " +
+      "Use 'stats' for questions about visitors: how many visits or page views, popular pages, where visitors come from, countries or devices. " +
       "Designed pages list their sections; use them to find where an item or price lives (e.g. a menu item on the page whose sections list it).",
     user: `Site index (collection, id, title, path, date; designed = a page such as the homepage built from sections, whose headings, text, prices, buttons and cards can be changed; sections = what's on it):\n${JSON.stringify(index)}\n\nContent types that can be added:\n${JSON.stringify(types)}\n\nRequest from Slack:\n${slackMessage(message)}`,
     schema: classifySchema(),
     maxTokens: 2000,
   });
+
+  if (choice.action === "stats") return answerStats(env, { message, days: choice.days, paths: index.map((e) => e.path), progress });
 
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
 

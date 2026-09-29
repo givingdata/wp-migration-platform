@@ -68,6 +68,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |
+| Let Slack answer "how many visits?" | Turn on Web Analytics for the site in Cloudflare; in the client's `worker/wrangler.toml` set `ANALYTICS_SOURCE = "cloudflare"`, `CF_ACCOUNT_ID`, `ANALYTICS_SITE_TAG`, then `npx wrangler secret put CF_ANALYTICS_TOKEN` (Account Analytics: Read), push. Demo sites: `ANALYTICS_SOURCE = "sample"` (made-up numbers, labelled) |
 | Let staff request edits from Slack | `node ../../platform/scripts/slack-add-client.mjs <client> --domain <domain> --push` in the client folder (shared SiteFlo app via the `slack-router/` Worker), then invite their staff to the FloMySite.com workspace; `docs/SLACK.md` |
 
 ### Rarely / never

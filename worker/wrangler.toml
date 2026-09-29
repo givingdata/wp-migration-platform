@@ -25,6 +25,12 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 # SLACK_STAFF_DOMAINS = ""
 # SLACK_HOURLY_LIMIT = "20"
 
+# Visitor numbers for the Slack bot (worker/src/analytics.js): "sample" (demo sites, made-up and
+# labelled) or "cloudflare" (Web Analytics; also CF_ACCOUNT_ID, ANALYTICS_SITE_TAG and the
+# CF_ANALYTICS_TOKEN secret). Unset = the bot says visitor numbers aren't set up.
+# ANALYTICS_SOURCE = ""
+# CF_ACCOUNT_ID = ""
+# ANALYTICS_SITE_TAG = ""
 # Secrets (set with `wrangler secret put <NAME>`, locally in .dev.vars):
 #   API_KEY               shared with the form (Bearer token)
 #   HMAC_SECRET           optional; defaults to API_KEY
@@ -33,6 +39,7 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 #   SLACK_ROUTER_KEY      optional, from scripts/slack-add-client.mjs (shared 1WP app)
 #   SLACK_SIGNING_SECRET  optional, only for a client's own Slack app (direct mode)
 #   SLACK_BOT_TOKEN       optional, only for a client's own Slack app (direct mode)
+#   CF_ANALYTICS_TOKEN    optional, Account Analytics: Read only (ANALYTICS_SOURCE = "cloudflare")
 
 [[kv_namespaces]]
 binding = "CONTENT"

@@ -479,3 +479,25 @@ test("deleting a request deletes the bot's thread replies and cancels its propos
   await deleted("Ev10", { type: "message", subtype: "message_changed", channel: "C1", message: { subtype: "tombstone", ts: "100.1" }, previous_message: { user: "U1", ts: "100.1" } });
   assert.equal(slack.filter((m) => m.method === "chat.delete").length, 2);
 });
+
+test("a visitor question gets an answer from the numbers, labelled when they're sample data", async () => {
+  const { gh, env, slack, claude } = setup();
+  claude.length = 0;
+  claude.push({ action: "stats", collection: null, id: null, typeKey: null, days: 30, reply: null, summary: "Visits this month" });
+  await message(env);
+  assert.match(slack.at(-1).text, /aren't set up/, "no source configured yet");
+  assert.equal(claude.length, 0);
+
+  env.ANALYTICS_SOURCE = "sample";
+  claude.push(
+    { action: "stats", collection: null, id: null, typeKey: null, days: 30, reply: null, summary: "Visits this month" },
+    { answer: "*4,812 visits* in the last 30 days." },
+  );
+  await message(env, { id: "Ev2" });
+  const last = slack.at(-1);
+  assert.equal(last.method, "chat.update");
+  assert.match(last.text, /4,812 visits/);
+  assert.match(last.text, /Sample data/);
+  assert.equal(last.blocks, undefined, "an answer, not an Approve card");
+  assert.equal(gh.commits.length, 0);
+});
