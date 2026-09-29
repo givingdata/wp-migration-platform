@@ -131,6 +131,16 @@ Next (planned for 2026-09-25):
      Build the banner into the platform, shown only when a cookie-setting provider is on.
    - Note for clients: GA and Cloudflare count differently (GA sessions vs Cloudflare visits,
      and ad blockers stop GA more often), so their numbers won't match exactly.
+6. **Welcome message for new clients (planned 2026-09-29).** Today nothing tells staff how to use
+   the bot when they join their channel. When `slack-add-client.mjs` creates a channel, the router
+   posts and pins a short welcome: what they can ask for (text changes, news items, photos, visitor
+   numbers), that a person clicks Approve before anything goes live, that changes go live within
+   minutes, what the bot won't do (deletes, menu, settings: use the staff form), and to post in the
+   channel rather than in a thread. Skip it on re-runs so it isn't posted twice.
+7. **Time zone in setup (planned 2026-09-29).** Visitor numbers need the `TIMEZONE` Worker
+   variable (for example `America/Vancouver`), or days are counted in UTC. `ops/provision.mjs` and
+   the dashboard's **Set up clients** page don't set it yet: add a time zone field (default from
+   the client's location) and write it into `worker/wrangler.toml`.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 
