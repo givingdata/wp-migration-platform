@@ -158,6 +158,47 @@ Next:
    it after a reboot, so the assessor's Build preview doesn't fail with "Can't reach the
    dashboard".
 
+## Template designs (planned 2026-09-29)
+
+flomysite.com now says the prices cover "a new site built from a SiteFlo template design, styled
+with your logo and brand colours", with custom design sold separately. Today that template is
+one look: sales previews use the `modern` preset plus the prospect's brand, and only the homepage
+gets the banded sections (hero, split, cards, stats, stories, call to action with light / alt /
+band tones) that were first built for Cinderella's Roots design. The café demo (`bistro` preset,
+FoodZero design, menu/features/tiles sections) shows how much better a complete design looks.
+Goal: a small set of better templates.
+
+How to choose them:
+
+1. **Start from client types, not design galleries.** Pick 3–4 from real prospects (e.g.
+   charity/nonprofit, hospitality, professional services, arts/community). Each needs a
+   different homepage: impact stats + donate + stories; photos + menu + hours; services + proof
+   + contact. Start with three, not ten.
+2. **A template is three things:** a theme preset (fonts, colour roles, buttons, spacing), a
+   homepage recipe (which sections, in what order, which tones), and inner page layouts (About,
+   Services, News, Contact). Previews look plain mainly because only the first two change.
+3. **Selection criteria:**
+   - survives a brand swap: one accent colour on neutral backgrounds, not a palette or gradient
+     the design depends on;
+   - fits real WordPress content: long text, few good photos (photo-led designs only for client
+     types that have photos, like hospitality);
+   - maps onto the existing section types, needing at most one or two new ones;
+   - stays readable with any client colour (pale or yellow brand colours still give readable text
+     and buttons);
+   - works on phones, with no carousels, heavy animation or unusual grids.
+4. **Sourcing.** Bought Figma templates are fastest, but check the licence: many marketplace
+   licences cover one end product, which doesn't allow reuse across client sites. Figma
+   Community files are often CC BY (credit required), usually fine. Or commission a designer to
+   produce a set to `docs/DESIGN_HANDOFF.md`, and own them outright.
+5. **Test before committing.** Build previews of three real prospect sites from past assessor
+   scans with each candidate preset (`preview.mjs build <url> --preset <name>`); keep the ones
+   that still look good with real brands and content.
+6. **Later: the assessor recommends a template** for the prospect's type of site and builds the
+   preview in it.
+
+Possible first step: summarise past assessor scans by client type to decide which three
+templates to find first.
+
 ## Future option: Claude edits the site
 
 Part of the original spec (staff update the site with Claude's help). Today Claude only
