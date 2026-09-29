@@ -9,6 +9,10 @@ import Quote from "./Quote.astro";
 import Stories from "./Stories.astro";
 import Text from "./Text.astro";
 import Posts from "./Posts.astro";
+import Menu from "./Menu.astro";
+import Features from "./Features.astro";
+import Tiles from "./Tiles.astro";
+import Cta from "./Cta.astro";
 interface Props { sections: Section[] }
 const { sections } = Astro.props;
 ---
@@ -20,4 +24,8 @@ const { sections } = Astro.props;
   : s.type === "quote" ? <Quote s={s} />
   : s.type === "stories" ? <Stories s={s} />
   : s.type === "text" ? <Text s={s} />
+  : s.type === "menu" ? <Menu s={s} />
+  : s.type === "features" ? <Features s={s} />
+  : s.type === "tiles" ? <Tiles s={s} />
+  : s.type === "cta" ? <Cta s={s} />
   : <Posts s={s} />)}

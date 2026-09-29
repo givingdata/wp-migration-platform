@@ -1,0 +1,27 @@
+---
+// Price list: two columns of items (name, price, short description) over a dotted rule.
+import type { Menu } from "../../lib/sections";
+import Heading from "./Heading.astro";
+import Buttons from "./Buttons.astro";
+interface Props { s: Menu }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+  <div class="wrap">
+    <div class="s-cards-head">
+      <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
+      {s.intro && <p class="s-intro">{s.intro}</p>}
+    </div>
+    <ul class="s-menu">
+      {s.items.map((item) => (
+        <li class="s-menu-item">
+          <p class="s-menu-price">{item.price ?? ""}</p>
+          <h3 class="s-menu-name">{item.name}</h3>
+          {item.text && <p class="s-menu-text">{item.text}</p>}
+        </li>
+      ))}
+    </ul>
+    {s.note && <p class="s-menu-note">{s.note}</p>}
+    <Buttons buttons={s.buttons} />
+  </div>
+</section>

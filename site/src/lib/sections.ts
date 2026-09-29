@@ -18,7 +18,8 @@ export interface Button { label: string; href: string; style?: "primary" | "seco
 export interface Img { src: string; alt?: string }
 interface Base { type: string; id?: string; tone?: "light" | "alt" | "band"; eyebrow?: string; title?: string; accent?: string }
 
-export interface Hero extends Base { type: "hero"; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
+// Hero layouts: "photo" (default) = full-width photo behind the text; "split" = text beside a framed photo.
+export interface Hero extends Base { type: "hero"; layout?: "photo" | "split"; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
 export interface Stats extends Base { type: "stats"; intro?: string; items: { value: string; label: string }[]; highlight?: { value: string; label: string; text?: string } }
 export interface Split extends Base { type: "split"; paragraphs?: string[]; tags?: string[]; image?: Img; quote?: { text: string; by?: string }; reverse?: boolean; buttons?: Button[] }
 export interface Cards extends Base { type: "cards"; intro?: string; items: { title: string; text: string; href?: string; linkLabel?: string; icon?: string }[]; contacts?: { label: string; email: string }[] }
@@ -26,9 +27,17 @@ export interface Quote extends Base { type: "quote"; text: string; by?: string; 
 export interface Stories extends Base { type: "stories"; items: { quote: string; by: string; detail?: string }[] }
 export interface Text extends Base { type: "text"; paragraphs?: string[]; list?: string[]; buttons?: Button[]; image?: Img }
 export interface Posts extends Base { type: "posts"; contentType?: string; count?: number; link?: Button }
+// A price list (restaurant or café menu, services): two columns of items with a dotted rule.
+export interface Menu extends Base { type: "menu"; intro?: string; items: { name: string; price?: string; text?: string }[]; note?: string; buttons?: Button[] }
+// A row of short features, each with a line icon (components/sections/Icon.astro names).
+export interface Features extends Base { type: "features"; intro?: string; items: { icon?: string; title: string; text?: string }[] }
+// Photo tiles with their title on the photo, each optionally a link.
+export interface Tiles extends Base { type: "tiles"; intro?: string; items: { title: string; href?: string; image?: Img }[] }
+// A centred call to action: heading, a line of text, buttons.
+export interface Cta extends Base { type: "cta"; text?: string; buttons?: Button[] }
 
-export type Section = Hero | Stats | Split | Cards | Quote | Stories | Text | Posts;
-export const SECTION_TYPES = ["hero", "stats", "split", "cards", "quote", "stories", "text", "posts"] as const;
+export type Section = Hero | Stats | Split | Cards | Quote | Stories | Text | Posts | Menu | Features | Tiles | Cta;
+export const SECTION_TYPES = ["hero", "stats", "split", "cards", "quote", "stories", "text", "posts", "menu", "features", "tiles", "cta"] as const;
 
 export interface SiteSettings {
   header?: { style?: "default" | "band"; button?: Button };

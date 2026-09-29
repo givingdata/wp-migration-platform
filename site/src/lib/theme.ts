@@ -19,7 +19,7 @@ type ColorToken = (typeof COLOR_TOKENS)[number];
 type OtherToken = (typeof OTHER_TOKENS)[number];
 type Colors = Record<ColorToken, string>;
 type Tokens = Record<OtherToken, string>;
-interface Preset { label: string; colors: Colors; darkColors: Colors; tokens: Tokens }
+interface Preset { label: string; colors: Colors; darkColors: Colors; tokens: Tokens; fonts?: string[] }
 
 const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const SERIF = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif';
@@ -85,6 +85,28 @@ export const PRESETS: Record<string, Preset> = {
     },
     tokens: { ...BASE, "font-heading": SANS, "heading-weight": "800", radius: "12px" },
   },
+  // Restaurants and cafés (after the FoodZero Figma template: forest green and sage, Rufina
+  // headings over Lato text, square corners). Goes with the bistro styles in global.css.
+  bistro: {
+    label: "Bistro: forest green and sage, elegant serif headings, square corners",
+    colors: {
+      bg: "#ffffff", surface: "#ffffff", "surface-2": "#ebf0e4", text: "#1f2418", muted: "#4d4d4d",
+      border: "#d6dccb", accent: "#5e6600", "accent-hover": "#233000", focus: "#1a5fb4",
+      heading: "#111408", "band-bg": "#233000", "band-text": "#ffffff", "band-muted": "#d3dac4", "band-accent": "#c9d45a",
+    },
+    darkColors: {
+      bg: "#12160c", surface: "#1a1f12", "surface-2": "#232a18", text: "#eef2e6", muted: "#b9c0ab",
+      border: "#343d26", accent: "#c9d45a", "accent-hover": "#dfe78c", focus: "#8cb8ff",
+      heading: "#f4f7ee", "band-bg": "#233000", "band-text": "#ffffff", "band-muted": "#d3dac4", "band-accent": "#c9d45a",
+    },
+    tokens: {
+      ...BASE,
+      "font-body": '"Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+      "font-heading": '"Rufina", Georgia, "Times New Roman", serif',
+      "heading-weight": "700", "text-size": "1.0625rem", radius: "0px", "button-radius": "0px", wrap: "76rem",
+    },
+    fonts: ["Rufina:wght@400;700", "Lato:wght@400;700"],
+  },
   minimal: {
     label: "Minimal: greyscale, small corners",
     colors: {
@@ -133,7 +155,8 @@ function resolve(cfg: ThemeConfig) {
   checkValues("darkColors", darkColors, [...COLOR_TOKENS, ...OPTIONAL_COLOR_TOKENS]);
   checkValues("tokens", tokens, OTHER_TOKENS);
 
-  const fonts = cfg.googleFonts ?? [];
+  // A client's googleFonts replace the preset's own (e.g. bistro's Rufina + Lato).
+  const fonts = cfg.googleFonts?.length ? cfg.googleFonts : preset.fonts ?? [];
   for (const f of fonts) {
     if (!/^[A-Za-z0-9 ]+(:[A-Za-z0-9,.;@]+)?$/.test(f)) fail(`bad googleFonts entry ${JSON.stringify(f)} (e.g. "Inter:wght@400;700")`);
   }

@@ -293,3 +293,94 @@ h3 { font-size: 1.25rem; }
 .announcements a { color: var(--band-accent); }
 .announcements a:hover { color: var(--band-text); }
 .announcements span { color: var(--band-muted); }
+
+/* ---------- Newer sections: menu, features, tiles, call to action, split hero ---------- */
+
+/* Menu / price list: price above a dotted rule, then the name and a short description */
+.s-menu { list-style: none; padding: 0; margin: 0; display: grid; gap: 2.75rem 3.5rem; }
+@media (min-width: 48rem) { .s-menu { grid-template-columns: 1fr 1fr; } }
+.s-menu-price { margin: 0 0 0.9rem; padding-bottom: 0.45rem; min-height: 1.6em; text-align: right; border-bottom: 2px dotted var(--heading); font-family: var(--font-heading); font-weight: var(--heading-weight); font-size: 1.35rem; color: var(--heading); }
+.s-menu-name { margin: 0 0 0.35rem; font-size: clamp(1.35rem, 2.4vw, 1.85rem); line-height: 1.2; }
+.s-menu-text { margin: 0; color: var(--muted); }
+.s-menu-note { margin: 2.5rem 0 0; color: var(--muted); font-size: 0.95rem; }
+.tone-band .s-menu-price, .tone-band .s-menu-name { color: var(--band-text); border-color: var(--band-muted); }
+
+/* Features: icon in a soft circle, centred text */
+.s-features { list-style: none; padding: 0; margin: 2.5rem 0 0; display: grid; gap: 2.5rem 2rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); text-align: center; }
+.s-feature h3 { margin: 1.25rem 0 0.6rem; font-size: 1.5rem; }
+.s-feature p { margin: 0 auto; max-width: 20rem; color: var(--muted); }
+.s-feature-icon { display: inline-grid; place-items: center; width: 7rem; height: 7rem; border-radius: 50%; background: var(--surface-2); color: var(--heading); }
+.tone-alt .s-feature-icon { background: var(--bg); }
+.tone-band .s-feature-icon { background: rgb(255 255 255 / 0.08); color: var(--band-text); }
+@media (min-width: 60rem) { .s-features.n-3 { grid-template-columns: repeat(3, 1fr); } .s-features.n-4 { grid-template-columns: repeat(4, 1fr); } }
+
+/* Tiles: photo with its title on top, arrow when it links somewhere */
+.s-tiles { list-style: none; padding: 0; margin: 2.5rem 0 0; display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+@media (min-width: 60rem) { .s-tiles.n-3 { grid-template-columns: repeat(3, 1fr); } .s-tiles.n-4 { grid-template-columns: repeat(4, 1fr); } }
+.s-tile { position: relative; aspect-ratio: 5 / 7; overflow: hidden; border-radius: var(--radius); background: var(--surface-2); }
+.s-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
+.s-tile::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgb(255 255 255 / 0.85), rgb(255 255 255 / 0) 35%); }
+.s-tile h3 { position: relative; z-index: 2; margin: 0; padding: 1.25rem 3.5rem 0 1.4rem; font-size: 1.6rem; color: var(--heading); }
+.s-tile h3 a { color: inherit; text-decoration: none; }
+.s-tile h3 a::after { content: ""; position: absolute; inset: 0; z-index: 3; }
+.s-tile-arrow { position: absolute; z-index: 2; top: 1.1rem; right: 1.3rem; font-size: 1.6rem; color: var(--heading); }
+.s-tile:hover img { transform: scale(1.04); }
+.s-tile:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Call to action */
+.s-cta .s-head { margin-bottom: 1rem; }
+.s-cta-text { margin: 0 auto; max-width: 36rem; color: var(--muted); font-size: 1.1rem; }
+.s-cta .s-buttons { justify-content: center; margin-top: 2rem; }
+
+/* Split hero: text beside a framed photo, on the band colour */
+.s-hero-split { display: block; min-height: 0; }
+.s-hero-split-inner { position: relative; display: grid; gap: 2.5rem; align-items: center; padding-block: clamp(3rem, 8vw, 6rem); }
+@media (min-width: 56rem) { .s-hero-split-inner { grid-template-columns: 1.15fr 1fr; gap: 3rem; } }
+.s-hero-split .s-hero-title { font-size: clamp(2.6rem, 6.2vw, 5.4rem); line-height: 1.04; }
+.s-hero-frame { margin: 0; }
+.s-hero-frame img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--radius); }
+@media (min-width: 56rem) { .s-hero-frame { margin-left: -4rem; } .s-hero-split .s-hero-main { position: relative; z-index: 1; } }
+.s-hero-facts { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; margin: 2.5rem 0 0; padding-top: 1.5rem; border-top: 1px dashed rgb(255 255 255 / 0.35); }
+.s-hero-facts div { display: flex; flex-direction: column-reverse; }
+.s-hero-facts dt { color: var(--band-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.s-hero-facts dd { margin: 0; color: var(--band-text); font-family: var(--font-heading); font-size: 1.2rem; }
+
+/* ---------- Bistro preset (config/theme.json "preset": "bistro"): FoodZero-style ---------- */
+[data-preset="bistro"] body { line-height: 1.7; }
+[data-preset="bistro"] h1 { font-size: clamp(2.4rem, 5.5vw, 4.4rem); line-height: 1.08; }
+[data-preset="bistro"] h2 { font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.12; }
+[data-preset="bistro"] .s-title { font-size: clamp(2.3rem, 5.2vw, 4.2rem); line-height: 1.08; }
+[data-preset="bistro"] .s-title em, [data-preset="bistro"] .s-hero-title em { font-style: normal; }
+[data-preset="bistro"] .s-eyebrow, [data-preset="bistro"] .eyebrow { letter-spacing: 0.16em; font-weight: 400; }
+[data-preset="bistro"] .s-intro { font-size: 1rem; }
+/* Header runs into the hero: one dark band, outlined button */
+[data-preset="bistro"] .site-header.header-band { border: 0; }
+[data-preset="bistro"] .header-band .brand { font-size: 1.7rem; letter-spacing: 0.01em; }
+[data-preset="bistro"] .header-band .main-nav a { font-weight: 400; }
+[data-preset="bistro"] .header-band .btn-primary { background: transparent; color: var(--band-text); border: 1px solid var(--band-text); font-family: var(--font-heading); }
+[data-preset="bistro"] .header-band .btn-primary:hover { background: var(--band-text); color: var(--band-bg); }
+/* Buttons: solid forest green, serif label */
+[data-preset="bistro"] .btn { font-family: var(--font-heading); font-weight: 700; padding: 0.95rem 2.2rem; }
+[data-preset="bistro"] .btn-primary { background: var(--band-bg); color: var(--band-text); }
+[data-preset="bistro"] .btn-primary:hover { background: var(--accent); color: var(--band-text); }
+[data-preset="bistro"] .s-hero .btn-primary, [data-preset="bistro"] .tone-band .btn-primary { background: var(--band-text); color: var(--band-bg); }
+[data-preset="bistro"] .s-hero .btn-primary:hover, [data-preset="bistro"] .tone-band .btn-primary:hover { background: var(--band-accent); color: var(--band-bg); }
+[data-preset="bistro"] .s-hero .btn-secondary { background: transparent; border-color: var(--band-text); }
+/* Photos: plain and square, no offset backdrop */
+[data-preset="bistro"] .s-backdrop { display: none; }
+[data-preset="bistro"] .s-split-media { margin: 0; }
+[data-preset="bistro"] .s-split-media img { aspect-ratio: 4 / 5; }
+/* News and event cards: no box, serif title over a dotted rule */
+[data-preset="bistro"] .card { border: 0; background: transparent; }
+[data-preset="bistro"] .card-body { padding: 1.4rem 0 0; }
+[data-preset="bistro"] .card-title { font-size: 1.6rem; line-height: 1.2; padding-bottom: 0.8rem; margin-bottom: 0.8rem; border-bottom: 2px dotted var(--heading); }
+[data-preset="bistro"] .card-title a { color: var(--heading); }
+[data-preset="bistro"] .card .meta { color: var(--accent); font-size: 0.85rem; }
+/* Stories: one large serif quote */
+[data-preset="bistro"] .s-story blockquote p { font-size: clamp(1.4rem, 2.8vw, 2.1rem); line-height: 1.4; }
+[data-preset="bistro"] .s-story-picker button { background: transparent; border: 1px solid var(--border); }
+/* Footer: the band colour itself, large serif name */
+[data-preset="bistro"] .footer-rich { background: var(--band-bg); }
+[data-preset="bistro"] .footer-name { font-size: 2.4rem; line-height: 1.1; }
+[data-preset="bistro"] .footer-cols { border-bottom: 2px dotted rgb(255 255 255 / 0.35); }
+[data-preset="bistro"] .footer-heading { font-family: var(--font-heading); text-transform: none; letter-spacing: 0; font-size: 1.15rem; font-weight: 700; }

@@ -1,0 +1,23 @@
+---
+// A row of short features, each with a line icon in a soft circle.
+import type { Features } from "../../lib/sections";
+import Heading from "./Heading.astro";
+import Icon from "./Icon.astro";
+interface Props { s: Features }
+const { s } = Astro.props;
+---
+<section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
+  <div class="wrap">
+    {(s.title || s.eyebrow) && <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />}
+    {s.intro && <p class="s-intro s-center">{s.intro}</p>}
+    <ul class:list={["s-features", `n-${s.items.length}`]}>
+      {s.items.map((f) => (
+        <li class="s-feature">
+          {f.icon && <span class="s-feature-icon"><Icon name={f.icon} /></span>}
+          <h3>{f.title}</h3>
+          {f.text && <p>{f.text}</p>}
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
