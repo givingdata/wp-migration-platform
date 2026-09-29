@@ -234,12 +234,12 @@ function sectionSummary(sections) {
 }
 
 // A question about visitors: fetch the numbers, then Claude answers from them (and only them).
-async function answerStats(env, { message, days, paths, progress }) {
+async function answerStats(env, { message, days, pages, progress }) {
   if (!analyticsSource(env)) return reply("Visitor numbers aren't set up for this site yet. Ask your web team to turn them on.");
   await progress?.("Looking up the visitor numbers…");
   let stats;
   try {
-    stats = await visitorStats(env, { days: days ?? 7, paths });
+    stats = await visitorStats(env, { days: days ?? 7, pages });
   } catch (e) {
     if (e instanceof AnalyticsError) return reply(e.message);
     throw e;
@@ -249,9 +249,10 @@ async function answerStats(env, { message, days, paths, progress }) {
       "Answer the staff member's question about their website's visitors, using only the numbers given (never invent or extrapolate). " +
       "A visit is one person's session; page views count every page loaded. daily has each day's visits, so you can answer about a single day. " +
       "Write a short, friendly Slack message: lead with the direct answer, then at most four bullet points if they help. " +
-      "Use Slack formatting (*bold*, • bullets), round sensibly, and say pages by their address. " +
+      "Use Slack formatting (*bold*, • bullets), round sensibly, and name pages by their title (the homepage is \"Home\"), not their address. " +
+      "Dates are the business's own days in its time zone; 'today' is the date given as today, and today's numbers are only so far. " +
       "If the question needs something these numbers don't include (who visited, time on page, sales), say what you can tell them instead.",
-    user: `Visitor numbers (${stats.from} to ${stats.to}, ${stats.days} days, today included):\n${JSON.stringify({ ...stats, source: undefined })}\n\nQuestion from Slack:\n${slackMessage(message)}`,
+    user: `Visitor numbers (${stats.from} to ${stats.to}, ${stats.days} days; today is ${stats.today} in ${stats.timeZone}):\n${JSON.stringify({ ...stats, source: undefined })}\n\nQuestion from Slack:\n${slackMessage(message)}`,
     schema: { type: "object", additionalProperties: false, required: ["answer"], properties: { answer: { type: "string" } } },
     maxTokens: 1500,
   });
@@ -330,7 +331,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
     maxTokens: 2000,
   });
 
-  if (choice.action === "stats") return answerStats(env, { message, days: choice.days, paths: index.map((e) => e.path), progress });
+  if (choice.action === "stats") return answerStats(env, { message, days: choice.days, pages: index.map((e) => ({ path: e.path, title: e.title })), progress });
 
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
 

@@ -31,6 +31,8 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 # ANALYTICS_SOURCE = ""
 # CF_ACCOUNT_ID = ""
 # ANALYTICS_SITE_TAG = ""
+# The business's time zone, so "today" and each day's visits are its own days (default UTC).
+# TIMEZONE = "America/Vancouver"
 # Secrets (set with `wrangler secret put <NAME>`, locally in .dev.vars):
 #   API_KEY               shared with the form (Bearer token)
 #   HMAC_SECRET           optional; defaults to API_KEY
