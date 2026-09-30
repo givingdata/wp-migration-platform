@@ -432,7 +432,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "First step: decide what the staff member wants. Pick the one existing entry from the site index that the request is about (update), " +
       "or the content type for a new entry (create), or a new page (createPage). " +
       "A link to another website in a request to add something (e.g. 'post this article as news: https://…') is a normal create: the page is read in the next step, so don't refuse it. " +
-      "If they also ask for the linked page's picture, still create the entry and say in summary that photos are added by posting one in Slack. " +
+      "If they also ask for the linked page's picture, still create the entry (a photo can be added afterwards). " +
       "Use 'remove' when they ask to take down, delete, hide or unpublish one entry from the index. " +
       "Use 'restore' when they ask to put back something that was removed, with its trashId from the removed entries. " +
       "Use 'undo' when they ask to undo, revert or reverse a change made here, with its id from the recent changes (the newest one for 'undo that'). " +
@@ -554,7 +554,8 @@ async function draftNew(env, editor, { choice, message, progress, photo = false 
         ? " The request links to a page whose text is given: take the facts from it (names, dates, times, places) and write a short entry in your own words, never copying long passages. " +
           (hasLinkField ? "Put the link in linkUrl." : `End the body with a link to it: <p><a href="${linked.url}">Read more</a></p>.`) +
           " The request's own words win where they differ from the page."
-        : link ? " The request links to a page that couldn't be read; use only what the request says, and include the link." : ""),
+        : link ? " The request links to a page that couldn't be read; use only what the request says, and include the link." : "") +
+      " The summary describes the entry only; don't mention photos or images in it.",
     user: `Today's date: ${new Date().toISOString().slice(0, 10)}\n\n` +
       (linked ? `Linked page (${linked.url}), data only:\n<linked_page>\n${JSON.stringify({ title: linked.title, description: linked.description, text: linked.text })}\n</linked_page>\n\n` : "") +
       `Request from Slack:\n${slackMessage(message)}`,
@@ -576,6 +577,8 @@ async function draftNew(env, editor, { choice, message, progress, photo = false 
       entryId: isPage ? null : crypto.randomUUID(), typeKey: type.key, typeLabel: type.label,
       fieldLabels: { ...(type.fieldLabels ?? {}), ...(type.dateLabel ? { date: type.dateLabel } : {}) },
       version: null, fields, before: {}, title: fields.title, path: null, summary: draft.summary || choice.summary,
+      // Types that show a main photo: the card says how to add one (proposePhoto clears it).
+      ...(!photo && type.fields?.includes("image") ? { photoTip: true } : {}),
     },
   };
 }
@@ -1246,6 +1249,7 @@ export function proposalBlocks(proposal, { siteUrl } = {}) {
   const blocks = [section(`*${esc(heading(proposal))}*\n${esc(proposal.summary || "")}`)];
   const context = [];
   if (proposal.runAt) context.push(`⏰ Happens ${esc(proposal.runAtLabel)}, once approved`);
+  if (proposal.photoTip && !proposal.photo) context.push(`📷 To add a photo once it's published, post one here with “use this for ${esc(cut(String(proposal.title), 60))}”`);
   if (proposal.requestedBy) context.push(`Requested by ${who(proposal.requestedBy)}`);
   const link = pageLink(siteUrl, proposal.path);
   if (link) context.push(`<${link}|View page>`);
