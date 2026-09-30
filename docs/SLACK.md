@@ -38,6 +38,25 @@ if the entry was changed again since (tell the bot what it should say now instea
 remove a photo that wasn't there before. The homepage, designed pages and pages linked from the
 main menu bar can't be removed.
 
+**"Anything out of date?"** The bot checks the whole site (`worker/src/health.js`, read-only,
+one read of the content) and replies with what could use a look, each with a link to the page:
+the newest news item over 90 days old, no upcoming events, pages that mention last year or the
+year before, placeholder text (lorem ipsum, "coming soon", TBD), links to pages that don't exist
+(one line per page; old WordPress addresses the site redirects don't count), outside links that
+answer 404/410 or can't be reached, and photos without an image description. Outside links are a
+random 15 per check (a Worker gets 50 outgoing requests per run on the free plan), so asking again
+checks others. The findings come from the content, not from Claude; staff then ask for fixes as
+usual.
+
+**Redirects.** When something is removed, its old address sends visitors to its listing page
+(`/news/`, `/events/`…, or the homepage for pages) instead of "page not found", or to the page
+staff name (*"take down the gala and send people to the events page"*). The address and where it
+goes are kept with the entry in `trash.json`, so putting it back ends the redirect. Staff can also
+send any old address somewhere (*"our flyer says /summer-camp, send it to the camps page"*); these
+are kept in `content.json` → `redirects`. Both go into `_redirects` at build time, after
+`redirects.csv` (which always wins), and never for an address the site serves. Renaming a page
+never changes its address, so renames need no redirect. Undo works.
+
 **Menu links.** *"Add the Volunteer page under About"*, *"rename Contact us to Get in touch"* or
 *"move Team to the top of the About dropdown"* changes the links inside the navigation menu's
 dropdowns, with each changed dropdown's links shown before → after on the Approve card. The menu

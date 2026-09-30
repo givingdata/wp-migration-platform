@@ -762,6 +762,15 @@ def main(argv=None):
         pages = [p.strip() for p in args.pages.split(",") if p.strip()] if args.pages else None
         data = WordPressExporter(args.wordpress_url, types, limit=args.limit, pages=pages).export()
         site_url = args.wordpress_url
+        # Redirects staff added on the new site (Slack) aren't WordPress's: keep them.
+        if output.exists():
+            try:
+                kept = json.loads(output.read_text(encoding="utf-8")).get("redirects")
+            except (ValueError, OSError):
+                kept = None
+            if kept:
+                data["redirects"] = kept
+                log.info("Kept %d redirect(s) added on the new site", len(kept))
 
     if not args.skip_media:
         mirror = MediaMirror(site_url, R2Uploader(force=args.force), include_external=args.include_external)

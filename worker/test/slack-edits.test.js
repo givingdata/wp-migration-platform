@@ -777,3 +777,45 @@ test("scheduling: local times convert to UTC across daylight saving; past or far
   const out = await proposeEdit(ctx.env, ctx.editor, { text: "change the hours" });
   assert.equal(out.proposal.runAt, undefined);
 });
+
+// Redirects ---------------------------------------------------------------------------------
+
+test("remove: visitors to the old address go to the listing, or where staff say", async () => {
+  const ctx = setup();
+  const p = await removeOldNews(ctx);
+  assert.equal(p.redirectTo, "/news/");
+  assert.match(JSON.stringify(proposalBlocks(p).blocks), /Visitors to \/old-news\/ go to \/news\//);
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  assert.equal(ctx.store.files()["trash.json"].deleted[0].redirectTo, "/news/");
+
+  const other = setup();
+  other.claude(pick({ action: "remove", collection: "posts", id: "n1", to: "/contact" }));
+  const q = (await proposeEdit(other.env, other.editor, { text: "take down the old news and send people to contact" })).proposal;
+  assert.equal(q.redirectTo, "/contact/", "matched to the page's address");
+  other.claude(pick({ action: "remove", collection: "posts", id: "n1", to: "/nowhere/" }));
+  assert.match((await proposeEdit(other.env, other.editor, { text: "take it down, send them to nowhere" })).text, /no page at \/nowhere\//);
+});
+
+test("redirect: an old address to a page; Approve saves it; undo takes it away", async () => {
+  const ctx = setup();
+  ctx.claude(pick({ action: "redirect", from: "/summer-camp", to: "/contact/", summary: "Flyer address" }));
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "our flyer says /summer-camp, send it to the contact page", by: "Sam" });
+  const p = out.proposal;
+  assert.equal(p.op, "redirect");
+  assert.deepEqual([p.from, p.to], ["/summer-camp", "/contact/"]);
+  assert.match(JSON.stringify(proposalBlocks(p).blocks), /Redirect \/summer-camp.*Old address.*Goes to.*\/contact\//);
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "Sam" });
+  assert.deepEqual(ctx.store.files()["content.json"].redirects.map((r) => [r.from, r.to]), [["/summer-camp", "/contact/"]]);
+
+  ctx.claude(pick({ action: "redirect", from: "/summer-camp/", to: "/contact/" }));
+  assert.match((await proposeEdit(ctx.env, ctx.editor, { text: "send summer camp to contact" })).text, /already goes to/);
+  ctx.claude(pick({ action: "redirect", from: "/contact/", to: "/" }));
+  assert.match((await proposeEdit(ctx.env, ctx.editor, { text: "redirect contact home" })).text, /is a page on the site/);
+
+  ctx.claude(pick({ action: "undo", changeId: p.id }));
+  const undo = (await proposeEdit(ctx.env, ctx.editor, { text: "undo that" })).proposal;
+  assert.equal(undo.op, "unredirect");
+  assert.match(JSON.stringify(proposalBlocks(undo).blocks), /page not found/);
+  await applyProposal(ctx.env, ctx.editor, undo.id, { by: "Sam" });
+  assert.deepEqual(ctx.store.files()["content.json"].redirects, []);
+});

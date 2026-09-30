@@ -63,7 +63,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
 | Hide the whole site from search engines (a demo or staging site) | `"noindex": true` in `config/site.json`, push: robots meta + `X-Robots-Tag` on every page, robots.txt disallows everything, no sitemap |
 | Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
-| Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push |
+| Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push. Staff can also ask the Slack bot (kept in `content.json` → `redirects`); removed entries redirect to their listing automatically (from `trash.json`) |
 | Before switching the domain | `node scripts/check-redirects.mjs --new https://<preview or new site> --old https://<WordPress site>`: lists old addresses that don't reach a working page |
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |

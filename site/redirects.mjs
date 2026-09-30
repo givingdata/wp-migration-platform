@@ -1,7 +1,9 @@
 // Astro integration: writes Cloudflare Pages' _redirects (301s) after the build, from
 //   1. redirects.csv in the client repo (your own rules; they win),
-//   2. every migrated page whose old WordPress address differs from its new one,
-//   3. standard WordPress addresses: uploads → R2 media, category/tag/author/feed/page
+//   2. staff redirects (content.json → redirects, added from Slack via the Edit module),
+//   3. removed entries (trash.json): the old address → the listing or the page staff chose,
+//   4. every migrated page whose old WordPress address differs from its new one,
+//   5. standard WordPress addresses: uploads → R2 media, category/tag/author/feed/page
 //      archives → the news listing, old sitemap names → the new sitemap.
 // Old ?p=123 / ?page_id=45 links can't be matched by _redirects (it ignores query strings),
 // so wp-ids.json is written for functions/index.js to redirect those.
@@ -40,7 +42,7 @@ const pathOf = (link) => {
 };
 
 /** All rules, in the order Cloudflare should apply them (first match wins). */
-export function buildRules({ map, csv = [], media = [], skipped = [], builtPaths = new Set() }) {
+export function buildRules({ map, csv = [], media = [], skipped = [], builtPaths = new Set(), staff = [], removed = [] }) {
   const rules = [...csv];
   const taken = new Set(csv.map((r) => r.from));
   const add = (from, to, source) => {
@@ -48,6 +50,19 @@ export function buildRules({ map, csv = [], media = [], skipped = [], builtPaths
     taken.add(from);
     rules.push({ from, to, status: "301", source });
   };
+  const served = (p) => builtPaths.has(p.endsWith("/") ? p : `${p}/`);
+  const valid = (r) => typeof r?.from === "string" && r.from.startsWith("/") && !/[\s*:]/.test(r.from) && typeof r.to === "string" && /^(\/|https?:\/\/)\S*$/.test(r.to);
+
+  // Staff redirects and removed entries: never for an address the site serves (a page put back,
+  // or a new one at the same address), and the bare and slashed forms both go.
+  for (const [list, source] of [[staff, "staff redirect"], [removed, "removed entry"]]) {
+    for (const r of list.filter(valid)) {
+      if (r.from === "/" || served(r.from)) continue;
+      const bare = r.from.replace(/\/+$/, "");
+      add(bare, r.to, source);
+      add(`${bare}/`, r.to, source);
+    }
+  }
 
   for (const e of map.entries) {
     const old = e.link && pathOf(e.link);
@@ -133,7 +148,11 @@ export default function redirects() {
         const built = new Set(map.entries.map((e) => e.link).filter(Boolean));
         const skipped = (map.collections ?? ["pages", "posts", "events", "exhibitions"]).flatMap((k) => content[k] || []).map((e) => e?.link).filter((l) => l && !built.has(l));
 
-        const rules = buildRules({ map, csv, media: content.media || [], skipped, builtPaths: builtPathsIn(out) });
+        const trashFile = path.join(path.dirname(contentFile), "trash.json");
+        const trash = fs.existsSync(trashFile) ? JSON.parse(fs.readFileSync(trashFile, "utf8")) : {};
+        const staff = Array.isArray(content.redirects) ? content.redirects : [];
+        const removed = (trash.deleted || []).filter((d) => d.path && d.redirectTo).map((d) => ({ from: d.path, to: d.redirectTo }));
+        const rules = buildRules({ map, csv, media: content.media || [], skipped, builtPaths: builtPathsIn(out), staff, removed });
         fs.writeFileSync(path.join(out, "_redirects"), toRedirectsFile(rules));
         const ids = Object.fromEntries(map.entries.filter((e) => e.wpId).map((e) => [String(e.wpId), e.path]));
         fs.writeFileSync(path.join(out, "wp-ids.json"), JSON.stringify(ids));

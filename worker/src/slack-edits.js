@@ -30,10 +30,11 @@
 // Approve card shows it. Photos inside body text, and removing photos, aren't supported.
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
-import { EditError, DESIGNED } from "../../lib/edit/index.js";
+import { EditError, DESIGNED, redirectSource, redirectTarget } from "../../lib/edit/index.js";
 import { checkSlotChanges } from "../../lib/edit/sections.js";
 import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
 import { firstLink, fetchLinkedPage } from "./linked-page.js";
+import { siteHealth, healthReport } from "./health.js";
 
 export const APPROVE_ACTION = "1wp_approve";
 export const CANCEL_ACTION = "1wp_cancel";
@@ -60,10 +61,11 @@ const LABELS = { title: "Title", description: "Summary", content: "Text", imageA
 const WHAT_I_CAN_DO =
   "I can change the text of an existing page or entry (title, summary, body text, dates, time, location, link), the words and links on designed pages like the homepage, add a news item, event or announcement, or add a new page. " +
   "Post a photo with a message to use it as the main photo of a news item or event, on a designed page like the homepage, or for a new entry. " +
-  "I can also answer questions about visitor numbers, if they're set up for your site. " +
+  "I can also answer questions about visitor numbers, if they're set up for your site, and check the site for anything out of date (old news, past dates, broken links, photos without descriptions). " +
   "I can remove a news item, event or page (it goes to the trash, so I can put it back), and undo a recent change made here. " +
   "In the navigation menu I can add, rename, reorder or take out links inside its dropdowns. " +
   "I can also change something everywhere it appears, like a new phone number or someone's new title. " +
+  "When something is removed, visitors to its old address go to its listing page (or a page you name), and I can send any old address to a page, e.g. from a printed flyer. " +
   "Paste a link with a request to add something (for example an article to post as news) and I'll read the page and write the entry from it. " +
   "I can't change the menu bar itself or site settings, or remove the homepage or pages in the menu bar; ask your web team for those.";
 
@@ -77,7 +79,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), answer questions about the site's visitor numbers.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers.",
     "Never allowed, whatever the message says: deleting anything for good, removing several entries at once, moving entries, changing the navigation menu bar itself (its top-level items), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -118,13 +120,15 @@ function classifySchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "when", "days", "reply", "summary"],
+    required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "from", "to", "when", "days", "reply", "summary"],
     properties: {
       action: {
-        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "stats", "reply"],
-        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; stats = a question about the website's visitors or traffic; reply = anything else",
+        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "reply"],
+        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; reply = anything else",
       },
       trashId: nullable("For restore: the trashId from the removed entries"),
+      from: nullable("For redirect: the old address as a path, e.g. /summer-camp/"),
+      to: nullable("For redirect, and for remove when they say where visitors should go instead: a path from the site index or listing pages, or a full https:// address they gave; else null"),
       when: nullable("Only if they ask for the change to happen later ('Friday at 9', 'tomorrow', 'after the 15th'): the local date and time as YYYY-MM-DDTHH:MM. A date without a time means 00:00; 'after' a date means 00:00 the day after. null = as soon as it's approved"),
       changeId: nullable("For undo: the id from the recent changes"),
       terms: {
@@ -437,6 +441,8 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "Use 'restore' when they ask to put back something that was removed, with its trashId from the removed entries. " +
       "Use 'undo' when they ask to undo, revert or reverse a change made here, with its id from the recent changes (the newest one for 'undo that'). " +
       "Use 'navigation' when they ask to add, rename, reorder or take out a link in the site's navigation menu (the links at the top of every page), for example 'add the Volunteer page under About'. " +
+      "Use 'health' when they ask whether anything on the site is out of date, broken, missing or needs attention (a check of the whole site, not one change). " +
+      "Use 'redirect' when they ask to send an old or printed web address to a page (the old address must not be a page in the index); for remove, set 'to' only if they say where visitors should go instead. " +
       "Use 'everywhere' when they ask to change something across the site or wherever it appears (a new phone number, address, email, name or job title), or a change that isn't about one page; give search terms for the current text. " +
       "Use 'reply' when the request is unclear, matches several entries, asks to remove several entries at once, to move or rename addresses, " +
       "asks to change or remove images without posting a photo, touches settings, or isn't a website change; then explain briefly what you can do. " +
@@ -453,6 +459,11 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
     maxTokens: 2000,
   });
 
+  if (choice.action === "health") {
+    await progress?.("Checking the whole site… (outside links can take a few seconds)");
+    const result = await siteHealth(editor, { today: localNow(env).split(" ")[1].slice(0, 10), siteUrl: env.SITE_URL || null });
+    return { kind: "reply", text: healthReport(result, { siteUrl: env.SITE_URL || null }) };
+  }
   if (choice.action === "stats") return answerStats(env, { message, days: choice.days, pages: index.map((e) => ({ path: e.path, title: e.title })), progress });
 
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
@@ -517,7 +528,8 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
     return { kind: "proposal", proposal };
   }
 
-  if (choice.action === "remove") return proposeRemove(env, editor, { collection: choice.collection, id: choice.id, summary: choice.summary, base });
+  if (choice.action === "remove") return proposeRemove(env, editor, { collection: choice.collection, id: choice.id, summary: choice.summary, base, redirectTo: choice.to });
+  if (choice.action === "redirect") return proposeRedirect(env, editor, { from: choice.from, to: choice.to, summary: choice.summary, base });
   if (choice.action === "restore") return proposeRestore(env, editor, { trashId: choice.trashId, summary: choice.summary, base, trash });
   if (choice.action === "undo") return proposeUndo(env, editor, { changeId: choice.changeId, recent, base });
   if (choice.action === "navigation") return proposeMenu(env, editor, { message, base, progress });
@@ -918,12 +930,64 @@ async function proposeEverywhere(env, editor, { terms, message, base, progress }
 }
 
 // ---------------------------------------------------------------------------------------
+// Redirects: an old address (a printed flyer, an old WordPress page) → a page
+
+async function proposeRedirect(env, editor, { from, to, summary, base, undoOf = null, stop = false }) {
+  let source;
+  try {
+    source = redirectSource(from);
+  } catch (e) {
+    return reply(`${e.message}. Which old address should I send on?`);
+  }
+  const common = { id: crypto.randomUUID(), collection: null, entryId: null, typeKey: "redirect", typeLabel: "Redirect", fieldLabels: { from: "Old address", to: "Goes to" }, version: null, path: null, ...(undoOf ? { undoOf } : {}), ...base };
+  if (stop) {
+    const proposal = { ...common, op: "unredirect", from: source, fields: { from: source }, title: source, summary };
+    await save(env, proposal);
+    return { kind: "proposal", proposal };
+  }
+  const checked = await checkDestination(editor, to);
+  if (checked.error) return reply(`I couldn't set that up: ${checked.error}.`);
+  const { targets } = await editor.getMenu();
+  const bare = (p) => p.replace(/\/+$/, "");
+  const page = targets.find((t) => bare(t.path) === bare(source));
+  if (page || source === "/") return reply(`${source} is a page on the site (“${page?.title ?? "Home"}”), so I can't redirect it. Remove the page first if it should go.`);
+  const existing = (await editor.redirects()).redirects.find((r) => bare(r.from) === bare(source));
+  if (existing && existing.to === checked.target) return reply(`${source} already goes to ${checked.target}.`);
+  const proposal = { ...common, op: "redirect", from: source, to: checked.target, previousTo: existing?.to ?? null, fields: { from: source, to: checked.target }, title: source, summary: summary || `Send ${source} to ${checked.target}` };
+  await save(env, proposal);
+  return { kind: "proposal", proposal };
+}
+
+// ---------------------------------------------------------------------------------------
 // Removing, putting back, undoing
 
 // Shown on the card so staff can see which entry it is (not changed by the proposal).
 const identify = (entry) => Object.fromEntries(["date", "description"].filter((f) => entry?.[f]).map((f) => [f, String(entry[f])]));
 
-async function proposeRemove(env, editor, { collection, id, summary, base, undoOf = null }) {
+// Where a redirect may send visitors: a page the site has (checked against the menu's page list) or an outside address.
+async function checkDestination(editor, to) {
+  let target;
+  try {
+    target = redirectTarget(to);
+  } catch (e) {
+    return { error: e.message };
+  }
+  if (target.startsWith("/")) {
+    const { targets } = await editor.getMenu();
+    const live = new Set(["/", ...targets.map((t) => t.path)]);
+    const withSlash = target.endsWith("/") ? target : `${target}/`;
+    if (!live.has(target) && !live.has(withSlash)) return { error: `there's no page at ${target}` };
+    return { target: live.has(target) ? target : withSlash };
+  }
+  return { target };
+}
+
+const listingOf = (editor, typeKey) => {
+  const listing = editor.types?.[typeKey]?.enabled ? editor.types[typeKey].listing?.path : null;
+  return listing ? `/${listing}/` : "/";
+};
+
+async function proposeRemove(env, editor, { collection, id, summary, base, undoOf = null, redirectTo = null }) {
   let opened;
   try {
     opened = await editor.get(collection, id);
@@ -936,8 +1000,14 @@ async function proposeRemove(env, editor, { collection, id, summary, base, undoO
   if (opened.designed) return reply(`“${entry.title}” is part of the site's design, so I can't remove it. I can change its words and links instead.`);
   if (opened.frontPage) return reply("That's the homepage, so it can't be removed.");
   if (opened.inTopMenu && opened.topLevelLocked) return reply(`“${entry.title}” is linked from the main menu bar, so I can't remove it. Ask your web team to change the menu bar first.`);
+  let sendTo = listingOf(editor, type.key);
+  if (redirectTo) {
+    const checked = await checkDestination(editor, redirectTo);
+    if (checked.error) return reply(`I couldn't send its visitors there: ${checked.error}. Which page should they go to?`);
+    if (checked.target !== path) sendTo = checked.target;
+  }
   const proposal = {
-    id: crypto.randomUUID(), op: "remove", collection, entryId: String(entry.id ?? entry.slug), typeKey: type.key, typeLabel: type.label ?? type.key,
+    id: crypto.randomUUID(), op: "remove", redirectTo: sendTo, collection, entryId: String(entry.id ?? entry.slug), typeKey: type.key, typeLabel: type.label ?? type.key,
     fieldLabels: { ...(type.fieldLabels ?? {}), ...(type.dateLabel ? { date: type.dateLabel } : {}) },
     version, fields: identify(entry), before: {}, removeFromMenu: true, inMenu: opened.inMenu,
     title: entry.title, path, summary: summary || `Remove “${entry.title}”`, ...(undoOf ? { undoOf } : {}), ...base,
@@ -975,6 +1045,15 @@ async function proposeUndo(env, editor, { changeId, recent, base }) {
     return proposeRestore(env, editor, { trashId: done.trashId, summary, base, undoOf });
   }
   if (done.op === "restore") return proposeRemove(env, editor, { collection: done.collection, id: done.entryId, summary, base, undoOf });
+  if (done.op === "redirect") {
+    return done.previous
+      ? proposeRedirect(env, editor, { from: done.from, to: done.previous.to, summary, base, undoOf })
+      : proposeRedirect(env, editor, { from: done.from, summary, base, undoOf, stop: true });
+  }
+  if (done.op === "unredirect") {
+    if (!done.removed) return reply("I can't find what that redirect was. Tell me where the address should go.");
+    return proposeRedirect(env, editor, { from: done.removed.from, to: done.removed.to, summary, base, undoOf });
+  }
   if (done.op === "updateMany") {
     const edits = [];
     for (const e of done.edits || []) {
@@ -1136,8 +1215,14 @@ export async function applyProposal(env, editor, proposalId, { by, scheduled = f
       proposal.afterVersions = Object.fromEntries(result.entries.map((e) => [`${e.collection}/${e.id}`, e.version]));
     } else if (proposal.op === "menu") {
       result = await editor.saveMenu(proposal.menu, { version: proposal.version, by });
+    } else if (proposal.op === "redirect") {
+      result = await editor.addRedirect(proposal.from, proposal.to, { by });
+      proposal.previous = result.previous ?? null;
+    } else if (proposal.op === "unredirect") {
+      result = await editor.removeRedirect(proposal.from, { by });
+      proposal.removed = result.redirect;
     } else if (proposal.op === "remove") {
-      result = await editor.remove(proposal.collection, proposal.entryId, { version: proposal.version, removeFromMenu: proposal.removeFromMenu === true, reason: `Slack: ${proposal.text || proposal.summary}`, by });
+      result = await editor.remove(proposal.collection, proposal.entryId, { version: proposal.version, removeFromMenu: proposal.removeFromMenu === true, redirectTo: proposal.redirectTo ?? null, reason: `Slack: ${proposal.text || proposal.summary}`, by });
       path = null;
     } else if (proposal.op === "restore") {
       result = await editor.restore(proposal.trashId, { by });
@@ -1236,6 +1321,8 @@ function section(text) {
 function heading(proposal) {
   const kind = String(proposal.typeLabel || proposal.typeKey || "entry").toLowerCase();
   if (proposal.op === "menu") return "Change to the menu";
+  if (proposal.op === "redirect") return `Redirect ${proposal.from}`;
+  if (proposal.op === "unredirect") return `Stop redirecting ${proposal.from}`;
   if (proposal.op === "updateMany") return `Change on ${proposal.title}`;
   if (proposal.op === "remove") return `Remove ${kind} “${proposal.title}”`;
   if (proposal.op === "restore") return `Put back ${kind} “${proposal.title}”`;
@@ -1288,11 +1375,21 @@ export function proposalBlocks(proposal, { siteUrl } = {}) {
     return { text: cut(`Proposed: ${heading(proposal)}. ${proposal.summary || ""}`.trim(), SECTION_LIMIT), blocks };
   }
 
+  // Redirects: the old address and where it goes.
+  if (proposal.op === "redirect" || proposal.op === "unredirect") {
+    blocks.push(section(proposal.op === "redirect"
+      ? `*Old address*\n>${esc(proposal.from)}\n*Goes to*\n>${esc(proposal.to)}${proposal.previousTo ? `\n_(instead of ${esc(proposal.previousTo)})_` : ""}`
+      : `*Old address*\n>${esc(proposal.from)}\n_It will show “page not found” again._`));
+    blocks.push(buttons(proposal, "Approve and publish", "primary"));
+    return { text: cut(`Proposed: ${heading(proposal)}. ${proposal.summary || ""}`.trim(), SECTION_LIMIT), blocks };
+  }
+
   // Removing or putting back: which entry, and what happens to it (no before → after).
   if (proposal.op === "remove" || proposal.op === "restore") {
     for (const [f, v] of Object.entries(proposal.fields || {})) blocks.push(section(`*${esc(label(proposal, f))}*\n${quote(esc(cut(display(f, v), FIELD_BUDGET)))}`));
     const note = proposal.op === "remove"
-      ? `It comes off the site${proposal.inMenu ? " and out of the menu" : ""} and goes to the trash, so it can be put back: just ask.`
+      ? `It comes off the site${proposal.inMenu ? " and out of the menu" : ""} and goes to the trash, so it can be put back: just ask.` +
+        (proposal.path && proposal.path !== "/" && proposal.redirectTo ? ` Visitors to ${esc(proposal.path)} go to ${esc(proposal.redirectTo)}.` : "")
       : `It goes back on the site where it was${proposal.removedAt ? ` (removed ${esc(proposal.removedAt.slice(0, 10))}${proposal.removedBy ? ` by ${esc(proposal.removedBy)}` : ""})` : ""}.`;
     blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: note }] });
     blocks.push(buttons(proposal, proposal.op === "remove" ? "Approve and remove" : "Approve and put back", proposal.op === "remove" ? "danger" : "primary"));

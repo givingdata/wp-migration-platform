@@ -220,9 +220,20 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
 20. **Key facts.** A safe subset of site settings: hours (incl. holiday hours), phone, address,
     social links. Among the most common small-business requests; needs those facts to live in
     one place in content, not repeated in page text.
-21. **Redirects** when a page is renamed or removed, so old links and search results still work.
-22. **Content health check (read-only).** "Anything out of date on my site?" → past events still
-    listed, stale news, broken links, missing image descriptions, each with an offer to fix it.
+21. **Redirects (built 2026-09-30; `docs/SLACK.md` → Redirects).** Removing an entry records its
+    address and a destination (its listing, or the page staff name) in `trash.json`; staff can
+    also redirect any old address (`content.json` → `redirects`, `addRedirect()`/
+    `removeRedirect()`). `site/redirects.mjs` writes both after `redirects.csv`, never for a served
+    address. Renames never change slugs, so they need nothing. A full WordPress re-import keeps
+    staff redirects.
+22. **Content health check (built 2026-09-30; `docs/SLACK.md` → "Anything out of date?").**
+    `worker/src/health.js` over `lib/edit` `readAll()`: stale news, no upcoming events, last
+    year's dates on pages, placeholder text, missing internal pages (grouped per page), dead
+    outside links (random 15 per run: free-plan 50-subrequest limit), missing image
+    descriptions. Report written in code, not by Claude. Tried on Cinderella's content: found
+    real dead links (a Google Form, expired event pages), homepage photos without descriptions,
+    2024/2025 mentions, and old NextGEN gallery links. Later: a weekly check posted to the
+    channel on the router's cron.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 

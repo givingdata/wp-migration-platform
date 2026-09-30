@@ -60,3 +60,22 @@ test("entries the new site leaves out redirect to the listing", () => {
   const rules = buildRules({ map, skipped: ["https://old.org/4064-2/"] });
   assert.equal(rules.find((r) => r.from === "/4064-2/")?.to, "/news/");
 });
+
+test("staff redirects and removed entries: after redirects.csv, never for a served address", () => {
+  const csv = parseCsv("/camp/,/from-csv/\n");
+  const rules = buildRules({
+    map: { ...map, entries: [] },
+    csv,
+    builtPaths: new Set(["/news/", "/back-again/"]),
+    staff: [{ from: "/summer-camp", to: "/camps/" }, { from: "/camp/", to: "/ignored/" }, { from: "/bad path", to: "/x/" }],
+    removed: [{ from: "/news/old-gala/", to: "/news/" }, { from: "/back-again/", to: "/news/" }],
+  });
+  const byFrom = Object.fromEntries(rules.map((r) => [r.from, [r.to, r.source]]));
+  assert.deepEqual(byFrom["/summer-camp"], ["/camps/", "staff redirect"]);
+  assert.deepEqual(byFrom["/summer-camp/"], ["/camps/", "staff redirect"], "both forms");
+  assert.deepEqual(byFrom["/camp/"], ["/from-csv/", "redirects.csv"], "redirects.csv wins");
+  assert.deepEqual(byFrom["/news/old-gala/"], ["/news/", "removed entry"]);
+  assert.equal(byFrom["/back-again/"], undefined, "a page that's back on the site isn't redirected");
+  assert.equal(byFrom["/bad path"], undefined);
+  assert.match(toRedirectsFile(rules), /# staff redirect\n\/summer-camp \/camps\/ 301/);
+});
