@@ -7,6 +7,10 @@ compatibility_flags = ["global_fetch_strictly_public"]
 [observability]
 enabled = true
 
+# Scheduled Slack changes ("post this Friday at 9"): every client gets a signed tick.
+[triggers]
+crons = ["*/10 * * * *"]
+
 [vars]
 # Added to every client channel and never removed by prune (your own Slack login, for support).
 SUPPORT_EMAILS = "hello@flomysite.com"

@@ -10,7 +10,8 @@
 //
 //  Router: the shared 1wp-slack Worker (slack-router/) receives Slack's requests and forwards this
 //  client's ones (SLACK_CLIENT, SLACK_ROUTER_URL, SLACK_ROUTER_KEY).
-//   POST /slack/inbox          { kind: "message" | "action", data } signed with SLACK_ROUTER_KEY
+//   POST /slack/inbox          { kind: "message" | "action" | "deleted", data } or { kind: "tick" } (the router's
+//                              cron: run scheduled changes), signed with SLACK_ROUTER_KEY
 //   Web API calls go to <router>/api/<method>, signed the same way; the router adds the bot token.
 //
 // The routes are off (404) when neither mode is configured. Slack wants a 200 within 3 s, so
@@ -193,6 +194,8 @@ async function handleInbox(bytes, env, ctx, handlers) {
     if (await firstSighting(env, body.data.eventId)) later(ctx, "onMessage", () => handlers.onMessage(body.data));
   } else if (body?.kind === "action" && body.data?.channel) {
     later(ctx, "onAction", () => handlers.onAction(body.data));
+  } else if (body?.kind === "tick") {
+    if (handlers.onTick) later(ctx, "onTick", () => handlers.onTick());
   } else if (body?.kind === "deleted" && body.data?.channel && body.data?.ts) {
     if (handlers.onDeleted) later(ctx, "onDeleted", () => handlers.onDeleted({ channel: body.data.channel, ts: body.data.ts }));
   } else {
@@ -205,7 +208,7 @@ async function handleInbox(bytes, env, ctx, handlers) {
  * Routes POST /slack/events and /slack/interactions (direct mode, SLACK_SIGNING_SECRET) and
  * POST /slack/inbox (router mode, SLACK_ROUTER_KEY). Returns a Response, or null for any other
  * path. 404 for a /slack/* route whose mode isn't configured.
- * handlers: { onMessage(msg), onAction(act), onDeleted?({ channel, ts }) }, each returning a Promise
+ * handlers: { onMessage(msg), onAction(act), onDeleted?({ channel, ts }), onTick?() }, each returning a Promise
  */
 export async function handleSlackRoute(request, env, ctx, handlers) {
   const { pathname } = new URL(request.url);

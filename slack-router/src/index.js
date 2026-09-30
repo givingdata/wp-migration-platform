@@ -11,6 +11,9 @@
 //   POST /admin/clients         ADMIN_KEY. Add or update a client (creates its private channel)
 //   POST /admin/clients/remove  ADMIN_KEY. Remove a client and archive its channel
 //
+// Cron (every 10 minutes): { kind: "tick" } to every client that isn't paused, so each publishes
+// its scheduled Slack changes. One cron for all clients (the free plan allows 5 per account).
+//
 // Router → client: POST <client url>/slack/inbox, signed with the client's key. Clients are KV
 // records, so adding, pausing or removing one never redeploys this Worker. This Worker holds the
 // only Slack secrets. Never logs message text, emails or tokens.
@@ -328,7 +331,19 @@ async function admin(request, bytes, env, pathname) {
 
 // ---- entry --------------------------------------------------------------------------------------
 
+/** The cron: every active client gets a tick. Returns how many were reached. */
+export async function tickClients(env) {
+  const clients = (await allClients(env)).filter((c) => !c.paused && c.url);
+  const results = await Promise.allSettled(clients.map((c) => forward(env, c, "tick")));
+  results.forEach((r, i) => r.status === "rejected" && console.error(`router tick ${clients[i].client} failed:`, r.reason?.message || r.reason));
+  return results.filter((r) => r.status === "fulfilled").length;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(tickClients(env));
+  },
+
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     try {

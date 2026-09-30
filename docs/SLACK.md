@@ -28,9 +28,51 @@ and the bot asks where it goes; answer in the thread, no need to post the photo 
 per message. Not yet: photos inside a page's text, and removing photos. Needs the `files:read`
 scope (see below).
 
+**Removing and undoing.** *"Take down the Spring Gala event"* gives a **Remove** card (red
+button). On Approve the entry comes off the site and goes to `trash.json` with who removed it and
+why; its links inside dropdown menus go with it. *"Put the gala back"* shows what's in the trash
+and restores it where it was. *"Undo that"* (or *"undo the price change"*) reverses one of the
+changes made in Slack in the last 30 days: text and photos go back to what they were, a new entry
+is removed, a removal is put back. Each of these is a new card that needs **Approve**. Undo refuses
+if the entry was changed again since (tell the bot what it should say now instead), and can't
+remove a photo that wasn't there before. The homepage, designed pages and pages linked from the
+main menu bar can't be removed.
+
+**Menu links.** *"Add the Volunteer page under About"*, *"rename Contact us to Get in touch"* or
+*"move Team to the top of the About dropdown"* changes the links inside the navigation menu's
+dropdowns, with each changed dropdown's links shown before → after on the Approve card. The menu
+bar itself (its top-level items) stays as designed unless `design-specs.json` has
+`"menu": { "topLevel": "editable" }`, in which case a top-level item can get a new dropdown; the
+bar's items are never added, renamed or moved from Slack. Links go to pages that exist, or to an
+outside address the staff member gives. Undo works here too.
+
+**From pasted text or a link.** Paste an email or newsletter with *"post this as news"* and the
+bot writes the entry from it. With a link (*"add this as news: https://paper.example/story"*,
+or an event page), the Worker reads that page (`worker/src/linked-page.js`: HTML only, 8-second
+timeout, title/description/main text, capped) and Claude writes a short entry in its own words
+with a link back (in the Link field when the type has one, otherwise "Read more" at the end).
+If the page can't be read, it uses only what the message says. The page is data for Claude,
+never instructions.
+
+**Later.** Add a time to any request: *"post this on Friday at 9"*, *"take the gala down after
+the 15th"*, *"change the hours on Monday"*. The card says when (⏰) and the button reads
+**Approve for Mon 5 Oct, 9:00 a.m.** Approving schedules it: the message says when it will
+happen and keeps a **Cancel it** button. The shared router's cron ticks each client every
+10 minutes, so it goes live within about 10 minutes of the time, plus the usual build. Times
+are in the site's `TIMEZONE` (UTC if unset), up to a year ahead. If the page was changed in the
+meantime, the scheduled change doesn't go live and the message says why. Needs router mode
+(direct-mode Workers have no tick).
+
+**Everywhere at once.** *"Our phone number is now 604-555-0199"* or *"change Executive Director
+to CEO everywhere"*: the bot searches every entry and designed page for the current wording
+(`lib/edit` `search()`), Claude writes exact replacements from the matching snippets (including
+`tel:`/`mailto:` links), and one card shows each place before → after. Approve saves them all in
+one commit (`updateMany()`); if any of those pages changed in the meantime, nothing is saved.
+Up to 40 pages at a time; very short replacements (under 3 characters) are refused. Undo works.
+
 What it does **not** do:
 
-- No deletes, no menu changes, no settings. Those stay in the staff form.
+- No permanent deletes, no menu bar changes, no settings. Those stay in the staff form.
 - Nothing is published until someone presses **Approve**.
 - It only reads and answers in the channels you list, and only for the staff you list. Everyone
   else is ignored.

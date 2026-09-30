@@ -501,3 +501,55 @@ test("a visitor question gets an answer from the numbers, labelled when they're 
   assert.equal(last.blocks, undefined, "an answer, not an Approve card");
   assert.equal(gh.commits.length, 0);
 });
+
+// Scheduled changes ------------------------------------------------------------------------
+
+const { runScheduled } = await import("../src/slack-flow.js");
+const { editorFor } = await import("../src/content.js");
+
+function tomorrowAt9() {
+  const d = new Date(Date.now() + 86_400_000);
+  return `${d.toISOString().slice(0, 10)}T09:00`; // TIMEZONE unset = UTC
+}
+
+test("a change for later: Approve schedules it, the tick publishes it when it's due", async () => {
+  const ctx = setup();
+  ctx.claude[0].when = tomorrowAt9();
+  await message(ctx.env);
+  const draft = ctx.slack[2];
+  assert.ok(JSON.stringify(draft.blocks).includes("⏰ Happens"), "the card says when");
+  const [approve] = buttons(draft);
+  assert.match(approve.text.text, /^Approve for /);
+
+  await click(ctx.env, "1wp_approve", approve.value);
+  assert.equal(ctx.gh.commits.length, 0, "not published yet");
+  const scheduled = ctx.slack.at(-1);
+  assert.equal(scheduled.method, "chat.update");
+  assert.match(statusLine(scheduled), /^⏰ Approved by staff@example.org\. Happens /);
+  assert.deepEqual(buttons(scheduled).map((b) => b.action_id), ["1wp_cancel"], "can still be cancelled");
+
+  assert.equal(await runScheduled(ctx.env, () => editorFor(ctx.env)), 0, "not due yet");
+  assert.equal(ctx.gh.commits.length, 0);
+
+  assert.equal(await runScheduled(ctx.env, () => editorFor(ctx.env), Date.now() + 2 * 86_400_000), 1);
+  assert.equal(ctx.gh.commits.length, 1);
+  assert.match(gh(ctx).pages[0].content, /9–5, weekdays/);
+  const done = ctx.slack.at(-1);
+  assert.equal(done.ts, "t1", "the same Slack message");
+  assert.match(statusLine(done), /^✅ Approved by staff@example.org\. Going live/);
+  assert.equal(await runScheduled(ctx.env, () => editorFor(ctx.env), Date.now() + 3 * 86_400_000), 0, "runs once");
+});
+
+test("a scheduled change can be cancelled before it's due", async () => {
+  const ctx = setup();
+  ctx.claude[0].when = tomorrowAt9();
+  await message(ctx.env);
+  const [approve] = buttons(ctx.slack[2]);
+  await click(ctx.env, "1wp_approve", approve.value);
+  await click(ctx.env, "1wp_cancel", approve.value);
+  assert.match(statusLine(ctx.slack.at(-1)), /^✖️ Cancelled/);
+  await runScheduled(ctx.env, () => editorFor(ctx.env), Date.now() + 2 * 86_400_000);
+  assert.equal(ctx.gh.commits.length, 0);
+});
+
+const gh = (ctx) => JSON.parse(ctx.gh.files()["content.json"]);

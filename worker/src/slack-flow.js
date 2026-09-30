@@ -21,14 +21,20 @@
 // there (people can't delete an app's messages), cancels a proposal still waiting for Approve and
 // forgets an open question. A change already published stays live; git keeps its history.
 //
-// Nothing publishes without an Approve click, and Slack can't delete, change the menu or
-// settings. Commits carry the Slack user's email, like the staff form's.
+// A change for later ("Friday at 9") is approved the same way; Approve then schedules it, the
+// message says when (with a Cancel button), and onTick (the router's cron, every 10 minutes)
+// publishes it and updates that message like an Approve would.
+//
+// Nothing publishes without an Approve click. Slack can remove an entry only to the trash (and
+// put it back, or undo a recent change), and can't change the menu or settings. Commits carry the Slack user's email, like the staff form's.
 import specs from "../../config/design-specs.json" with { type: "json" };
 import { postMessage, updateMessage, slackApi, userEmail, downloadFile, IMAGE_TYPES, MAX_FILE_BYTES } from "./slack.js";
 import { storeImage, previewForClaude } from "./cloudflare.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { rememberDeploy } from "./deploys.js";
-import { proposeEdit, applyProposal, cancelProposal, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION } from "./slack-edits.js";
+import {
+  proposeEdit, applyProposal, cancelProposal, scheduleProposal, takeDue, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION,
+} from "./slack-edits.js";
 
 const siteUrl = (env) => env.SITE_URL || null;
 
@@ -168,6 +174,8 @@ export function slackHandlers(env, getEditor) {
       }
     },
 
+    onTick: () => runScheduled(env, getEditor),
+
     async onAction({ actionId, value, user, channel, messageTs }) {
       if (![APPROVE_ACTION, CANCEL_ACTION].includes(actionId) || !channelAllowed(env, channel)) return;
       const email = await userEmail(env, user);
@@ -181,6 +189,17 @@ export function slackHandlers(env, getEditor) {
         try {
           const { proposal } = await cancelProposal(env, value, { by: email });
           await show(resultBlocks(proposal, { status: "cancelled", by: email }));
+        } catch (e) {
+          await slackApi(env, "chat.postEphemeral", { channel, user, text: friendly(e) });
+        }
+        return;
+      }
+
+      const waiting = await getProposal(env, value);
+      if (waiting?.status === "pending" && waiting.runAt && Date.parse(waiting.runAt) > Date.now()) {
+        try {
+          const { proposal } = await scheduleProposal(env, value, { by: email, channel, messageTs });
+          await show(resultBlocks(proposal, { status: "scheduled", by: email }));
         } catch (e) {
           await slackApi(env, "chat.postEphemeral", { channel, user, text: friendly(e) });
         }
@@ -201,6 +220,27 @@ export function slackHandlers(env, getEditor) {
       }
     },
   };
+}
+
+/** Publish scheduled changes whose time has come (the router's cron calls this every 10 minutes). */
+export async function runScheduled(env, getEditor, now = Date.now()) {
+  const ids = await takeDue(env, now);
+  for (const id of ids) {
+    const waiting = await getProposal(env, id);
+    if (waiting?.status !== "scheduled") continue; // cancelled meanwhile
+    const where = { channel: waiting.channel, ts: waiting.messageTs };
+    const show = (view) => (where.channel && where.ts ? quietly(updateMessage(env, { ...where, ...view })) : Promise.resolve());
+    try {
+      const { proposal, path } = await applyProposal(env, getEditor(), id, { scheduled: true });
+      await show(resultBlocks(proposal, { status: "applied", siteUrl: siteUrl(env), path }));
+      if (where.channel && where.ts) await quietly(rememberDeploy(env, { sha: proposal.commitSha, channel: where.channel, messageTs: where.ts, proposalId: proposal.id }));
+    } catch (e) {
+      console.error("Scheduled change failed", e.message);
+      const proposal = await getProposal(env, id);
+      if (proposal) await show(resultBlocks(proposal, { status: "failed", error: `The scheduled change didn't go live: ${friendly(e)}` }));
+    }
+  }
+  return ids.length;
 }
 
 /** The site deploy that includes an approved Slack change finished: update its message. */

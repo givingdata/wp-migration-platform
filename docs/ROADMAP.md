@@ -157,6 +157,72 @@ Next (planned for 2026-09-25):
    photo flow's index of image places and the Approve card's image blocks (URLs under
    `R2_PUBLIC_URL`). Read-only, so no Approve step; it helps staff see what's there before
    asking for a photo change.
+10. **Microsoft Teams bot (option, planned 2026-09-30).** The same edits from Teams, for clients
+    who use Microsoft 365. Build only when a client asks. Reused as-is: Claude drafting
+    (`slack-edits.js`, `lib/edit`), proposals in KV, Approve → commit, 🟢 Live notices
+    (`deploys.js`), visitor numbers, remembered questions and the staff check. New:
+    - **Chat-neutral replies.** `slack-flow.js`/`slack.js` return plain cards (text,
+      before/after, images, Approve/Cancel) with a Slack renderer (Block Kit) and a Teams
+      renderer (Adaptive Cards, updated in place after Approve).
+    - **`1wp-teams` router** (or a `/teams` route on `1wp-slack`): an Azure Bot registration
+      (free tier) + Microsoft app ID/secret; checks the Bot Framework token on each message,
+      replies through the conversation's `serviceUrl` with plain `fetch` (no Microsoft SDK),
+      maps the sender's tenant ID → client, and forwards the same signed request the client
+      Worker already gets.
+    - **Differences:** no reactions (use a typing indicator or edit the reply); in channels the
+      bot only hears @mentions unless the manifest asks for channel-message permission (RSC);
+      photos posted in channels are stored in SharePoint and need Microsoft Graph permissions
+      to download (1:1 chats are simpler); delete-a-request handling needs checking.
+    - **Getting the bot to clients (the hard part).** Clients have their own Microsoft 365
+      organization, and we have no Microsoft 365 org to invite them into as guests. Each
+      client's IT admin allows a custom app upload or adds SiteFlo to their org app catalog;
+      otherwise list in the Teams Store (Partner Center, publisher verification, Microsoft
+      review). Check Microsoft's 2025 changes to bots used across organizations first.
+    - **First step when needed:** a test in a trial Microsoft 365 org: bot registration →
+      message in → Adaptive Card with Approve → edit committed.
+
+More things staff could change from Slack (ideas 2026-09-30, cheapest first):
+
+11. **Remove and undo (built 2026-09-30; `docs/SLACK.md` → Removing and undoing).** "Take down
+    the Spring Gala event" → a Remove card; on Approve the entry moves to `trash.json`
+    (`lib/edit` `remove()`), and its dropdown menu links go with it. "Put back the gala post"
+    restores it. "Undo that" / "undo the price change" reverses a recent Slack change: a text
+    change goes back to its before values, a new entry is removed, a removal is restored. Every
+    one still needs Approve. The homepage, designed pages and pages in the main menu bar can't be
+    removed (the Edit module refuses them).
+12. **Links in dropdown menus (built 2026-09-30; `docs/SLACK.md` → Menu links).** "Add the
+    Volunteer page under About": Claude returns each changed dropdown's full link list, checked
+    against the site's pages (or an outside link staff gave), shown before → after, saved with
+    `saveMenu()` (version check; the locked menu bar is enforced there too). Undo works.
+13. **Site-wide find and replace (built 2026-09-30; `docs/SLACK.md` → Everywhere at once).**
+    Claude gives search terms → `lib/edit` `search()` → Claude writes exact find → replace pairs
+    from the snippets → one card with every place → `updateMany()` saves them in one commit
+    (all-or-nothing version checks). Max 40 pages. Undo works.
+14. **Turn pasted text and links into posts (built 2026-09-30; `docs/SLACK.md` → From pasted
+    text or a link).** Pasted text already worked through create; now the first link in a
+    request to add something is read (`worker/src/linked-page.js`) and Claude writes a short
+    entry from it in its own words, linking back. Not yet: Slack's "forward email to channel"
+    files, and the linked page's image.
+15. **Scheduling (built 2026-09-30; `docs/SLACK.md` → Later).** Claude sets a local `when`
+    (site `TIMEZONE`); Approve schedules (KV `slack:scheduled`), with Cancel; the **router's**
+    single cron (every 10 min) sends each client a signed tick, and due changes go through the
+    usual `applyProposal`. One cron for all clients because the free plan allows only 5 Cron
+    Triggers per account. Needs the router redeployed. Photos can't be scheduled yet.
+16. **Preview link on the Approve card.** Build the proposed change on a preview branch (as sales
+    previews do) so staff see the real page before approving.
+17. **Section changes on designed pages.** Hide, show or reorder sections ("move the
+    testimonials above the menu"), limited to the design's existing section types. Today the
+    prompt forbids it.
+18. **Documents.** PDF uploads (menus, newsletters, annual reports, board minutes) stored in R2
+    and linked from a page; same path as photos (`files:read`, size/type checks, Approve card).
+19. **More photo work.** Photos inside body text, galleries, and removing a photo (noted as "not
+    yet" when photos shipped).
+20. **Key facts.** A safe subset of site settings: hours (incl. holiday hours), phone, address,
+    social links. Among the most common small-business requests; needs those facts to live in
+    one place in content, not repeated in page text.
+21. **Redirects** when a page is renamed or removed, so old links and search results still work.
+22. **Content health check (read-only).** "Anything out of date on my site?" → past events still
+    listed, stale news, broken links, missing image descriptions, each with an offer to fix it.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 

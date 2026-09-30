@@ -3,7 +3,7 @@
 // router hosts are dispatched to the real code.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import router, { clientKey } from "../src/index.js";
+import router, { clientKey, tickClients } from "../src/index.js";
 import { handleSlackRoute, postMessage, slackApi, userEmail, routerHeaders } from "../../worker/src/slack.js";
 import { toHex } from "../../worker/src/auth.js";
 
@@ -40,7 +40,7 @@ const people = [
 
 beforeEach(() => {
   env = { SLACK_SIGNING_SECRET: SIGNING, SLACK_BOT_TOKEN: "xoxb-router", ROUTER_SECRET: "router-secret", ADMIN_KEY: "admin", SUPPORT_EMAILS: "hello@flomysite.com", ROUTER: fakeKV() };
-  received = { messages: [], actions: [], deleted: [] };
+  received = { messages: [], actions: [], deleted: [], ticks: 0 };
   slackCalls = [];
   slackAnswers = {
     "conversations.create": () => ({ ok: true, channel: { id: "C100" } }),
@@ -64,7 +64,7 @@ beforeEach(() => {
     }
     const request = new Request(url, init);
     if (u.origin === CLIENT_URL) {
-      const handlers = { onMessage: async (m) => void received.messages.push(m), onAction: async (a) => void received.actions.push(a), onDeleted: async (d) => void received.deleted.push(d) };
+      const handlers = { onMessage: async (m) => void received.messages.push(m), onAction: async (a) => void received.actions.push(a), onDeleted: async (d) => void received.deleted.push(d), onTick: async () => void received.ticks++ };
       return (await handleSlackRoute(request, clientEnv, clientCtx, handlers)) || new Response("no", { status: 404 });
     }
     if (u.origin === ROUTER) return router.fetch(request, env, routerCtx);
@@ -288,4 +288,21 @@ test("a deleted request reaches its client, which may read and delete in its own
   assert.deepEqual(slackCalls.slice(-2).map((c) => c.method), ["conversations.replies", "chat.delete"]);
   await assert.rejects(slackApi(clientEnv, "chat.delete", { channel: "C999", ts: "2.2" }), /not_your_channel/);
   await assert.rejects(slackApi(clientEnv, "conversations.replies", { channel: "C999", ts: "1.1" }), /not_your_channel/);
+});
+
+test("cron: every active client gets a signed tick; paused clients don't", async () => {
+  await addAcme();
+  assert.equal(await tickClients(env), 1);
+  await settle();
+  assert.equal(received.ticks, 1);
+
+  await adminCall("/admin/clients", { client: "acme", url: CLIENT_URL, staffDomains: ["acme.org"], paused: true });
+  assert.equal(await tickClients(env), 0);
+  await settle();
+  assert.equal(received.ticks, 1);
+
+  // A client Worker that rejects the tick (e.g. not updated yet) doesn't stop the others.
+  await adminCall("/admin/clients", { client: "acme", url: CLIENT_URL, staffDomains: ["acme.org"], paused: false });
+  clientEnv.SLACK_ROUTER_KEY = "wrong";
+  assert.equal(await tickClients(env), 0);
 });

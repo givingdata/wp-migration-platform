@@ -33,6 +33,12 @@ out again, so no per-client key list is stored. Requests in both directions are 
 using the same timestamp + HMAC scheme as the staff form (`worker/src/auth.js`). A leaked client
 key lets someone post only in that client's channel.
 
+**Cron.** Every 10 minutes (`[triggers]` in `wrangler.toml`) the router sends each active client
+a signed `{ kind: "tick" }` to `/slack/inbox`, and the client publishes any scheduled Slack
+changes that are due. One cron for all clients, because the free plan allows only 5 Cron
+Triggers per account. A client Worker that doesn't know ticks yet answers 400; that's logged
+and the others carry on.
+
 ## Setup, onboarding, management
 
 **Once, ever**
