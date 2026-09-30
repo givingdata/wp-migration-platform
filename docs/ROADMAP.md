@@ -96,6 +96,10 @@ as regular members, one private channel per client, served by one SiteFlo app th
 manual step is inviting their staff to the workspace. Cinderella moves from its own app setup to the
 router as the first client (that move also gives it a new bot token, item 3 below).
 
+**Status 2026-09-30:** items 1, 3, 4, 11–15, 21 and 22 are built and live on the demo and
+Cinderella (router redeployed with its cron). Tested by hand in #demo: remove + undo, a new phone
+number everywhere, a news item from a link. Items 5–9, 10 and 16–20 are open.
+
 Next (planned for 2026-09-25):
 
 1. **Images from Slack (built 2026-09-28; `docs/SLACK.md` → Photos).** A photo posted with a
@@ -105,14 +109,14 @@ Next (planned for 2026-09-25):
    messages and serves `/files/download` for the client's own channel only; `lib/edit` gained
    `setImage()` (images must be under the site's `R2_PUBLIC_URL`). Needs `files:read` (reinstall).
    Next: photos inside body text, removing a photo, several photos at once (a gallery).
-2. **`docs/SLACK.md` additions** (in "When it doesn't work"):
+2. **`docs/SLACK.md` additions (done 2026-09-30)** (in "When it doesn't work"):
    - The **Slack desktop app** may not show the bot's thread updates or the finished draft
      while the web app does: press **⌘R** (Ctrl+R on Windows) to refresh, or use
      **Help → Troubleshooting → Clear Cache and Restart**.
    - Requests posted as a **reply in a thread** are ignored by design; post in the channel.
-3. **New bot token for Cinderella** before real staff use it: the current one was pasted into
-   a chat during setup. Reinstalling keeps the same token, so get a new one and update the
-   Worker secret `SLACK_BOT_TOKEN`.
+3. **New bot token (done 2026-09-28).** The token pasted into a chat during setup was retired
+   when the app was uninstalled and reinstalled as SiteFlo; the new one is on the router
+   (`SLACK_BOT_TOKEN`), which holds the only Slack secrets.
 4. **Visitor numbers in Slack (built 2026-09-29; `worker/src/analytics.js`).** Staff ask "how many
    visits this month?" and Claude answers from the numbers only. Sources: `cloudflare` (Web
    Analytics, cookieless; needs a read-only Account Analytics key; no backfill) and `sample`
@@ -189,7 +193,7 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
     restores it. "Undo that" / "undo the price change" reverses a recent Slack change: a text
     change goes back to its before values, a new entry is removed, a removal is restored. Every
     one still needs Approve. The homepage, designed pages and pages in the main menu bar can't be
-    removed (the Edit module refuses them).
+    removed (the Edit module refuses them). Tested in #demo 2026-09-30 (remove, then undo).
 12. **Links in dropdown menus (built 2026-09-30; `docs/SLACK.md` → Menu links).** "Add the
     Volunteer page under About": Claude returns each changed dropdown's full link list, checked
     against the site's pages (or an outside link staff gave), shown before → after, saved with
@@ -197,17 +201,21 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
 13. **Site-wide find and replace (built 2026-09-30; `docs/SLACK.md` → Everywhere at once).**
     Claude gives search terms → `lib/edit` `search()` → Claude writes exact find → replace pairs
     from the snippets → one card with every place → `updateMany()` saves them in one commit
-    (all-or-nothing version checks). Max 40 pages. Undo works.
+    (all-or-nothing version checks). Max 40 pages. Undo works. Tested in #demo 2026-09-30 (a new
+    phone number).
 14. **Turn pasted text and links into posts (built 2026-09-30; `docs/SLACK.md` → From pasted
     text or a link).** Pasted text already worked through create; now the first link in a
     request to add something is read (`worker/src/linked-page.js`) and Claude writes a short
-    entry from it in its own words, linking back. Not yet: Slack's "forward email to channel"
-    files, and the linked page's image.
+    entry from it in its own words, linking back. Tested in #demo 2026-09-30. Two fixes after the
+    test: the first step now knows links can be read (it refused before), and cards for new
+    entries carry a fixed "📷 post a photo" tip instead of Claude's own (wrong) remark about
+    photos. Not yet: Slack's "forward email to channel" files, and the linked page's image.
 15. **Scheduling (built 2026-09-30; `docs/SLACK.md` → Later).** Claude sets a local `when`
     (site `TIMEZONE`); Approve schedules (KV `slack:scheduled`), with Cancel; the **router's**
     single cron (every 10 min) sends each client a signed tick, and due changes go through the
     usual `applyProposal`. One cron for all clients because the free plan allows only 5 Cron
-    Triggers per account. Needs the router redeployed. Photos can't be scheduled yet.
+    Triggers per account. Router redeployed 2026-09-30; a tick was checked in its logs with no
+    client errors. Photos can't be scheduled yet.
 16. **Preview link on the Approve card.** Build the proposed change on a preview branch (as sales
     previews do) so staff see the real page before approving.
 17. **Section changes on designed pages.** Hide, show or reorder sections ("move the
@@ -234,6 +242,16 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
     real dead links (a Google Form, expired event pages), homepage photos without descriptions,
     2024/2025 mentions, and old NextGEN gallery links. Later: a weekly check posted to the
     channel on the router's cron.
+
+Follow-ups from building 11–22:
+
+- **Rolling platform changes out** to client repos is a merge (they have their own commits):
+  `git pull --no-rebase --no-edit upstream main && git push`. With more clients this wants a
+  script (or the dashboard) that merges, runs the `worker` tests and pushes each one; see
+  "Content-only client repos" above for the longer-term fix.
+- **Time-zone data differs between Node versions** (B.C.'s permanent daylight time is in newer
+  data): tests must check against the runtime's own rules, never a hard-coded offset.
+- **Schedule photos**, and the **linked page's image** as the entry's photo (licence permitting).
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 

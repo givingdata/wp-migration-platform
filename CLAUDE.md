@@ -36,7 +36,7 @@ Slack can change their text too. `rebuild.yml` also rebuilds daily so announceme
 ### Changing the platform
 
 Make generic fixes in the platform repo and push; then in each client folder run
-`git pull upstream main && git push` to roll them out. Client-only changes go straight in the client repo.
+`git pull --no-rebase --no-edit upstream main && git push` to roll them out (client repos have their own commits, so it's a merge; `--no-edit` stops git opening an editor for the message). Client-only changes go straight in the client repo.
 In a client repo, pushing redeploys whatever changed:
 - `site/` → site (`deploy-site.yml`)
 - `worker/` → Worker (`deploy-worker.yml`)

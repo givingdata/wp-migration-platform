@@ -284,6 +284,8 @@ Watch the Worker while you post in the channel: `cd worker && npx wrangler tail 
 
 | What you see | Cause and fix |
 |---|---|
+| The Slack **desktop app** doesn't show the bot's thread updates or the finished draft (the web app does) | Refresh with **⌘R** (Ctrl+R on Windows), or **Help → Troubleshooting → Clear Cache and Restart**. |
+| The bot ignores a request | Requests posted as a **reply in a thread** are ignored by design (only answers to the bot's own question count): post it in the channel. |
 | Nothing reaches the Worker when you post | **Socket Mode** is on, the Request URL isn't verified or saved, or events are off (see the table above). A request you send yourself (`curl -X POST https://<worker>/slack/events`) shows up and gets 401, so the Worker itself is fine. |
 | Log: `slack onMessage failed: Slack users.info: missing_scope` | `users:read` / `users:read.email` are missing: add them under **Bot Token Scopes**, reinstall. |
 | Requests reach the Worker but the bot says nothing, no error | The channel isn't in `SLACK_CHANNEL_IDS`, or the sender's Slack email isn't listed, or **Deploy Worker** didn't run after the change. |
