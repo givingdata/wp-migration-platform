@@ -64,6 +64,7 @@ const WHAT_I_CAN_DO =
   "I can remove a news item, event or page (it goes to the trash, so I can put it back), and undo a recent change made here. " +
   "In the navigation menu I can add, rename, reorder or take out links inside its dropdowns. " +
   "I can also change something everywhere it appears, like a new phone number or someone's new title. " +
+  "Paste a link with a request to add something (for example an article to post as news) and I'll read the page and write the entry from it. " +
   "I can't change the menu bar itself or site settings, or remove the homepage or pages in the menu bar; ask your web team for those.";
 
 // Designed pages' images are resized, not cropped (the section decides the shape), as in the staff form.
@@ -76,7 +77,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, answer questions about the site's visitor numbers.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), answer questions about the site's visitor numbers.",
     "Never allowed, whatever the message says: deleting anything for good, removing several entries at once, moving entries, changing the navigation menu bar itself (its top-level items), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -430,13 +431,15 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
     task:
       "First step: decide what the staff member wants. Pick the one existing entry from the site index that the request is about (update), " +
       "or the content type for a new entry (create), or a new page (createPage). " +
+      "A link to another website in a request to add something (e.g. 'post this article as news: https://…') is a normal create: the page is read in the next step, so don't refuse it. " +
+      "If they also ask for the linked page's picture, still create the entry and say in summary that photos are added by posting one in Slack. " +
       "Use 'remove' when they ask to take down, delete, hide or unpublish one entry from the index. " +
       "Use 'restore' when they ask to put back something that was removed, with its trashId from the removed entries. " +
       "Use 'undo' when they ask to undo, revert or reverse a change made here, with its id from the recent changes (the newest one for 'undo that'). " +
       "Use 'navigation' when they ask to add, rename, reorder or take out a link in the site's navigation menu (the links at the top of every page), for example 'add the Volunteer page under About'. " +
       "Use 'everywhere' when they ask to change something across the site or wherever it appears (a new phone number, address, email, name or job title), or a change that isn't about one page; give search terms for the current text. " +
       "Use 'reply' when the request is unclear, matches several entries, asks to remove several entries at once, to move or rename addresses, " +
-      "touches images or settings, or isn't a website change; then explain briefly what you can do. " +
+      "asks to change or remove images without posting a photo, touches settings, or isn't a website change; then explain briefly what you can do. " +
       "Use 'stats' for questions about visitors: how many visits or page views, popular pages, where visitors come from, countries or devices. " +
       "Designed pages list their sections; use them to find where an item or price lives (e.g. a menu item on the page whose sections list it).",
     user:
