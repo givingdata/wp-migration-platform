@@ -751,8 +751,13 @@ test("create from a link: the page is read and given to Claude as data", async (
 });
 
 test("scheduling: local times convert to UTC across daylight saving; past or far-off times", async () => {
-  assert.equal(new Date(localToUtc("2026-07-01T09:00", "America/Vancouver")).toISOString(), "2026-07-01T16:00:00.000Z");
-  assert.equal(new Date(localToUtc("2026-12-01T09:00", "America/Vancouver")).toISOString(), "2026-12-01T17:00:00.000Z");
+  // Checked against the runtime's own time-zone rules, which change (B.C. moved to permanent
+  // daylight time, so newer tz data gives Vancouver a different winter offset).
+  const wall = (ms, tz) => new Intl.DateTimeFormat("sv-SE", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms)).replace(" ", "T");
+  for (const tz of ["America/Vancouver", "America/New_York", "Europe/London", "Australia/Sydney"]) {
+    for (const local of ["2026-07-01T09:00", "2026-12-01T09:00", "2027-03-01T23:30"]) assert.equal(wall(localToUtc(local, tz), tz), local, `${tz} ${local}`);
+  }
+  assert.equal(new Date(localToUtc("2026-12-01T09:00", "Etc/GMT+8")).toISOString(), "2026-12-01T17:00:00.000Z", "fixed UTC−8");
   assert.equal(new Date(localToUtc("2026-12-01T09:00", "UTC")).toISOString(), "2026-12-01T09:00:00.000Z");
 
   const ctx = setup();
