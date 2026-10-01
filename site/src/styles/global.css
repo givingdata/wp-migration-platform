@@ -181,6 +181,7 @@ h3 { font-size: 1.25rem; }
 .s-hero-title { color: var(--band-text); font-size: clamp(2.4rem, 6vw, 4.4rem); font-weight: var(--heading-weight); line-height: 1.08; margin: 0 0 1.25rem; }
 .s-hero-title em { color: var(--band-accent); font-style: italic; }
 .s-lede { font-size: 1.15rem; color: var(--band-muted); max-width: 34rem; margin: 0; }
+.s-para + .s-para { margin-top: 0.75em; } /* paragraphs split from one text field (Paras.astro) */
 .s-hero .btn-primary { background: var(--band-accent); color: var(--band-bg); }
 .s-hero .btn-primary:hover { background: var(--band-text); }
 .s-hero .btn-secondary { color: var(--band-text); background: rgb(255 255 255 / 0.08); }

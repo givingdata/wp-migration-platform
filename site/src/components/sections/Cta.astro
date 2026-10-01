@@ -1,6 +1,7 @@
 ---
 // A centred call to action: heading, a line of text, buttons. Soft background by default.
 import type { Cta } from "../../lib/sections";
+import Paras from "./Paras.astro";
 import Heading from "./Heading.astro";
 import Buttons from "./Buttons.astro";
 interface Props { s: Cta }
@@ -9,7 +10,7 @@ const { s } = Astro.props;
 <section class:list={["s-section", "s-cta", `tone-${s.tone ?? "alt"}`]} id={s.id}>
   <div class="wrap s-narrow s-center">
     <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />
-    {s.text && <p class="s-cta-text">{s.text}</p>}
+    {s.text && <Paras class="s-cta-text" text={s.text} />}
     <Buttons buttons={s.buttons} />
   </div>
 </section>

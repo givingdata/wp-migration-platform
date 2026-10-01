@@ -1,6 +1,7 @@
 ---
 // Photo tiles with their title on the photo (and an arrow when the tile is a link).
 import type { Tiles } from "../../lib/sections";
+import Paras from "./Paras.astro";
 import Heading from "./Heading.astro";
 interface Props { s: Tiles }
 const { s } = Astro.props;
@@ -8,7 +9,7 @@ const { s } = Astro.props;
 <section class:list={["s-section", `tone-${s.tone ?? "light"}`]} id={s.id}>
   <div class="wrap">
     {(s.title || s.eyebrow) && <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />}
-    {s.intro && <p class="s-intro s-center">{s.intro}</p>}
+    {s.intro && <Paras class="s-intro s-center" text={s.intro} />}
     <ul class:list={["s-tiles", `n-${s.items.length}`]}>
       {s.items.map((t) => (
         <li class="s-tile">

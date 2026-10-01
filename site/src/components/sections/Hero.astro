@@ -2,6 +2,7 @@
 // Hero. "photo" (default): full-width photo behind the text, stats bottom-right.
 // "split": text beside a framed photo on the band colour (no overlay on the photo).
 import type { Hero } from "../../lib/sections";
+import Paras from "./Paras.astro";
 import Buttons from "./Buttons.astro";
 interface Props { s: Hero; first?: boolean }
 const { s, first = false } = Astro.props;
@@ -14,7 +15,7 @@ const Title = first ? "h1" : "h2";
       <div class="s-hero-main">
         {s.eyebrow && <p class="s-eyebrow">{s.eyebrow}</p>}
         <Title class="s-hero-title">{s.title}{s.accent && <> <em>{s.accent}</em></>}</Title>
-        {s.text && <p class="s-lede">{s.text}</p>}
+        {s.text && <Paras class="s-lede" text={s.text} />}
         <Buttons buttons={s.buttons} />
         {s.stats && s.stats.length > 0 && (
           <dl class="s-hero-facts">
@@ -37,7 +38,7 @@ const Title = first ? "h1" : "h2";
       <div class="s-hero-main">
         {s.eyebrow && <p class="s-eyebrow">{s.eyebrow}</p>}
         <Title class="s-hero-title">{s.title}{s.accent && <> <em>{s.accent}</em></>}</Title>
-        {s.text && <p class="s-lede">{s.text}</p>}
+        {s.text && <Paras class="s-lede" text={s.text} />}
         <Buttons buttons={s.buttons} />
       </div>
       {s.stats && s.stats.length > 0 && (

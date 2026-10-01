@@ -59,16 +59,19 @@ const DATE_FIELDS = new Set(["date", "endDate"]);
 const TEXT_LIMITS = { title: 200, description: 1000, content: 200_000, time: 200, location: 500, author: 200, imageAlt: 300, linkUrl: 2000 };
 const LABELS = { title: "Title", description: "Summary", content: "Text", imageAlt: "Image description", date: "Date", endDate: "End date", time: "Time", location: "Location", author: "Author", linkUrl: "Link" };
 
-const WHAT_I_CAN_DO =
-  "I can change the text of an existing page or entry (title, summary, body text, dates, time, location, link), the words and links on designed pages like the homepage, add a news item, event or announcement, or add a new page. " +
-  "Post a photo with a message to use it as the main photo of a news item or event, on a designed page like the homepage, or for a new entry. " +
-  "I can also answer questions about visitor numbers, if they're set up for your site, and check the site for anything out of date (old news, past dates, broken links, photos without descriptions). " +
-  "I can remove a news item, event or page (it goes to the trash, so I can put it back), and undo a recent change made here. " +
-  "In the navigation menu I can add, rename, reorder or take out links inside its dropdowns. " +
-  "I can also change something everywhere it appears, like a new phone number or someone's new title. " +
-  "When something is removed, visitors to its old address go to its listing page (or a page you name), and I can send any old address to a page, e.g. from a printed flyer. " +
-  "Paste a link with a request to add something (for example an article to post as news) and I'll read the page and write the entry from it. " +
-  "I can't change the menu bar itself or site settings, or remove the homepage or pages in the menu bar; ask your web team for those.";
+// Slack mrkdwn: a short list so it can be scanned in a thread. Appended after a blank line.
+const WHAT_I_CAN_DO = [
+  "*What I can do*",
+  "• *Change text:* titles, summaries, body text, dates, times, places and links on pages, news and events. On designed pages like the homepage, the words and links (not the layout). A blank line in your text starts a new paragraph.",
+  "• *Add:* a news item, event, announcement or new page. Paste a link and I'll write the entry from that page.",
+  "• *Photos:* post a photo with a message to use it on a news item, event, designed page or new entry.",
+  "• *Change everywhere:* e.g. a new phone number or someone's new title.",
+  "• *Remove and undo:* news, events and pages go to the trash, so I can put them back. I can also undo a recent change made here.",
+  "• *Menu:* add, rename, reorder or take out links inside its dropdowns.",
+  "• *Old addresses:* removed pages send visitors to their listing page (or one you name), and I can point any old address, e.g. from a printed flyer, to a page.",
+  "• *Questions:* visitor numbers (if set up), and a check for anything out of date (old news, past dates, broken links, photos without descriptions).",
+  "_Ask your web team to change the menu bar itself or site settings, or to remove the homepage or pages in the menu bar._",
+].join("\n");
 
 // Designed pages' images are resized, not cropped (the section decides the shape), as in the staff form.
 const DESIGNED_IMAGE_SPEC = { aspectRatio: null, minWidth: 300, maxWidth: 1600 };
@@ -486,7 +489,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
     try {
       opened = await editor.get(choice.collection, choice.id);
     } catch (e) {
-      if (e instanceof EditError) return reply(`I couldn't find the page or entry you mean. ${WHAT_I_CAN_DO}`);
+      if (e instanceof EditError) return reply(`I couldn't find the page or entry you mean.\n\n${WHAT_I_CAN_DO}`);
       throw e;
     }
     if (opened.designed) return proposeDesigned(env, { choice, opened, message, base, progress });
@@ -516,7 +519,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
       if (edited.error) return reply("I couldn't pin down which part of the text to change. Could you quote the words you want changed?");
       if (edited.html !== String(current.content ?? "")) changes.content = edited.html;
     }
-    if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. ${WHAT_I_CAN_DO}`);
+    if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change.\n\n${WHAT_I_CAN_DO}`);
     const issues = problems(changes);
     if (issues.length) return reply(`I couldn't draft that: ${issues.join("; ")}.`);
 
@@ -551,7 +554,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
 async function draftNew(env, editor, { choice, message, progress, photo = false }) {
   const isPage = choice.action === "createPage" || choice.typeKey === "page";
   const type = isPage ? { key: "page", label: "Page", fields: [] } : editor.types?.[choice.typeKey];
-  if (!isPage && (!type?.enabled || type.key === "page")) return reply(`I can't add that kind of entry. ${WHAT_I_CAN_DO}`);
+  if (!isPage && (!type?.enabled || type.key === "page")) return reply(`I can't add that kind of entry.\n\n${WHAT_I_CAN_DO}`);
   // A link in the request (an article, an event page): read it so the entry can be written from it.
   const link = firstLink(message);
   let linked = null;
@@ -685,7 +688,7 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
     }
     const { entry, type, version, path } = opened;
     const spec = editor.types?.[type.key];
-    if (opened.designed || !spec?.fields?.includes("image")) return reply(`${type.label ?? "That entry"} doesn't show a main photo on this site. ${WHAT_I_CAN_DO}`);
+    if (opened.designed || !spec?.fields?.includes("image")) return reply(`${type.label ?? "That entry"} doesn't show a main photo on this site.\n\n${WHAT_I_CAN_DO}`);
     await progress?.(`Preparing the photo for “${String(entry.title ?? "").slice(0, 120)}”…`);
     const stored = await storeImage(spec, crypto.randomUUID());
     const proposal = {
@@ -719,12 +722,13 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
 async function proposeDesigned(env, { choice, opened, message, base, progress }) {
   const { entry, version, path } = opened;
   const slots = entry.sections.flatMap((s) => s.slots.filter((x) => x.kind !== "image").map((x) => ({ ...x, section: s.label })));
-  if (!slots.length) return reply(`That page has no text I can change. ${WHAT_I_CAN_DO}`);
+  if (!slots.length) return reply(`That page has no text I can change.\n\n${WHAT_I_CAN_DO}`);
   await progress?.(`Found “${String(entry.title ?? "").slice(0, 120)}”. Drafting the change…`);
   const draft = await ask(env, {
     task:
       "Second step: this page is built from designed sections. Change only the text values the request is about, returning the complete new text for each. " +
-      "Sections, their order, and images can't change here; if the request needs that, return no edits.",
+      "Sections, their order, and images can't change here; if the request needs that, return no edits. " +
+        "Values are plain text: in longer text values a blank line (\\n\\n) starts a new paragraph and a single \\n is a line break; never write HTML tags such as <p> or <br>.",
     user: `Designed page “${entry.title}” (${path}); its text values (slot, section, label, value):\n${JSON.stringify(slots.map((x) => ({ slot: x.slot, section: x.section, label: x.label, value: x.value })))}\n\nRequest from Slack:\n${slackMessage(message)}`,
     schema: designedSchema(slots),
     maxTokens: 6000,
@@ -735,7 +739,7 @@ async function proposeDesigned(env, { choice, opened, message, base, progress })
     const current = bySlot.get(slot);
     if (current && typeof value === "string" && value.trim() !== current.value.trim()) changes[slot] = value.trim();
   }
-  if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout or images. ${WHAT_I_CAN_DO}`);
+  if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout or images.\n\n${WHAT_I_CAN_DO}`);
   const { errors } = checkSlotChanges(slots, changes);
   if (Object.keys(errors).length) return reply(`I couldn't draft that: ${Object.entries(errors).map(([slot, e]) => `${bySlot.get(slot)?.label ?? slot}: ${e}`).join("; ")}.`);
 
@@ -833,7 +837,7 @@ async function proposeMenu(env, editor, { message, base, progress }) {
     before[heading] = menuLinks(old);
     beforeItems[heading] = rawMenu(old);
   }
-  if (!Object.keys(changes).length) return reply(draft.reply || `That already matches the menu, or I couldn't tell what to change. ${WHAT_I_CAN_DO}`);
+  if (!Object.keys(changes).length) return reply(draft.reply || `That already matches the menu, or I couldn't tell what to change.\n\n${WHAT_I_CAN_DO}`);
   const proposal = {
     id: crypto.randomUUID(), op: "menu", collection: null, entryId: null, typeKey: "menu", typeLabel: "Menu", fieldLabels: {},
     version: current.version, menu, changes, before, beforeItems, title: "Menu", path: null, summary: draft.summary || "Change the menu", ...base,
@@ -994,7 +998,7 @@ async function proposeRemove(env, editor, { collection, id, summary, base, undoO
   try {
     opened = await editor.get(collection, id);
   } catch (e) {
-    if (e instanceof EditError) return reply(`I couldn't find the page or entry you mean. ${WHAT_I_CAN_DO}`);
+    if (e instanceof EditError) return reply(`I couldn't find the page or entry you mean.\n\n${WHAT_I_CAN_DO}`);
     throw e;
   }
   const { entry, type, version, path } = opened;

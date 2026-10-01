@@ -1,5 +1,6 @@
 ---
 import type { Stats } from "../../lib/sections";
+import Paras from "./Paras.astro";
 import Heading from "./Heading.astro";
 interface Props { s: Stats }
 const { s } = Astro.props;
@@ -7,7 +8,7 @@ const { s } = Astro.props;
 <section class:list={["s-section", `tone-${s.tone ?? "alt"}`]} id={s.id}>
   <div class="wrap">
     <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} center />
-    {s.intro && <p class="s-intro s-center">{s.intro}</p>}
+    {s.intro && <Paras class="s-intro s-center" text={s.intro} />}
     <dl class:list={["s-stats", `n-${s.items.length}`]}>
       {s.items.map((it) => <div class="s-stat"><dt>{it.label}</dt><dd>{it.value}</dd></div>)}
     </dl>

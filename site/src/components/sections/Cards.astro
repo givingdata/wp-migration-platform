@@ -1,5 +1,6 @@
 ---
 import type { Cards } from "../../lib/sections";
+import Paras from "./Paras.astro";
 import Heading from "./Heading.astro";
 interface Props { s: Cards }
 const { s } = Astro.props;
@@ -8,14 +9,14 @@ const { s } = Astro.props;
   <div class="wrap">
     <div class="s-cards-head">
       <Heading eyebrow={s.eyebrow} title={s.title} accent={s.accent} />
-      {s.intro && <p class="s-intro">{s.intro}</p>}
+      {s.intro && <Paras class="s-intro" text={s.intro} />}
     </div>
     <ul class:list={["s-cards", `n-${s.items.length}`]}>
       {s.items.map((c, i) => (
         <li class:list={["s-card", `c-${i % 3}`]}>
           {c.icon && <span class="s-card-icon" aria-hidden="true">{c.icon}</span>}
           <h3>{c.href ? <a href={c.href}>{c.title}</a> : c.title}</h3>
-          <p>{c.text}</p>
+          <Paras text={c.text} />
           {c.href && c.linkLabel && <p class="s-card-link" aria-hidden="true">{c.linkLabel} →</p>}
         </li>
       ))}

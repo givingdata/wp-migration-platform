@@ -1,0 +1,11 @@
+---
+// Multi-line section text: a blank line starts a new paragraph, a single line break stays a
+// line break. Each paragraph gets the same class (e.g. s-lede) plus s-para for spacing.
+interface Props { text?: string; class?: string }
+const { text = "", class: cls } = Astro.props;
+const paras = String(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+---
+{paras.map((p) => {
+  const lines = p.split("\n");
+  return <p class:list={[cls, "s-para"]}>{lines.map((line, i) => <>{i > 0 && <br />}{line}</>)}</p>;
+})}
