@@ -70,6 +70,9 @@ h3 { font-size: 1.25rem; }
 .footer-links, .social-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
 .footer-links a, .social-links a { color: var(--muted); }
 .footer-links a:hover, .social-links a:hover { color: var(--accent); }
+.footer-credit { margin: 1.25rem 0 0; font-size: 0.8rem; text-align: center; }
+.footer-credit a { color: inherit; text-decoration: none; }
+.footer-credit a:hover { text-decoration: underline; }
 .social-links a { display: inline-flex; align-items: center; min-height: 24px; }
 
 /* Home */
@@ -344,45 +347,3 @@ h3 { font-size: 1.25rem; }
 .s-hero-facts div { display: flex; flex-direction: column-reverse; }
 .s-hero-facts dt { color: var(--band-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .s-hero-facts dd { margin: 0; color: var(--band-text); font-family: var(--font-heading); font-size: 1.2rem; }
-
-/* ---------- Bistro preset (config/theme.json "preset": "bistro"): FoodZero-style ---------- */
-[data-preset="bistro"] body { line-height: 1.7; }
-[data-preset="bistro"] h1 { font-size: clamp(2.4rem, 5.5vw, 4.4rem); line-height: 1.08; }
-[data-preset="bistro"] h2 { font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.12; }
-[data-preset="bistro"] .s-title { font-size: clamp(2.3rem, 5.2vw, 4.2rem); line-height: 1.08; }
-[data-preset="bistro"] .s-title em, [data-preset="bistro"] .s-hero-title em { font-style: normal; }
-[data-preset="bistro"] .s-eyebrow, [data-preset="bistro"] .eyebrow { letter-spacing: 0.16em; font-weight: 400; }
-[data-preset="bistro"] .s-intro { font-size: 1rem; }
-/* Header runs into the hero: one dark band, outlined button */
-[data-preset="bistro"] .site-header.header-band { border: 0; }
-[data-preset="bistro"] .header-band .brand { font-size: 1.7rem; letter-spacing: 0.01em; }
-[data-preset="bistro"] .header-band .main-nav a { font-weight: 400; }
-[data-preset="bistro"] .header-band .btn-primary { background: transparent; color: var(--band-text); border: 1px solid var(--band-text); font-family: var(--font-heading); }
-[data-preset="bistro"] .header-band .btn-primary:hover { background: var(--band-text); color: var(--band-bg); }
-/* Buttons: solid forest green, serif label */
-[data-preset="bistro"] .btn { font-family: var(--font-heading); font-weight: 700; padding: 0.95rem 2.2rem; }
-[data-preset="bistro"] .btn-primary { background: var(--band-bg); color: var(--band-text); }
-[data-preset="bistro"] .btn-primary:hover { background: var(--accent); color: var(--band-text); }
-[data-preset="bistro"] .s-hero .btn-primary, [data-preset="bistro"] .tone-band .btn-primary { background: var(--band-text); color: var(--band-bg); }
-[data-preset="bistro"] .s-hero .btn-primary:hover, [data-preset="bistro"] .tone-band .btn-primary:hover { background: var(--band-accent); color: var(--band-bg); }
-[data-preset="bistro"] .s-hero .btn-secondary { background: transparent; border-color: var(--band-text); }
-/* Photos: plain and square, no offset backdrop */
-[data-preset="bistro"] .s-backdrop { display: none; }
-[data-preset="bistro"] .s-split-media { margin: 0; }
-[data-preset="bistro"] .s-split-media img { aspect-ratio: 4 / 5; }
-/* News and event cards: no box, serif title over a dotted rule */
-[data-preset="bistro"] .card { border: 0; background: transparent; }
-[data-preset="bistro"] .card-body { padding: 1.4rem 0 0; }
-[data-preset="bistro"] .card-title { font-size: 1.6rem; line-height: 1.2; padding-bottom: 0.8rem; margin-bottom: 0.8rem; border-bottom: 2px dotted var(--heading); }
-[data-preset="bistro"] .card-title a { color: var(--heading); }
-[data-preset="bistro"] .card .meta { color: var(--accent); font-size: 0.85rem; }
-/* Stories: one large serif quote */
-[data-preset="bistro"] .s-story blockquote p { font-size: clamp(1.4rem, 2.8vw, 2.1rem); line-height: 1.4; }
-[data-preset="bistro"] .s-story-picker button { background: transparent; border: 1px solid var(--border); }
-[data-preset="bistro"] .s-story-picker button[aria-pressed="true"] { background: var(--band-bg); border-color: var(--band-bg); }
-[data-preset="bistro"] .entry-post { padding-top: 2.5rem; }
-/* Footer: the band colour itself, large serif name */
-[data-preset="bistro"] .footer-rich { background: var(--band-bg); }
-[data-preset="bistro"] .footer-name { font-size: 2.4rem; line-height: 1.1; }
-[data-preset="bistro"] .footer-cols { border-bottom: 2px dotted rgb(255 255 255 / 0.35); }
-[data-preset="bistro"] .footer-heading { font-family: var(--font-heading); text-transform: none; letter-spacing: 0; font-size: 1.15rem; font-weight: 700; }

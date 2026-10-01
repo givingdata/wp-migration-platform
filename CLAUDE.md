@@ -44,7 +44,7 @@ In a client repo, pushing redeploys whatever changed:
 - `lib/` → both (content types and the Edit module, shared by the Worker, site and form)
 - `form/` → staff form (`deploy-form.yml`)
 - `config/theme.json` → site (preset, colours, fonts, logo; designers follow `docs/DESIGN_HANDOFF.md`)
-- `config/site.json` → site (analytics tags, Search Console verification, default share image)
+- `config/site.json` → site (analytics tags, Search Console verification, default share image, the "Website by SiteFlo" footer credit)
 - `redirects.csv` → site (your own 301s; the build adds automatic ones, see below)
 
 Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `content.json` is missing).
@@ -61,6 +61,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Draft sections for a page from its existing content | In the client folder: `CLAUDE_API_KEY=… node ../../platform/scripts/draft-sections.mjs --pages /,how-to-help` → review `sections.draft.md`/`.json` → `--merge` into `sections.json`, preview, push |
 | Menu or footer changed on WordPress | `python wordpress_export.py --output content.json --site-info-only`, commit, push. Keeps a menu staff edited in the form unless you add `--overwrite-menu` |
 | Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
+| Remove the "Website by SiteFlo" footer credit (a client arranged to leave it off) | `"credit": false` in `config/site.json`, push. On by default; not something staff can change from the form or Slack |
 | Hide the whole site from search engines (a demo or staging site) | `"noindex": true` in `config/site.json`, push: robots meta + `X-Robots-Tag` on every page, robots.txt disallows everything, no sitemap |
 | Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
 | Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push. Staff can also ask the Slack bot (kept in `content.json` → `redirects`); removed entries redirect to their listing automatically (from `trash.json`) |

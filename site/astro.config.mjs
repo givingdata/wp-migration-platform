@@ -1,6 +1,7 @@
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import redirects from "./redirects.mjs";
 
 // Pages marked "hide from search" (seo.noindex) stay out of the sitemap too.
@@ -45,6 +46,37 @@ function hideSite() {
   };
 }
 
+// public/sample/ holds the pictures for src/data/sample-content.json. A build from a real
+// content.json (same lookup as src/lib/content.ts) leaves them out of the published site.
+function dropSamples() {
+  const real = [process.env.CONTENT_PATH, "../content.json", "content.json"].some((p) => p && fs.existsSync(p));
+  return {
+    name: "drop-samples",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        if (real) fs.rmSync(new URL("sample/", dir), { recursive: true, force: true });
+      },
+    },
+  };
+}
+
+// Extra CSS for the site's preset (src/styles/presets/<preset>.css), imported by BaseLayout as
+// "virtual:preset.css" right after global.css. Only the chosen preset's file is built, so sites
+// don't ship the styles of designs they don't use; presets without a file get an empty one.
+function presetCss() {
+  let preset = "classic";
+  try {
+    preset = JSON.parse(fs.readFileSync(new URL("../config/theme.json", import.meta.url), "utf8")).preset || preset;
+  } catch {}
+  const file = new URL(`./src/styles/presets/${preset}.css`, import.meta.url);
+  const id = "virtual:preset.css";
+  return {
+    name: "preset-css",
+    resolveId: (source) => (source === id ? (fs.existsSync(file) ? fileURLToPath(file) : "\0preset.css") : null),
+    load: (resolved) => (resolved === "\0preset.css" ? "" : null),
+  };
+}
+
 // SITE_URL is the production origin (used for canonical URLs, sitemap, Open Graph).
 const site = process.env.SITE_URL || "https://example.org";
 
@@ -53,8 +85,9 @@ export default defineConfig({
   output: "static",
   trailingSlash: "ignore",
   build: { format: "directory" },
-  integrations: [...(siteHidden ? [] : [sitemap({ filter: (page) => !hidden.has(new URL(page).pathname) })]), redirects(), hideSite()],
+  integrations: [...(siteHidden ? [] : [sitemap({ filter: (page) => !hidden.has(new URL(page).pathname) })]), redirects(), hideSite(), dropSamples()],
   vite: {
+    plugins: [presetCss()],
     // content.json and config/design-specs.json live one level up.
     server: { fs: { allow: [".."] } },
   },

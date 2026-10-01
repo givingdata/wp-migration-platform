@@ -2,5 +2,6 @@
   "analytics": [],
   "searchConsole": null,
   "shareImage": null,
-  "noindex": false
+  "noindex": false,
+  "credit": true
 }

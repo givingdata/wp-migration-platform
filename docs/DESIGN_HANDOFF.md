@@ -18,6 +18,7 @@ keeps the preset's value.
 | `editorial` | Black and white, crimson accent, square corners, serif headings, narrow text column |
 | `modern` | Indigo accent, heavy sans headings, off-white background |
 | `minimal` | Greyscale, small corners |
+| `bistro` | Restaurants and cafés: forest green and sage, large serif headings, square corners (adds its own styling beyond the tokens) |
 
 To see one: set `"preset"` in `config/theme.json`, run `npm run dev`, and open http://localhost:3000.
 
@@ -38,6 +39,11 @@ file maps straight onto the site. The build rejects names it doesn't know.
 | `border` | Header/footer rules, card outlines, table lines |
 | `accent` | Links, eyebrow labels, hovered card titles, blockquote rule |
 | `accent-hover` | Links on hover |
+| `heading` | Headings (can differ from `text`) |
+| `band-bg` | Background of contrasting bands: the banded header, dark section strips (`tone: band`), the rich footer |
+| `band-text` | Text on a band |
+| `band-muted` | Secondary text on a band |
+| `band-accent` | Links and highlights on a band |
 | `focus` | Keyboard focus outline (must stand out against `bg` and `surface`) |
 | `overlay` | Optional. Shade over photos with text on them (homepage hero, quote). Defaults to the band colour; set a neutral dark (e.g. `#111111`) to keep photos' own colours |
 
@@ -54,9 +60,12 @@ Supply both modes. If the client doesn't want dark mode, say so and we set `"dar
 | `radius` | Corners on cards, images, menus | `10px`, `0px` for square |
 | `wrap` | Maximum page width | `72rem` (1152px) |
 | `narrow` | Maximum width of article text | `44rem` (704px) |
+| `button-radius` | Corners on buttons | `999px` (pill), `0px` for square |
 
 Heading sizes are fixed (h1 is 2–3rem, scaling with screen width; h2 is 1.5–1.9rem; h3 is
-1.25rem). Spacing is not a token yet.
+1.25rem). Spacing is not a token yet. A preset can change heading sizes and other styling in its
+own CSS file (`site/src/styles/presets/<preset>.css`, as `bistro` does); only sites using that
+preset load it.
 
 ### Fonts
 
@@ -78,16 +87,27 @@ Show the tokens applied to the pages that exist today, at **1440px** (desktop) a
 (phone):
 
 - **Header**: logo/site name plus the main menu, including one dropdown (submenu) open
-- **Homepage**: intro, the featured item and the card grids (exhibitions, events, news)
+- **Homepage**: built from sections (see below), or the default intro and card grids (news, events)
 - **Listing page**: a grid of cards
-- **Entry pages**: a post, an event (image beside details on desktop) and an exhibition
+- **Entry pages**: a post and an event (image beside details on desktop); an exhibition only if the
+  client has the optional exhibition type
 - **A general page** with WordPress content: headings, lists, a quote, a table, an image with a
   caption and a photo gallery
-- **Footer** and the **404** page
+- **Footer** and the **404** page. The footer ends with a small "Website by SiteFlo" line (linking to
+  flomysite.com) in the footer's muted text colour: leave room for it. It's on for every site unless
+  we've agreed with the client to remove it
 
-Image shapes are fixed by content type (`config/design-specs.json`): exhibitions **3:2**,
-events **1:1**, posts **16:9**. Design cards and hero images at those ratios. Staff-uploaded
-photos are cropped to them automatically.
+Image shapes are set per content type in the client's `config/design-specs.json`. The defaults are
+posts **16:9** and events **1:1** (exhibitions **3:2** when used). Design cards and entry images at
+those ratios, or ask for a different ratio for this client before launch: staff-uploaded photos are
+cropped to it automatically, and photos already uploaded keep the old shape.
+
+Pages can also be built from **sections** (`sections.json`), in any order: `hero` (photo behind the
+text, or beside it), `split` (text beside a photo), `cards`, `tiles` (photos with titles), `features`
+(icons), `stats`, `quote`, `stories`, `text`, `posts` (latest news or events), `menu` (a price list)
+and `cta`. Each section can use the page background, an alternate fill or the band colours. Section
+photos have their own shapes (hero 4:5 beside the text, split 5:4, tiles 5:7); a preset can change
+them. Show which sections each designed page uses, in order.
 
 ## 4. Accessibility (required)
 
@@ -113,7 +133,7 @@ Included: anything expressible with the tokens, preset, fonts and logo above.
 
 Custom (quoted separately; built as extra components in the client's own repo):
 
-- New homepage sections or a different section order (a section-based homepage is planned)
+- New section types beyond the list in section 3 (choosing and ordering the existing ones is included)
 - A different header or navigation pattern (centred logo, mega-menu, sticky or transparent header)
 - New components: donation meters, sliders or carousels, maps, embedded forms
 - Per-page layouts, animation, or background images and textures

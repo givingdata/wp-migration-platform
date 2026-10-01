@@ -4,6 +4,7 @@ import * as icons from "simple-icons";
 import { SITE } from "../lib/site";
 import { getContent, resolveMenuUrl } from "../lib/content";
 import { siteSettings } from "../lib/sections";
+import { SITE_CONFIG } from "../lib/siteConfig";
 
 const { text, menu, social } = getContent().footer;
 // Optional richer footer from sections.json: about text, address, contact emails, a note.
@@ -19,6 +20,8 @@ const socials = social.map((s) => {
   const icon = (icons as Record<string, { path: string } | undefined>)[`si${s.network[0].toUpperCase()}${s.network.slice(1)}`];
   return { name, url: s.url, path: icon?.path ?? null };
 });
+// "Website by SiteFlo" (config/site.json "credit"), tagged so flomysite.com's analytics show which site sent the visit.
+const creditUrl = `https://www.flomysite.com/?utm_source=${encodeURIComponent(Astro.site?.hostname ?? "site")}&utm_medium=footer&utm_campaign=credit`;
 ---
 
 <footer class:list={["site-footer", extra && "footer-rich"]}>
@@ -63,5 +66,6 @@ const socials = social.map((s) => {
         </ul>
       )}
     </div>
+    {SITE_CONFIG.credit && <p class="footer-credit"><a href={creditUrl}>Website by SiteFlo</a></p>}
   </div>
 </footer>

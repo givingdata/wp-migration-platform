@@ -8,12 +8,16 @@
 //   ],
 //   "searchConsole": "verification-code",
 //   "shareImage": "https://…/share.jpg",
-//   "noindex": false
+//   "noindex": false,
+//   "credit": true
 // }
 //
 // "noindex": true hides the whole site from search engines (demos, staging): a robots meta tag on
 // every page, X-Robots-Tag on every response, robots.txt disallowing everything, and no sitemap
 // (astro.config.mjs reads the same flag).
+//
+// "credit" (default true) shows "Website by SiteFlo" at the bottom of the footer, linking to
+// flomysite.com. Set it to false for a client who has arranged to leave it off.
 
 import config from "../../../config/site.json";
 
@@ -32,6 +36,7 @@ interface SiteConfig {
   searchConsole: string | null;
   shareImage: string | null;
   noindex: boolean;
+  credit: boolean;
 }
 
 function fail(msg: string): never {
@@ -83,7 +88,8 @@ function load(raw: any): SiteConfig {
   const shareImage = raw?.shareImage ? String(raw.shareImage) : null;
   if (shareImage && !/^(https:\/\/|\/)/.test(shareImage)) fail("shareImage must be an https URL or a /path");
   if (raw?.noindex !== undefined && typeof raw.noindex !== "boolean") fail("noindex must be true or false");
-  return { analytics, searchConsole, shareImage, noindex: raw?.noindex === true };
+  if (raw?.credit !== undefined && typeof raw.credit !== "boolean") fail("credit must be true or false");
+  return { analytics, searchConsole, shareImage, noindex: raw?.noindex === true, credit: raw?.credit !== false };
 }
 
 export const SITE_CONFIG = load(config);
