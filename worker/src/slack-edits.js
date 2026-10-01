@@ -30,6 +30,7 @@
 // Approve card shows it. Photos inside body text, and removing photos, aren't supported.
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
+import { recordUsage } from "./usage.js";
 import { EditError, DESIGNED, redirectSource, redirectTarget } from "../../lib/edit/index.js";
 import { checkSlotChanges } from "../../lib/edit/sections.js";
 import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
@@ -101,6 +102,7 @@ async function ask(env, { task, user, schema, maxTokens, image }) {
     // A photo goes before the text, as Claude's docs recommend.
     messages: [{ role: "user", content: image ? [{ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } }, { type: "text", text: user }] : user }],
   });
+  await recordUsage(env, "slack", response);
   if (response.stop_reason === "refusal") {
     const category = response.stop_details?.category ?? "unspecified";
     throw new ClaudeError(`Claude declined to process this request (${category})`, 422);

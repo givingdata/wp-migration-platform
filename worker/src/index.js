@@ -12,6 +12,7 @@
 import specs from "../../config/design-specs.json" with { type: "json" };
 import { authenticate, AuthError, safeEqual } from "./auth.js";
 import { structureContent, ClaudeError } from "./claude.js";
+import { usageSummary } from "./usage.js";
 import { storeImage, saveSubmission, getSubmission, listSubmissions } from "./cloudflare.js";
 import { editorFor, GitHubError } from "./content.js";
 import { handleEditRoute } from "./edit-routes.js";
@@ -246,6 +247,12 @@ export default {
       }
       const edit = await handleEditRoute(request, env, () => editorFor(env));
       if (edit) return json(edit.body, edit.status, request, env);
+      // Claude usage and estimated cost by month (dashboard).
+      if (pathname === "/usage" && request.method === "GET") {
+        await requireApiKey(request, env);
+        if (!env.CONTENT) throw new HttpError("No KV namespace bound", 500);
+        return json({ success: true, months: await usageSummary(env) }, 200, request, env);
+      }
       if (pathname === "/content" && request.method === "GET") {
         await requireApiKey(request, env);
         return json({ success: true, items: await listSubmissions(env) }, 200, request, env);

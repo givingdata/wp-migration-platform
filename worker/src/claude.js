@@ -1,7 +1,8 @@
 // Turns raw form input into a clean, site-ready content entry using Claude.
 import Anthropic from "@anthropic-ai/sdk";
+import { recordUsage } from "./usage.js";
 
-export const DEFAULT_MODEL = "claude-opus-5";
+export const DEFAULT_MODEL = "claude-opus-5-5";
 
 // Structured-output schema: every property required, nullable where optional.
 function entrySchema() {
@@ -72,6 +73,7 @@ export async function structureContent(env, submission, typeSpec) {
       },
     ],
   });
+  await recordUsage(env, "form", response);
 
   if (response.stop_reason === "refusal") {
     const category = response.stop_details?.category ?? "unspecified";

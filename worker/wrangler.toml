@@ -15,7 +15,7 @@ CONTENT_PATH = "content.json"
 R2_PUBLIC_URL = ""
 # Comma-separated origins allowed to call the Worker (the form's host)
 ALLOWED_ORIGINS = "http://localhost:8080"
-# CLAUDE_MODEL = "claude-opus-5"
+# CLAUDE_MODEL = "claude-opus-5-5"
 # Slack (optional, docs/SLACK.md). The bot only acts in these channels, for these staff.
 # scripts/slack-add-client.mjs fills these in for the shared 1WP app (router mode).
 # SLACK_CLIENT = ""

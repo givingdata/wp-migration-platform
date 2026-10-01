@@ -6,7 +6,7 @@ Cloudflare Worker behind the staff form. One submission flows through:
 POST /submit (multipart)
   → API key + HMAC-SHA256 check
   → image → R2 original + WebP variants (Images binding: resize + crop to the type's aspect ratio)
-  → Claude (claude-opus-5, JSON-schema output) → clean title / slug / summary / HTML body
+  → Claude (claude-opus-5-5, JSON-schema output; usage → KV usage:<month>:…) → clean title / slug / summary / HTML body
   → KV  content:<id>  (full record + status)
   → GitHub commit to content.json (through the Edit module, lib/edit) → Pages rebuild
 ```
@@ -45,7 +45,7 @@ wrangler deploy
 | `R2_PUBLIC_URL` | `[vars]` | Public base of the media bucket (custom domain / r2.dev) |
 | `ALLOWED_ORIGINS` | `[vars]` | Comma-separated origins for CORS (the form's URL) |
 | `SITE_NAME` | `[vars]` | Used in Claude's instructions |
-| `CLAUDE_MODEL` | `[vars]`, optional | Defaults to `claude-opus-5` |
+| `CLAUDE_MODEL` | `[vars]`, optional | Defaults to `claude-opus-5-5` |
 | `CONTENT` / `MEDIA` / `IMAGES` | bindings | KV, R2 bucket, Cloudflare Images |
 
 Image rules (aspect ratio, breakpoints, accepted types, max size, quality) come from
@@ -109,6 +109,15 @@ Errors — `{ "success": false, "error": "…", "fields": { "<name>": "<problem>
 
 Bearer API key required. Returns the KV record (`status`: `structured` → `committed`, or
 `commit_failed` with `error`) or the latest 50 submissions.
+
+### `GET /usage`
+
+Bearer API key required. Claude calls and estimated cost for the last 3 months, newest first:
+`{ months: [{ month, calls, inputTokens, outputTokens, cost, unpriced, byFeature: { slack, form }, byModel }] }`.
+Every Claude call (staff form and Slack) saves one KV key `usage:<YYYY-MM>:…` (kept ~13 months)
+and logs a `claude-usage` line (`npx wrangler tail`). Costs are estimates from the prices in
+`src/usage.js` (update them when Anthropic's change); the Claude Console has the actual bill.
+The dashboard shows these numbers on each client.
 
 ### `GET /specs`, `GET /health`
 

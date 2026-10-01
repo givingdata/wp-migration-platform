@@ -52,9 +52,13 @@ function setup(content = base()) {
   const store = memoryStore(content);
   const editor = createEditor({ store, specs });
   const kv = new Map();
+  const usage = []; // Claude usage records (src/usage.js), kept apart from proposals
   const env = {
     CLAUDE_API_KEY: "k", SITE_NAME: "Test Museum",
-    CONTENT: { get: async (k) => kv.get(k) ?? null, put: async (k, v, opts) => kv.set(k, v) && (kv.opts = opts) },
+    CONTENT: {
+      get: async (k) => kv.get(k) ?? null,
+      put: async (k, v, opts) => (k.startsWith("usage:") ? usage.push(opts.metadata) : kv.set(k, v) && (kv.opts = opts)),
+    },
   };
   const queue = [];
   const requests = [];
@@ -70,7 +74,7 @@ function setup(content = base()) {
     }), { headers: { "content-type": "application/json" } });
   };
   const claude = (...bodies) => queue.push(...bodies.map((body) => ({ body })));
-  return { store, editor, env, kv, requests, claude, queue };
+  return { store, editor, env, kv, usage, requests, claude, queue };
 }
 
 const nulls = (fields) => Object.fromEntries(fields.map((f) => [f, null]));
@@ -144,6 +148,8 @@ test("reply: a delete request is not turned into a change", async () => {
   assert.deepEqual(out, { kind: "reply", text: "I can't delete pages; ask your web team." });
   assert.equal(ctx.kv.size, 0);
   assert.equal(ctx.requests.length, 1, "no second call");
+  assert.equal(ctx.usage.length, 1, "the Claude call is still counted");
+  assert.equal(ctx.usage[0].f, "slack");
 });
 
 test("reply when Claude's draft changes nothing, or picks an entry that doesn't exist", async () => {

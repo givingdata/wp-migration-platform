@@ -18,7 +18,7 @@
 //   --out NAME             default sections.draft (→ NAME.json + NAME.md)
 //   --merge                write the last draft (NAME.json) into sections.json instead of drafting
 //   --site-name NAME       default: SITE_NAME env, else the site's hostname
-// Env: CLAUDE_API_KEY or ANTHROPIC_API_KEY; CLAUDE_MODEL (default claude-opus-5).
+// Env: CLAUDE_API_KEY or ANTHROPIC_API_KEY; CLAUDE_MODEL (default claude-opus-5-5).
 import fs from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -253,7 +253,7 @@ async function main() {
 
   const apiKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
   const client = new Anthropic(apiKey ? { apiKey } : {});
-  const model = process.env.CLAUDE_MODEL || "claude-opus-5";
+  const model = process.env.CLAUDE_MODEL || "claude-opus-5-5";
   const others = Object.fromEntries(Object.entries(existing.pages || {}).filter(([k]) => !keys.includes(k)));
   const input = [
     `Organization: ${siteName}`,
