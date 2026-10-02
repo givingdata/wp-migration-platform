@@ -342,6 +342,37 @@ each domain, so build a small monitor instead:
 Real downtime on Pages is rare; a bad deploy, a lock that came off, or an expired domain is the
 more realistic risk, which is why the checks look at content and settings as well as status.
 
+## Headless WordPress (planned 2026-10-02; option for Complex-tier sites)
+
+For clients who need to keep WordPress (staff familiarity, large structured content, an RFP
+that asks for it), WordPress stays the editor and source of truth, and the platform builds and
+serves the public site. First candidate: the Vancouver Writers Fest RFP, which accepts
+headless if it meets their requirements. Default clients stay on the JSON + Slack setup.
+
+1. **WordPress moves to a private address** (`cms.<domain>`) behind Cloudflare Access; only
+   staff reach wp-admin. Its host stays the client's (VWF: DreamHost) or moves to a cheap one.
+2. **Publish → rebuild:** a small must-use plugin calls GitHub `repository_dispatch` on
+   `transition_post_status` (covers scheduled posts going live), and the build pulls content
+   from the REST API. `wordpress_export.py` already does the reading; it needs custom post
+   types, custom fields (ACF/Pods, which must be set to show in the API), taxonomy terms and
+   links between records.
+3. **WordPress store for the Edit module:** writes through the REST API with an application
+   password, so Slack edits and the staff form land in WordPress, not `content.json`, and
+   there's one source of truth.
+4. **Carries over from WordPress:** Yoast data (`yoast_head_json`), Redirection rules (read at
+   build into `_redirects`), scheduling, users and roles. **Doesn't:** page builders, form
+   plugins and calendar or shortcode views, which the platform replaces.
+5. **Also needed:** a "Preview on site" route for drafts (authenticated), styles for WordPress
+   core blocks in each theme preset, and the cookie consent banner (Slack section, item 5).
+   VWF also needs Meta Pixel behind consent.
+6. **Related platform work this would bring forward:** linked records (an event lists its
+   authors and venue; an author page lists their events), Pagefind search with filters,
+   and credit/licence fields on media.
+
+Later, for clients who want an admin screen without WordPress: a git-based CMS (Keystatic,
+TinaCMS or Sveltia) that edits the same JSON files, so the Edit module, Slack and the build keep
+working unchanged.
+
 ## Future option: Claude edits the site
 
 Part of the original spec (staff update the site with Claude's help). Today Claude only
