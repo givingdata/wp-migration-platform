@@ -43,10 +43,28 @@ one read of the content) and replies with what could use a look, each with a lin
 the newest news item over 90 days old, no upcoming events, pages that mention last year or the
 year before, placeholder text (lorem ipsum, "coming soon", TBD), links to pages that don't exist
 (one line per page; old WordPress addresses the site redirects don't count), outside links that
-answer 404/410 or can't be reached, and photos without an image description. Outside links are a
-random 15 per check (a Worker gets 50 outgoing requests per run on the free plan), so asking again
-checks others. The findings come from the content, not from Claude; staff then ask for fixes as
-usual.
+answer 404/410 or can't be reached, photos without a description (the main photo, designed
+sections' photos and photos inside the text, counted per page), pages with no summary (Google then
+picks the text itself), search descriptions over ~155 characters, and search titles that several
+pages share or that run over ~60 characters. Search titles and descriptions are worked out the way
+the site renders them (`seo.title`, else "Title | `SITE_NAME`"; `seo.description`, else the
+summary); long automatic titles and missing summaries count for pages only, not news or events;
+noindex pages are skipped. Outside links are a random 15 per check (a Worker gets 50 outgoing
+requests per run on the free plan), so asking again checks others. Long lists stop at 8 with
+"…and N more", and each group ends with what to ask for ("describe the photos on About", "how
+does About look on Google?"). The findings come from the content, not from Claude; staff then ask
+for fixes as usual. The report says "photo descriptions", "search title" and "search
+description", never SEO, meta or alt text.
+
+**Monthly check-up.** On the first weekday of each month, between 10:00 and 17:00 in the site's
+`TIMEZONE`, the bot posts a short summary of the same check in the site's channel (the first of
+`SLACK_CHANNEL_IDS`): how many things could use a look, a line per group with the first three
+pages, and an invitation to ask "is anything out of date?" for the full list. Nothing is posted
+when the check finds nothing. Outside links are left out (they're slow; asking the bot checks
+them). It runs on the router's 10-minute tick (`worker/src/checkup.js`), and a KV marker per month
+(`slack:checkup:YYYY-MM`) makes it post once; a check that fails is tried again on the next tick.
+On by default; `SLACK_CHECKUP = "off"` in the client's `worker/wrangler.toml` turns it off. Router
+mode only.
 
 **Redirects.** When something is removed, its old address sends visitors to its listing page
 (`/news/`, `/events/`…, or the homepage for pages) instead of "page not found", or to the page
@@ -238,6 +256,7 @@ secrets just skip that step.
   SLACK_STAFF_EMAILS = "jane@example.org,bob@gmail.com"
   SLACK_STAFF_DOMAINS = "thecinderellaproject.com"    # everyone with an @thecinderellaproject.com address
   SLACK_HOURLY_LIMIT = "20"                           # requests per person per hour
+  SLACK_CHECKUP = "off"                               # optional: no monthly check-up post
   ```
 
   Lines that still start with `#` are switched off. With no channel, or no staff emails or domains,

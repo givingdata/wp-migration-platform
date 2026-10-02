@@ -23,7 +23,8 @@
 //
 // A change for later ("Friday at 9") is approved the same way; Approve then schedules it, the
 // message says when (with a Cancel button), and onTick (the router's cron, every 10 minutes)
-// publishes it and updates that message like an Approve would.
+// publishes it and updates that message like an Approve would. The same tick posts the monthly
+// check-up (checkup.js) once a month.
 //
 // Nothing publishes without an Approve click. Slack can remove an entry only to the trash (and
 // put it back, or undo a recent change), and can't change the menu or settings. Commits carry the Slack user's email, like the staff form's.
@@ -33,6 +34,7 @@ import { storeImage, previewForClaude } from "./cloudflare.js";
 import { fetchImageLink, findLinkedImage } from "./linked-page.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { rememberDeploy } from "./deploys.js";
+import { runCheckup } from "./checkup.js";
 import {
   proposeEdit, applyProposal, cancelProposal, scheduleProposal, takeDue, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION,
 } from "./slack-edits.js";
@@ -180,7 +182,14 @@ export function slackHandlers(env, getEditor) {
       }
     },
 
-    onTick: () => runScheduled(env, getEditor),
+    // The router's cron: scheduled changes first, then the monthly check-up when it's due (checkup.js).
+    async onTick() {
+      try {
+        return await runScheduled(env, getEditor);
+      } finally {
+        await runCheckup(env, getEditor).catch((e) => console.error("Monthly check-up failed", e?.message || e));
+      }
+    },
 
     async onAction({ actionId, value, user, channel, messageTs }) {
       if (![APPROVE_ACTION, CANCEL_ACTION].includes(actionId) || !channelAllowed(env, channel)) return;
