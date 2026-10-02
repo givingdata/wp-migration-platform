@@ -11,7 +11,8 @@
 //
 // When the bot asks a question instead of drafting, it remembers the request (KV, a day) so the
 // answer carries it: a reply in that thread, or the same person's next channel message within
-// ASK_FOLLOWUP_SECONDS. Other thread replies are ignored, so staff can talk in threads.
+// ASK_FOLLOWUP_SECONDS. Other thread replies are ignored, so staff can talk in threads, except
+// "#3: …" or "skip #3" under a photo descriptions card, which changes it (photo-descriptions.js).
 //
 // A photo posted with (or as) a request is downloaded after the staff check, shown to Claude as
 // a small copy, and stored like a staff-form upload once Claude has picked where it goes. The
@@ -23,7 +24,8 @@
 //
 // A change for later ("Friday at 9") is approved the same way; Approve then schedules it, the
 // message says when (with a Cancel button), and onTick (the router's cron, every 10 minutes)
-// publishes it and updates that message like an Approve would.
+// publishes it and updates that message like an Approve would. The same tick posts the monthly
+// check-up (checkup.js) once a month.
 //
 // Nothing publishes without an Approve click. Slack can remove an entry only to the trash (and
 // put it back, or undo a recent change), and can't change the menu or settings. Commits carry the Slack user's email, like the staff form's.
@@ -33,9 +35,11 @@ import { storeImage, previewForClaude } from "./cloudflare.js";
 import { fetchImageLink, findLinkedImage } from "./linked-page.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { rememberDeploy } from "./deploys.js";
+import { runCheckup } from "./checkup.js";
 import {
   proposeEdit, applyProposal, cancelProposal, scheduleProposal, takeDue, getProposal, proposalBlocks, resultBlocks, APPROVE_ACTION, CANCEL_ACTION,
 } from "./slack-edits.js";
+import { rememberCard, reviseFromThread } from "./photo-descriptions.js";
 
 const siteUrl = (env) => env.SITE_URL || null;
 
@@ -117,7 +121,8 @@ export function slackHandlers(env, getEditor) {
     async onMessage({ channel, user, text, ts, threadTs, files }) {
       if (!channelAllowed(env, channel)) return;
       const asked = await takeQuestion(env, { channel, user, threadTs });
-      if (threadTs && !asked) return; // a thread conversation, not an answer to the bot
+      // A thread conversation, not an answer to the bot (unless it changes a photo descriptions card).
+      if (threadTs && !asked) return void (await quietly(reviseFromThread(env, { channel, user, text, threadTs })));
       const thread = threadTs || ts;
       const reply = (message) => postMessage(env, { channel, threadTs: thread, text: message });
       const request = asked ? withAnswer(asked, text) : text;
@@ -155,6 +160,7 @@ export function slackHandlers(env, getEditor) {
         const result = await proposeEdit(env, getEditor(), { text: request, by: email, requestedBy: user, progress, image, storeImage: store });
         const view = result.kind === "proposal" ? proposalBlocks(result.proposal, { siteUrl: siteUrl(env) }) : { text: result.text };
         await updateMessage(env, { channel, ts: working, ...view });
+        if (result.kind === "proposal" && result.proposal.descriptions) await quietly(rememberCard(env, { channel, thread, ts: working, proposalId: result.proposal.id }));
         if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text, photo }));
       } catch (e) {
         console.error("Slack draft failed", e.message);
@@ -180,7 +186,14 @@ export function slackHandlers(env, getEditor) {
       }
     },
 
-    onTick: () => runScheduled(env, getEditor),
+    // The router's cron: scheduled changes first, then the monthly check-up when it's due (checkup.js).
+    async onTick() {
+      try {
+        return await runScheduled(env, getEditor);
+      } finally {
+        await runCheckup(env, getEditor).catch((e) => console.error("Monthly check-up failed", e?.message || e));
+      }
+    },
 
     async onAction({ actionId, value, user, channel, messageTs }) {
       if (![APPROVE_ACTION, CANCEL_ACTION].includes(actionId) || !channelAllowed(env, channel)) return;

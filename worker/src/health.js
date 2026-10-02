@@ -8,9 +8,21 @@
 //   links      links to pages on this site that don't exist (old WordPress addresses that the
 //              site redirects, by slug like the menu, don't count), and outside links that
 //              answer 404/410 or can't be reached (a random MAX_EXTERNAL each time, in parallel)
-//   alt        photos without an image description (for screen readers)
+//   alt        photos without a description (for screen readers): the main photo, designed
+//              sections' photos and photos inside the text, counted per page
+//   summary    pages and entries with no summary or search description, so Google picks the
+//              text itself; search descriptions Google will cut off (over ~155 characters)
+//   title      search titles shared by several pages, or long enough for Google to cut off
+//              (over ~60 characters)
 //
-// Each finding says where (title + address) so staff can ask the bot to fix it.
+// Search titles and descriptions are worked out as the site renders them
+// (site/src/layouts/BaseLayout.astro): `seo.title || "<title> | <site name>"` (the homepage: the
+// site name) and `seo.description || summary`. Pages marked noindex are skipped.
+//
+// Each finding says where (title + address) so staff can ask the bot to fix it. The report
+// (healthReport) and the monthly check-up (checkup.js) group them the same way (GROUPS), each
+// group ending with what to ask for. Staff-facing words: "photo descriptions", "search title",
+// "search description".
 import { htmlToText } from "./slack-edits.js";
 
 const STALE_NEWS_DAYS = 90;
@@ -19,6 +31,9 @@ const STALE_NEWS_DAYS = 90;
 const MAX_EXTERNAL = 15;
 const EXTERNAL_TIMEOUT_MS = 6000;
 const MAX_PER_KIND = 8;
+// Roughly what Google shows before cutting off with "…".
+export const TITLE_MAX = 60;
+export const DESCRIPTION_MAX = 155;
 const PLACEHOLDER = /lorem ipsum|coming soon|\bTB[AD]\b|placeholder text|\[insert/i;
 // Addresses the build redirects anyway (site/redirects.mjs): WordPress archives, files, feeds.
 const HANDLED = /^\/(wp-content|wp-admin|wp-includes|category|tag|author|page|feed|comments|cdn-cgi)(\/|$)|^\/[^/]*\.(xml|txt|pdf|jpe?g|png|gif|webp|svg|docx?|xlsx?|pptx?|zip)$/i;
@@ -54,7 +69,7 @@ function places(all) {
  * Check the site's content. `today` is the business's own date (YYYY-MM-DD).
  * @returns {Promise<{ findings: Array<{ kind: string, title?: string, path?: string, detail: string }>, checked: object }>}
  */
-export async function siteHealth(editor, { today, siteUrl = null, checkExternal = true, fetchImpl = fetch } = {}) {
+export async function siteHealth(editor, { today, siteUrl = null, siteName = "", checkExternal = true, fetchImpl = fetch } = {}) {
   const all = await editor.readAll();
   const findings = [];
   const add = (kind, detail, where = {}) => findings.push({ kind, detail, ...where });
@@ -79,10 +94,10 @@ export async function siteHealth(editor, { today, siteUrl = null, checkExternal 
     const old = [year - 1, year - 2].filter((y) => new RegExp(`\\b${y}\\b`).test(p.text));
     if (old.length) {
       const at = p.text.search(new RegExp(`\\b${old[0]}\\b`));
-      add("years", `Mentions ${old.join(" and ")}: “…${p.text.slice(Math.max(0, at - 50), at + 50).replace(/\s+/g, " ").trim()}…”`, { title: p.title, path: p.path });
+      add("years", `Mentions ${old.join(" and ")}: “…${p.text.slice(Math.max(0, at - 50), at + 50).replace(/\s+/g, " ").trim()}…”`, { title: p.title, path: p.path, years: old, year });
     }
     const ph = p.text.match(PLACEHOLDER);
-    if (ph) add("placeholder", `Has placeholder text (“${ph[0]}”)`, { title: p.title, path: p.path });
+    if (ph) add("placeholder", `Has placeholder text (“${ph[0]}”)`, { title: p.title, path: p.path, match: ph[0] });
   }
 
   // Links.
@@ -138,20 +153,119 @@ export async function siteHealth(editor, { today, siteUrl = null, checkExternal 
     });
   }
 
-  // Image descriptions.
+  // Photo descriptions: one line per page, counting every photo without one.
   for (const e of all.entries) {
-    if (e.entry.image && !String(e.entry.imageAlt || "").trim()) add("alt", "Its main photo has no image description", { title: e.title, path: e.path });
+    const parts = [];
+    if (e.entry.image && !String(e.entry.imageAlt || "").trim()) parts.push([1, "the main photo"]);
+    const inText = photosWithoutAlt(e.entry.content);
+    if (inText) parts.push([inText, "in the text"]);
+    if (parts.length) add("alt", missingPhotos(parts), { title: e.title, path: e.path, photos: total(parts) });
   }
   for (const d of all.designed) {
+    const parts = [];
     for (const s of d.sections) {
+      let n = 0;
       for (const x of s.slots.filter((slot) => slot.kind === "image" && slot.value)) {
         const alt = s.slots.find((slot) => slot.slot === x.slot.replace(/\.src$/, ".alt"));
-        if (alt && !String(alt.value || "").trim()) add("alt", `A photo in ${s.label} has no image description`, { title: d.title, path: d.path });
+        if (alt && !String(alt.value || "").trim()) n++;
       }
+      if (n) parts.push([n, `in ${s.label}`]);
+    }
+    if (parts.length) add("alt", missingPhotos(parts), { title: d.title, path: d.path, photos: total(parts) });
+  }
+
+  // Search titles and descriptions.
+  const listings = searchListings(all, siteName);
+  const byTitle = new Map();
+  for (const l of listings) {
+    const key = l.searchTitle.trim().toLowerCase();
+    if (!byTitle.has(key)) byTitle.set(key, []);
+    byTitle.get(key).push(l);
+  }
+  for (const same of byTitle.values()) {
+    if (same.length < 2) continue;
+    // Same-named pages need their address to tell them apart ("Boutique Day 2018 (/post/…/)").
+    const others = same.slice(1).map((l) => (l.title.trim().toLowerCase() === same[0].title.trim().toLowerCase() ? `${l.title} (${l.path})` : l.title));
+    const named = others.length > 3 ? `${others.slice(0, 3).join(", ")} and ${others.length - 3} more` : joinAnd(others);
+    add("title", `Has the same search title as ${named}: “${same[0].searchTitle}”`, { title: same[0].title, path: same[0].path, pages: same.length });
+  }
+  // Long titles and missing summaries on news, events and the like are common and mostly fine
+  // (Google shows the start of the article), so those count for pages only; titles and
+  // descriptions staff wrote count everywhere.
+  const pageLike = (l) => l.kind === "page" || l.kind === "designed" || l.path === "/";
+  for (const l of listings) {
+    if (l.searchTitle.length > TITLE_MAX && (l.ownTitle || pageLike(l))) add("title", `Search title is ${l.searchTitle.length} characters; Google shows about ${TITLE_MAX}: “${l.searchTitle}”`, { title: l.title, path: l.path });
+  }
+  for (const l of listings) {
+    if (l.written.length > DESCRIPTION_MAX) add("summary", `Search description is ${l.written.length} characters; Google shows about ${DESCRIPTION_MAX}`, { title: l.title, path: l.path });
+    else if (!l.written && !l.fallback && pageLike(l)) {
+      add("summary", l.hasText ? "No summary, so Google shows the first lines of the page instead" : "No summary and no text, so Google gets the site's general description", { title: l.title, path: l.path });
     }
   }
 
   return { findings, checked: { entries: all.entries.length, designed: all.designed.length, external: externalChecked, externalTotal: external.size } };
+}
+
+const total = (parts) => parts.reduce((n, [count]) => n + count, 0);
+const joinAnd = (list) => (list.length < 2 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`);
+
+// "The main photo and 3 photos in the text have no description"
+function missingPhotos(parts) {
+  const words = parts.map(([n, where]) => (where === "the main photo" ? where : `${n} photo${n === 1 ? "" : "s"} ${where}`));
+  const text = joinAnd(words);
+  return `${text[0].toUpperCase()}${text.slice(1)} ${total(parts) === 1 ? "has" : "have"} no description`;
+}
+
+/** Photos (<img>) in body HTML with no alt, or an empty one. */
+export function photosWithoutAlt(html) {
+  let n = 0;
+  for (const [tag] of String(html ?? "").matchAll(/<img\b[^>]*>/gi)) {
+    const alt = tag.match(/\balt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    if (!alt || !String(alt[1] ?? alt[2] ?? alt[3] ?? "").replace(/&nbsp;|&#160;/gi, " ").trim()) n++;
+  }
+  return n;
+}
+
+// The first section text a designed page's description comes from (site/src/lib/sections.ts
+// sectionsDescription: a section's text, intro or first paragraph).
+function sectionsText(sections) {
+  for (const s of sections) {
+    const slot = s.slots.find((x) => [`${s.index}.text`, `${s.index}.intro`, `${s.index}.paragraphs.0`].includes(x.slot) && String(x.value || "").trim());
+    if (slot) return slot.value.trim();
+  }
+  return "";
+}
+
+/**
+ * One search listing per address, as the site renders it: { title, path, searchTitle, written
+ * (search description or summary staff wrote), fallback (section text a designed page uses
+ * instead), hasText, kind (content type, or "designed"), ownTitle }. A designed page wins over the entry it's built on; noindex pages are left out.
+ */
+function searchListings(all, siteName) {
+  const byPath = new Map();
+  for (const e of all.entries) {
+    if (!e.path || byPath.has(e.path)) continue;
+    byPath.set(e.path, { kind: e.type, title: e.title, path: e.path, seo: e.entry.seo || {}, summary: String(e.entry.description || "").trim(), fallback: "", hasText: !!htmlToText(e.entry.content).trim() });
+  }
+  for (const d of all.designed) {
+    const entry = byPath.get(d.path);
+    const fallback = sectionsText(d.sections);
+    // Section text comes before the entry's summary here (site/src/layouts/Post.astro).
+    byPath.set(d.path, { kind: "designed", title: d.title, path: d.path, seo: d.seo || {}, summary: fallback ? "" : entry?.summary || "", fallback, hasText: !!fallback || !!entry?.hasText });
+  }
+  const name = String(siteName || "").trim();
+  return [...byPath.values()]
+    .filter((l) => !l.seo.noindex)
+    .map((l) => ({
+      kind: l.kind,
+      title: l.title,
+      ownTitle: !!String(l.seo.title || "").trim(),
+      path: l.path,
+      searchTitle: String(l.seo.title || "").trim() || (l.path === "/" || !name ? name || l.title : `${l.title} | ${name}`),
+      written: String(l.seo.description || "").trim() || l.summary,
+      fallback: l.fallback,
+      hasText: l.hasText,
+    }));
 }
 
 function sample(list, n) {
@@ -182,9 +296,28 @@ async function checkUrl(url, fetchImpl) {
 // Slack mrkdwn needs &, < and > escaped.
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const HEADINGS = {
-  news: "News", events: "Events", years: "Old dates (still current?)", placeholder: "Placeholder text", links: "Links", alt: "Image descriptions",
-};
+// Report groups, in order, each with what to ask the bot for (naming the group's first page).
+export const GROUPS = [
+  { key: "news", heading: "News", kinds: ["news"], fix: () => "“post this as news: …” with the text or a link" },
+  { key: "events", heading: "Events", kinds: ["events"], fix: () => "“add an event: …” with the details or a link" },
+  { key: "years", heading: "Old dates (still current?)", kinds: ["years"], fix: (page, f) => `“change ${f.years?.[0] ?? "last year"} to ${f.year ?? "this year"} on ${page ?? "the page"}”` },
+  { key: "placeholder", heading: "Placeholder text", kinds: ["placeholder"], fix: (page) => `“remove the placeholder text on ${page ?? "the page"}”` },
+  { key: "links", heading: "Links", kinds: ["links"], fix: (page) => (page ? `“remove the broken links on ${page}”, or say where a link should go` : "“remove the broken link from the menu”, or say where it should go") },
+  { key: "photos", heading: "Photo descriptions", kinds: ["alt"], fix: (page) => `“describe the photos on ${page ?? "the page"}”` },
+  { key: "titles", heading: "Search titles", kinds: ["title"], fix: (page) => `“how does ${page ?? "a page"} look on Google?” (you can change the search title there)` },
+  { key: "descriptions", heading: "Search descriptions", kinds: ["summary"], fix: (page) => `“how does ${page ?? "a page"} look on Google?” (you can change the search description there)` },
+];
+
+/** Findings by report group, in GROUPS order, without empty groups: [{ group, list }]. */
+export function groupFindings(findings) {
+  return GROUPS.map((group) => ({ group, list: findings.filter((f) => group.kinds.includes(f.kind)) })).filter((g) => g.list.length);
+}
+
+/** What to ask for to fix a group, naming its first page (Slack-escaped). */
+export function fixHint({ group, list }) {
+  const first = list.find((f) => f.title && f.path);
+  return `Ask me: ${esc(group.fix(first?.title ?? null, first ?? list[0]))}`;
+}
 
 /** The Slack reply: grouped findings with where they are, and what to ask for next. */
 export function healthReport({ findings, checked }, { siteUrl = null } = {}) {
@@ -193,13 +326,12 @@ export function healthReport({ findings, checked }, { siteUrl = null } = {}) {
   const scope = `I checked ${checked.entries + checked.designed} pages and entries${checked.externalTotal ? ` and ${checked.external} outside link${checked.external === 1 ? "" : "s"}${checked.externalTotal > checked.external ? ` (a random ${checked.external} of ${checked.externalTotal}; ask again to check others)` : ""}` : ""}.`;
   if (!findings.length) return `✅ Nothing looks out of date. ${scope}`;
   const lines = [`Here's what could use a look. ${scope}`];
-  for (const kind of Object.keys(HEADINGS)) {
-    const list = findings.filter((f) => f.kind === kind);
-    if (!list.length) continue;
-    lines.push("", `*${HEADINGS[kind]}*`);
-    for (const f of list.slice(0, MAX_PER_KIND)) lines.push(`• ${f.title || f.path ? `${where(f)}: ` : ""}${esc(f.detail)}`);
-    if (list.length > MAX_PER_KIND) lines.push(`• …and ${list.length - MAX_PER_KIND} more`);
+  for (const g of groupFindings(findings)) {
+    lines.push("", `*${g.group.heading}*`);
+    for (const f of g.list.slice(0, MAX_PER_KIND)) lines.push(`• ${f.title || f.path ? `${where(f)}: ` : ""}${esc(f.detail)}`);
+    if (g.list.length > MAX_PER_KIND) lines.push(`• …and ${g.list.length - MAX_PER_KIND} more`);
+    lines.push(`→ ${fixHint(g)}`);
   }
-  lines.push("", "Ask me to fix any of these, e.g. “change 2025 to 2026 on the About page” or “add an image description to the photo on the Contact page”.");
+  lines.push("", "Ask me to fix any of these, or check again once you've made changes.");
   return lines.join("\n");
 }

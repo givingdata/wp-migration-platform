@@ -7,7 +7,10 @@ import { signedJson, signedMultipart } from "./signing.js";
 import { initMenu } from "./menu.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
-const FIELDS = ["title", "description", "date", "endDate", "time", "location", "author", "linkUrl", "imageAlt"];
+const FIELDS = ["title", "description", "date", "endDate", "time", "location", "author", "linkUrl", "imageAlt", "seo.title", "seo.description"];
+// The search title and description live in entry.seo (lib/edit/search.js).
+const fieldValue = (entry, f) => (f.startsWith("seo.") ? entry?.seo?.[f.slice(4)] : entry?.[f]) ?? "";
+const SEARCH_SLOTS = [["seo.title", "Search title", "text"], ["seo.description", "Search description", "textarea"]];
 const PAGE_LABEL = "Pages";
 const DESIGNED = "designed";
 
@@ -184,13 +187,13 @@ export function initEdit({ config, specs, escapeHtml }) {
     showUrl(current.path);
     editForm.querySelectorAll("[data-edit-field]").forEach((el) => {
       const name = el.dataset.editField;
-      el.hidden = name === "imageAlt" ? !entry.image : !fields.has(name);
+      el.hidden = name === "imageAlt" ? !entry.image : name === "search" ? false : !fields.has(name);
     });
     editForm.querySelectorAll("[data-edit-label]").forEach((el) => {
       el.textContent = type.fieldLabels?.[el.dataset.editLabel] || (el.dataset.editLabel === "endDate" ? "End date" : "Link");
     });
     $("e-date-label").textContent = type.dateLabel || "Date";
-    for (const f of FIELDS) if (editForm.elements[f]) editForm.elements[f].value = entry[f] ?? "";
+    for (const f of FIELDS) if (editForm.elements[f]) editForm.elements[f].value = fieldValue(entry, f);
 
     const notes = [];
     if (current.frontPage) notes.push("This is the homepage. It can be changed but not deleted.");
@@ -263,11 +266,13 @@ export function initEdit({ config, specs, escapeHtml }) {
 
   function renderDesigned() {
     let n = 0;
-    designedBox.innerHTML = current.entry.sections
+    // The page's search title and description, after its sections (saved with the same changes).
+    const search = { label: "How it looks on Google", slots: SEARCH_SLOTS.map(([slot, label, kind]) => ({ slot, label, kind, optional: true, value: fieldValue(current.entry, slot) })) };
+    designedBox.innerHTML = [...current.entry.sections, search]
       .filter((s) => s.slots.length)
       .map((s) => `<fieldset class="designed-section"><legend>${escapeHtml(s.label)}</legend>${s.slots.map((slot) => slotField(slot, n++)).join("")}</fieldset>`)
       .join("");
-    current.initial = Object.fromEntries(current.entry.sections.flatMap((s) => s.slots).map((s) => [s.slot, s.value]));
+    current.initial = Object.fromEntries([...current.entry.sections, search].flatMap((s) => s.slots).map((s) => [s.slot, s.value]));
   }
 
   function openDesigned(data) {
@@ -413,7 +418,7 @@ export function initEdit({ config, specs, escapeHtml }) {
       const input = editForm.elements[f];
       if (!input || input.closest("[data-edit-field]")?.hidden) continue;
       const value = input.value.trim();
-      if (value !== String(current.entry[f] ?? "")) changes[f] = value;
+      if (value !== String(fieldValue(current.entry, f))) changes[f] = value;
     }
     const html = contentHtml();
     if (html !== loadedHtml) changes.content = html;

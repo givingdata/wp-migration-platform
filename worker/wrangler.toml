@@ -8,6 +8,9 @@ enabled = true
 
 [vars]
 SITE_NAME = "Your Organization"
+# The site's tagline, for the Slack bot's "how does it look on Google?" on a homepage with no
+# description of its own. Deploy Worker fills it in from the GitHub variable SITE_TAGLINE.
+# SITE_TAGLINE = ""
 GITHUB_REPO = "OWNER/CLIENT-site"
 GITHUB_BRANCH = "main"
 CONTENT_PATH = "content.json"
@@ -24,6 +27,9 @@ ALLOWED_ORIGINS = "http://localhost:8080"
 # SLACK_STAFF_EMAILS = ""
 # SLACK_STAFF_DOMAINS = ""
 # SLACK_HOURLY_LIMIT = "20"
+# Monthly check-up posted in the channel (first weekday, 10:00–17:00 in TIMEZONE; worker/src/checkup.js).
+# On by default; "off" turns it off.
+# SLACK_CHECKUP = "off"
 
 # Visitor numbers for the Slack bot (worker/src/analytics.js): "sample" (demo sites, made-up and
 # labelled) or "cloudflare" (Web Analytics; also CF_ACCOUNT_ID, ANALYTICS_SITE_TAG and the

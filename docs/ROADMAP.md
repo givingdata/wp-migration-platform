@@ -240,8 +240,12 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
     outside links (random 15 per run: free-plan 50-subrequest limit), missing image
     descriptions. Report written in code, not by Claude. Tried on Cinderella's content: found
     real dead links (a Google Form, expired event pages), homepage photos without descriptions,
-    2024/2025 mentions, and old NextGEN gallery links. Later: a weekly check posted to the
-    channel on the router's cron.
+    2024/2025 mentions, and old NextGEN gallery links. Stage 3 (2026-10-02): photos without
+    descriptions inside page text, missing summaries, repeated or long search titles, long
+    search descriptions; each group ends with what to ask for. Monthly check-up
+    (`worker/src/checkup.js`): first weekday of the month, 10:00–17:00 site time, on the
+    router's tick, once per month (KV marker), only with findings, no outside links;
+    `SLACK_CHECKUP = "off"` turns it off.
 
 Follow-ups from building 11–22:
 

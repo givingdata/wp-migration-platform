@@ -296,8 +296,17 @@ export async function postMessage(env, { channel, threadTs, text, blocks }) {
 
 /** chat.update: replace a message's text/blocks (e.g. swap buttons for "Approved by …"). */
 export async function updateMessage(env, { channel, ts, text, blocks }) {
-  await slackApi(env, "chat.update", { channel, ts, text, ...(blocks ? { blocks } : {}) });
+  try {
+    await slackApi(env, "chat.update", { channel, ts, text, ...(blocks ? { blocks } : {}) });
+  } catch (e) {
+    // Slack rejects the whole message when it can't load one image; show those as links instead.
+    if (!(e instanceof SlackError) || !/invalid_blocks/.test(e.message) || !blocks?.some((b) => b.type === "image")) throw e;
+    await slackApi(env, "chat.update", { channel, ts, text, blocks: blocks.map(imageAsLink) });
+  }
 }
+
+const imageAsLink = (b) =>
+  b.type === "image" ? { type: "section", text: { type: "mrkdwn", text: `🖼 <${b.image_url}|${b.title?.text || "Photo"}>${b.alt_text ? `: ${b.alt_text}` : ""}` } } : b;
 
 /** A Slack user's email (lowercased) via users.info, cached a day in KV. null if hidden/absent. */
 export async function userEmail(env, userId) {

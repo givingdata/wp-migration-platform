@@ -63,13 +63,14 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Add or change analytics (GA4, Tag Manager, Cloudflare, Plausible, Fathom, Matomo, Meta, custom) | Edit `analytics` in `config/site.json`, push. A Universal Analytics `UA-` ID fails the build on purpose (dead since July 2023) |
 | Remove the "Website by SiteFlo" footer credit (a client arranged to leave it off) | `"credit": false` in `config/site.json`, push. On by default; not something staff can change from the form or Slack |
 | Hide the whole site from search engines (a demo or staging site) | `"noindex": true` in `config/site.json`, push: robots meta + `X-Robots-Tag` on every page, robots.txt disallows everything, no sitemap |
-| Change a page's search title/description, or hide it from search | Add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push |
+| Change a page's search title/description, or hide it from search | Staff: the form's **How it looks on Google** fields, or ask the Slack bot ("how does About look on Google?", "use this as the share image for …"). Or add `"seo": {"title", "description", "image", "noindex"}` to the entry in `content.json` (or the page in `sections.json`), push; `noindex` is only set this way |
 | Redirect an old address | Add `from,to[,status]` to `redirects.csv` (see `redirects.csv.example`), push. Staff can also ask the Slack bot (kept in `content.json` → `redirects`); removed entries redirect to their listing automatically (from `trash.json`) |
 | Before switching the domain | `node scripts/check-redirects.mjs --new https://<preview or new site> --old https://<WordPress site>`: lists old addresses that don't reach a working page |
 | Images moved to a new domain | `R2_PUBLIC_URL=https://media.<domain> python wordpress_export.py --output content.json --media-only` |
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |
 | Let Slack answer "how many visits?" | Turn on Web Analytics for the site in Cloudflare; in the client's `worker/wrangler.toml` set `ANALYTICS_SOURCE = "cloudflare"`, `CF_ACCOUNT_ID`, `ANALYTICS_SITE_TAG`, and `TIMEZONE` (e.g. `America/Vancouver`), then `npx wrangler secret put CF_ANALYTICS_TOKEN` (Account Analytics: Read), push. Demo sites: `ANALYTICS_SOURCE = "sample"` (made-up numbers, labelled) |
+| Stop the monthly Slack check-up for a site | `SLACK_CHECKUP = "off"` under `[vars]` in the client's `worker/wrangler.toml`, push (on by default: first weekday of the month, only when the site check finds something; `docs/SLACK.md`) |
 | Let staff request edits from Slack | `node ../../platform/scripts/slack-add-client.mjs <client> --domain <domain> --push` in the client folder (shared SiteFlo app via the `slack-router/` Worker), then invite their staff to the FloMySite.com workspace; `docs/SLACK.md` |
 
 ### Rarely / never

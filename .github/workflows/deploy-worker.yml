@@ -52,6 +52,19 @@ jobs:
           fi
           grep -E '^(id|bucket_name|R2_PUBLIC_URL|ALLOWED_ORIGINS) =' wrangler.toml
 
+      # The site's tagline (GitHub variable SITE_TAGLINE) for the Slack bot's Google preview.
+      - name: Site tagline
+        env:
+          TAGLINE: ${{ vars.SITE_TAGLINE }}
+        run: |
+          node -e '
+            const fs = require("fs"); const t = process.env.TAGLINE;
+            if (!t) process.exit(0);
+            const s = fs.readFileSync("wrangler.toml", "utf8").replace(/^#? ?SITE_TAGLINE = .*\n/m, "");
+            fs.writeFileSync("wrangler.toml", s.replace(/^\[vars\]$/m, "[vars]\nSITE_TAGLINE = " + JSON.stringify(t)));
+          '
+          grep -E '^SITE_TAGLINE =' wrangler.toml || true
+
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         env:

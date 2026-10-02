@@ -25,8 +25,20 @@ photo of a news item, event or other entry that shows one, an image on a designe
 entry) and writes the image description for screen readers. The photo is stored and resized like a
 staff-form upload, and the Approve card shows it (before and after). Post a photo without a message
 and the bot asks where it goes; answer in the thread, no need to post the photo again. One photo
-per message. Not yet: photos inside a page's text, and removing photos. Needs the `files:read`
+per message. Not yet: putting new photos inside a page's text, and removing photos. Needs the `files:read`
 scope (see below).
+
+**Photo descriptions.** *"Describe the photos on the About page"* or *"fix missing photo
+descriptions"* (no page: the one with the most goes first): the bot finds photos with no
+description (`<img>` in the body text with no or empty `alt`, a main photo without `imageAlt`, a
+designed page's image whose description is empty), downloads up to 10 (shrunk for Claude; ones it
+can't open are left out and counted), and Claude describes them from what it sees plus the page
+title and nearby text (one sentence under 150 characters, no names of people). One card shows each
+photo numbered with its description and says how many are left on that page and how many other
+pages need them. Before Approve, a reply in the card's thread changes it: *"#3: Volunteers sorting
+donations"* or *"skip #3"*; the card updates in place. Approve is an ordinary update (only the
+`alt` of those tags changes; other attributes stay as they were), so undo works. Code:
+`worker/src/photo-descriptions.js`.
 
 **Removing and undoing.** *"Take down the Spring Gala event"* gives a **Remove** card (red
 button). On Approve the entry comes off the site and goes to `trash.json` with who removed it and
@@ -43,10 +55,44 @@ one read of the content) and replies with what could use a look, each with a lin
 the newest news item over 90 days old, no upcoming events, pages that mention last year or the
 year before, placeholder text (lorem ipsum, "coming soon", TBD), links to pages that don't exist
 (one line per page; old WordPress addresses the site redirects don't count), outside links that
-answer 404/410 or can't be reached, and photos without an image description. Outside links are a
-random 15 per check (a Worker gets 50 outgoing requests per run on the free plan), so asking again
-checks others. The findings come from the content, not from Claude; staff then ask for fixes as
-usual.
+answer 404/410 or can't be reached, photos without a description (the main photo, designed
+sections' photos and photos inside the text, counted per page), pages with no summary (Google then
+picks the text itself), search descriptions over ~155 characters, and search titles that several
+pages share or that run over ~60 characters. Search titles and descriptions are worked out the way
+the site renders them (`seo.title`, else "Title | `SITE_NAME`"; `seo.description`, else the
+summary); long automatic titles and missing summaries count for pages only, not news or events;
+noindex pages are skipped. Outside links are a random 15 per check (a Worker gets 50 outgoing
+requests per run on the free plan), so asking again checks others. Long lists stop at 8 with
+"…and N more", and each group ends with what to ask for ("describe the photos on About", "how
+does About look on Google?"). The findings come from the content, not from Claude; staff then ask
+for fixes as usual. The report says "photo descriptions", "search title" and "search
+description", never SEO, meta or alt text.
+
+**Monthly check-up.** On the first weekday of each month, between 10:00 and 17:00 in the site's
+`TIMEZONE`, the bot posts a short summary of the same check in the site's channel (the first of
+`SLACK_CHANNEL_IDS`): how many things could use a look, a line per group with the first three
+pages, and an invitation to ask "is anything out of date?" for the full list. Nothing is posted
+when the check finds fewer than three things. Outside links are left out (they're slow; asking the bot checks
+them). It runs on the router's 10-minute tick (`worker/src/checkup.js`), and a KV marker per month
+(`slack:checkup:YYYY-MM`) makes it post once; a check that fails is tried again on the next tick.
+On by default; `SLACK_CHECKUP = "off"` in the client's `worker/wrangler.toml` turns it off. Router
+mode only.
+
+**How it looks on Google.** *"How does the About page look on Google?"* (or *"search preview for
+the homepage"*) replies with a mock search result (`worker/src/search-preview.js`, read-only): the
+title and description exactly as the site renders them (`lib/edit` `searchPages()`, which follows
+`BaseLayout.astro`), the address, where each comes from when the page has no search title or
+description of its own (title + site name; its summary, the start of its text, or the site's
+tagline), and its share image. Warnings in plain words: a title over ~60 or a description over
+~155 characters (likely cut off), a missing or short description, and a title or description
+another page also uses. *"Make the search description for About mention free prom dresses"* is an
+ordinary change (Approve, undo); the drafting prompt only touches the search title/description
+when the request is about Google, search or shared links. They're stored in the entry's (or
+designed page's) `seo` object; a search title is used exactly as written. Post a photo with
+*"use this as the share image for the Events page"* to set the picture shown when someone shares
+a link (`seo.image`, cropped to 1.91:1). The homepage's tagline fallback is only shown if the
+Worker has `SITE_TAGLINE` (Deploy Worker copies the GitHub variable `SITE_TAGLINE` into it);
+otherwise the preview says "your site's tagline". Staff never see the words SEO or meta.
 
 **Redirects.** When something is removed, its old address sends visitors to its listing page
 (`/news/`, `/events/`…, or the homepage for pages) instead of "page not found", or to the page
@@ -238,6 +284,7 @@ secrets just skip that step.
   SLACK_STAFF_EMAILS = "jane@example.org,bob@gmail.com"
   SLACK_STAFF_DOMAINS = "thecinderellaproject.com"    # everyone with an @thecinderellaproject.com address
   SLACK_HOURLY_LIMIT = "20"                           # requests per person per hour
+  SLACK_CHECKUP = "off"                               # optional: no monthly check-up post
   ```
 
   Lines that still start with `#` are switched off. With no channel, or no staff emails or domains,
