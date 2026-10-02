@@ -96,9 +96,10 @@ as regular members, one private channel per client, served by one SiteFlo app th
 manual step is inviting their staff to the workspace. Cinderella moves from its own app setup to the
 router as the first client (that move also gives it a new bot token, item 3 below).
 
-**Status 2026-09-30:** items 1, 3, 4, 11–15, 21 and 22 are built and live on the demo and
+**Status 2026-10-02:** items 1–4, 8, 9, 11–15, 21, 22 and 23 are built and live on the demo and
 Cinderella (router redeployed with its cron). Tested by hand in #demo: remove + undo, a new phone
-number everywhere, a news item from a link. Items 5–9, 10 and 16–20 are open.
+number everywhere, a news item from a link. Items 5–7, 10 and 16–20 are open. What staff can do
+is listed for customers in `docs/FEATURES.md`.
 
 Next (planned for 2026-09-25):
 
@@ -145,7 +146,7 @@ Next (planned for 2026-09-25):
    variable (for example `America/Vancouver`), or days are counted in UTC. `ops/provision.mjs` and
    the dashboard's **Set up clients** page don't set it yet: add a time zone field (default from
    the client's location) and write it into `worker/wrangler.toml`.
-8. **SEO title and description from Slack (planned 2026-09-29).** Today the bot can't edit an
+8. **SEO title and description from Slack (built 2026-10-02, item 23).** The original plan: Today the bot can't edit an
    entry's `seo` block. Without one, the `<title>` and meta description come from the title and
    Summary (or the start of the body), so ordinary text edits change them as a side effect. With
    one (for example imported from Yoast), text edits don't reach the meta tags, and there's no
@@ -153,7 +154,8 @@ Next (planned for 2026-09-25):
    `worker/src/slack-edits.js`, with length limits (about 60 and 160 characters), before/after on
    the Approve card, and a prompt rule to use them only when staff ask about how the page appears
    in search or when shared. Keep `noindex`, `canonical` and the share image off-limits.
-9. **Show a page's images in Slack (planned 2026-09-29).** Today the bot only shows a site image
+9. **Show a page's images in Slack (built 2026-10-02 as "show the photo descriptions on
+   About", item 23: each photo as an image block with its place and description).** The plan: Today the bot only shows a site image
    on the Approve card of a photo change ("Before"); asking "what photos are on the About page?"
    gets the "what I can do" reply, and its own links don't unfurl. Add a `show` action in
    `worker/src/slack-edits.js` that replies with the page's images as Slack image blocks, each
@@ -246,6 +248,18 @@ More things staff could change from Slack (ideas 2026-09-30, cheapest first):
     (`worker/src/checkup.js`): first weekday of the month, 10:00–17:00 site time, on the
     router's tick, once per month (KV marker), only with findings, no outside links;
     `SLACK_CHECKUP = "off"` turns it off.
+23. **Search and photo descriptions (built 2026-10-02 in four stages; `docs/SLACK.md`).**
+    - **Photo descriptions** (`worker/src/photo-descriptions.js`): "describe the photos on About"
+      → Claude looks at each photo missing a description (a page at a time) and drafts one; staff
+      approve. Also show a page's descriptions, change one to staff's own words, or rewrite all.
+    - **Google preview and search fields** (`worker/src/search-preview.js`, `lib/edit/search.js`):
+      how a page looks in Google with length and repeat warnings; change `seo.title`,
+      `seo.description` and the share image (`seo.image`, from a posted photo or link).
+    - **Search checks** in the health check (item 22, stage 3).
+    - **Monthly check-up** posts only with three or more findings (`MIN_FINDINGS`).
+    - Deploy Worker passes the site tagline (`SITE_TAGLINE`) so previews match the site.
+    - Not yet: photo descriptions haven't been tried against real photos in Slack (Claude
+      vision); the demo has no `SITE_TAGLINE` repo variable.
 
 Follow-ups from building 11–22:
 
@@ -256,6 +270,22 @@ Follow-ups from building 11–22:
 - **Time-zone data differs between Node versions** (B.C.'s permanent daylight time is in newer
   data): tests must check against the runtime's own rules, never a hard-coded offset.
 - **Schedule photos**, and the **linked page's image** as the entry's photo (licence permitting).
+- **Slack cards with an image Slack can't load** now fall back to links instead of failing
+  (`slack.js` `updateMessage`). A photo carried over from an earlier message is dropped when the
+  next request isn't about it (fixed a loop, 2026-10-02).
+
+## Nightly rebuild (changed 2026-10-02)
+
+`rebuild.yml` runs on a schedule (06:00 UTC cron; GitHub usually starts it around 5 a.m.
+Pacific) so announcements expire and events move to "past". A small `check` job
+(`scripts/rebuild-needed.mjs`) now skips the build on nights when nothing changes by date: it
+builds when a dated entry started or ended in the last two days, on Mondays (safety net), and on
+1–2 January (footer year). Pushes, manual runs and any error always build.
+
+- **Cost:** GitHub rounds each job up to a whole minute, so a skipped night costs 1 minute (the
+  check) and a build night 2 (check + build, about 45 s each), the same on average as building
+  every night (~30 min/month per client). Kept as is (2026-10-02). If minutes matter at scale,
+  fold the check into the build job so skips cost 1 minute and builds 1.
 
 ## Sales previews (built 2026-09-25 to 09-28; `ops/preview.mjs`)
 
@@ -320,6 +350,12 @@ How to choose them:
    that still look good with real brands and content.
 6. **Later: the assessor recommends a template** for the prospect's type of site and builds the
    preview in it.
+
+**Built so far (2026-10-02):** parallax on hero photos and a new **photo scenes** section
+(full-width photos with a text card over each), with strength per section (`parallax: subtle |
+medium | strong`, medium by default). CSS scroll-driven animations with a small script for Firefox;
+off for visitors who prefer reduced motion. Live on Cinderella's `sections` preview; not used on the
+demo homepage yet.
 
 Possible first step: summarise past assessor scans by client type to decide which three
 templates to find first.

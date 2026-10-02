@@ -12,8 +12,9 @@ redeploy.
 | `event` | Event | `events` | `/events/` | Upcoming and past, split on the end date (or date) |
 | `announcement` | Announcement | `announcements` | `/announcements/` | Short notice; shows in a banner at the top of the homepage from **Show from** until **Show until** (no end date: until deleted) |
 
-Dates are checked when the site is built. `rebuild.yml` rebuilds every day at 06:00 UTC, so
-announcements appear and expire, and events move to "past", without anyone committing.
+Dates are checked when the site is built. `rebuild.yml` rebuilds early each morning (06:00 UTC
+schedule) on nights when a date passes, so announcements appear and expire, and events move to
+"past", without anyone committing (`scripts/rebuild-needed.mjs` skips the other nights).
 
 ## Settings for a type
 
