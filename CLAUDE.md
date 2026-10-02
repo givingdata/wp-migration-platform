@@ -70,7 +70,7 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 | Rotate the form API key (leak / staff leaving) | `FORM_API_KEY=<new> bash scripts/deploy.sh`, and update the `FORM_API_KEY` GitHub secret |
 | Re-import from WordPress before cutover | Re-run the export, commit, push |
 | Let Slack answer "how many visits?" | Turn on Web Analytics for the site in Cloudflare; in the client's `worker/wrangler.toml` set `ANALYTICS_SOURCE = "cloudflare"`, `CF_ACCOUNT_ID`, `ANALYTICS_SITE_TAG`, and `TIMEZONE` (e.g. `America/Vancouver`), then `npx wrangler secret put CF_ANALYTICS_TOKEN` (Account Analytics: Read), push. Demo sites: `ANALYTICS_SOURCE = "sample"` (made-up numbers, labelled) |
-| Stop the monthly Slack check-up for a site | `SLACK_CHECKUP = "off"` under `[vars]` in the client's `worker/wrangler.toml`, push (on by default: first weekday of the month, only when the site check finds something; `docs/SLACK.md`) |
+| Stop the monthly Slack check-up for a site | `SLACK_CHECKUP = "off"` under `[vars]` in the client's `worker/wrangler.toml`, push (on by default: first weekday of the month, only when the site check finds three or more things; `docs/SLACK.md`) |
 | Let staff request edits from Slack | `node ../../platform/scripts/slack-add-client.mjs <client> --domain <domain> --push` in the client folder (shared SiteFlo app via the `slack-router/` Worker), then invite their staff to the FloMySite.com workspace; `docs/SLACK.md` |
 
 ### Rarely / never
