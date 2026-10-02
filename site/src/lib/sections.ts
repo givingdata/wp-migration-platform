@@ -21,10 +21,10 @@ interface Base { type: string; id?: string; tone?: "light" | "alt" | "band"; eye
 // Hero layouts: "photo" (default) = full-width photo behind the text; "split" = text beside a framed photo.
 // shade (photo layout): "tint" (default) fades the photo into the band colour; "neutral" keeps
 // the photo's own colours under a soft dark gradient behind the text.
-// parallax (photo layout): the photo scrolls more slowly than the text; true = "medium".
+// parallax (photo layout): the photo scrolls more slowly than the text; "medium" unless set (true = "medium", false = off).
 export type Parallax = boolean | "subtle" | "medium" | "strong";
 const PARALLAX = [true, false, "subtle", "medium", "strong"];
-/** The parallax strength class for a section ("medium" when on by default), or null when off. */
+/** The parallax strength class for a section, or null when off. */
 export const parallaxClass = (p: Parallax | undefined, onByDefault = false) => {
   const v = p ?? onByDefault;
   return v === false ? null : `s-parallax s-parallax-${v === true ? "medium" : v}`;

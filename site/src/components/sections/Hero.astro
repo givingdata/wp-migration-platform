@@ -2,7 +2,7 @@
 // Hero. "photo" (default): full-width photo behind the text, stats bottom-right.
 // "split": text beside a framed photo on the band colour (no overlay on the photo).
 // shade "neutral" (photo layout): the photo keeps its colours, darkened only behind the text.
-// parallax (photo layout): the photo scrolls more slowly than the text: "subtle", "medium" (= true) or "strong".
+// parallax (photo layout): the photo scrolls more slowly than the text: "subtle", "medium" (default) or "strong"; false = off.
 import { parallaxClass, type Hero } from "../../lib/sections";
 import Paras from "./Paras.astro";
 import Buttons from "./Buttons.astro";
@@ -10,7 +10,7 @@ interface Props { s: Hero; first?: boolean }
 const { s, first = false } = Astro.props;
 const split = s.layout === "split";
 const Title = first ? "h1" : "h2";
-const parallax = parallaxClass(s.parallax);
+const parallax = parallaxClass(s.parallax, true);
 ---
 {split ? (
   <section class="s-hero s-hero-split" id={s.id}>

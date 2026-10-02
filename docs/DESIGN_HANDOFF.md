@@ -109,7 +109,7 @@ text, or beside it), `split` (text beside a photo), `cards`, `tiles` (photos wit
 and `cta`. Each section can use the page background, an alternate fill or the band colours. Section
 photos have their own shapes (hero 4:5 beside the text, split 5:4, tiles 5:7); a preset can change
 them. A hero's photo and scenes can scroll more slowly than the text (parallax), set per section:
-subtle, medium or strong. Show which sections each designed page uses, in order.
+subtle, medium (the default) or strong, or turned off. Show which sections each designed page uses, in order.
 
 ## 4. Accessibility (required)
 
