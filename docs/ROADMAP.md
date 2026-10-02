@@ -368,6 +368,16 @@ headless if it meets their requirements. Default clients stay on the JSON + Slac
 6. **Related platform work this would bring forward:** linked records (an event lists its
    authors and venue; an author page lists their events), Pagefind search with filters,
    and credit/licence fields on media.
+7. **WordPress blocks rendered by our components.** Map each block name to a platform
+   component with a lookup table (`core/image` → Image, `core/quote` → Quote,
+   `core/buttons` → Buttons…), falling back to the block's own HTML for blocks we don't map,
+   so pages written in wp-admin take on the theme preset instead of looking like a WordPress
+   theme. The standard REST API only returns finished HTML, so this needs the parsed block
+   list: WPGraphQL with a blocks add-on, or a small plugin of our own exposing
+   `parse_blocks()` output. Check which is practical before the first headless build.
+   Same pattern as `components/sections/Sections.astro`; when that file next grows, move it
+   from its ternary chain to a typed lookup map (keeps the per-type prop checks) so both use one
+   approach.
 
 Later, for clients who want an admin screen without WordPress: a git-based CMS (Keystatic,
 TinaCMS or Sveltia) that edits the same JSON files, so the Edit module, Slack and the build keep
