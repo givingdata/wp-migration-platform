@@ -39,7 +39,7 @@ and the bot reports when the change is live, usually within a few minutes. Detai
 | Menu links | "Add Volunteer under About" | Keep the menu current without a developer |
 | Remove and undo | "Take down the Spring Gala", "undo that" | Nothing is ever lost: removed items can be put back |
 | Old addresses | "Send /summer-camp to the Programs page" | Printed flyers and old links keep working |
-| Scheduling | "Post this on Friday at 9" | Set changes to go live later |
+| Scheduling | "Post this on Friday at 0900" or "Post this on Friday at 09:00 AM" | Set changes to go live later |
 | Questions | "Is anything out of date?", "How many visits last week?" | Answers about the site without logging in anywhere |
 
 If a request is unclear, the bot asks a question instead of guessing. Only listed staff in listed
