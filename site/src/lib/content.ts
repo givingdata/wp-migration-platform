@@ -209,7 +209,7 @@ export const latestPosts = (limit?: number) => latest("post", limit);
 
 /**
  * Announcements to show in the banner: started (date ≤ today) and not ended. Dates are
- * checked when the site is built; rebuild.yml also rebuilds daily so they expire on time.
+ * checked when the site is built; rebuild.yml also rebuilds overnight when a date passes (scripts/rebuild-needed.mjs) so they expire on time.
  */
 export function activeAnnouncements(): Entry[] {
   const t = today();

@@ -31,7 +31,7 @@ The form's **Edit existing** mode changes or deletes existing pages and entries 
 Edit module (`lib/edit/`): one commit per change, deletes go to `trash.json` and **Deleted items → Put back**
 restores them. Pages built from `sections.json` show up as **Designed pages**: staff change the text, links
 and pictures inside each section (not which sections there are or their order), saved to `sections.json`;
-Slack can change their text too. `rebuild.yml` also rebuilds daily so announcements expire and events move to "past".
+Slack can change their text too. `rebuild.yml` also rebuilds overnight so announcements expire and events move to "past" (only on nights when a date passes, plus Mondays: `scripts/rebuild-needed.mjs`).
 
 ### Changing the platform
 
@@ -89,5 +89,5 @@ Preview locally with `npm run dev` (http://localhost:3000; uses sample data if `
 - CI builds fail on purpose if `content.json` is missing (so sample data never ships).
 - Redirects: the build writes `_redirects` (redirects.csv first, then moved pages, WordPress uploads/gallery → R2, archives/feeds → /news/, old sitemap names) and `wp-ids.json`; `functions/index.js` 301s old `/?p=123` links (the only Pages Function; it runs for `/` only). For manual deploys run `npx wrangler pages deploy site/dist …` from the repo root (not `worker/`) so `functions/` is included.
 - The staff form's API key is visible in the browser: keep the form behind Cloudflare Access.
-- Tests: `cd worker && npm test` (also runs `lib/edit` tests); `node --test site/redirects.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
+- Tests: `cd worker && npm test` (also runs `lib/edit` tests); `node --test site/redirects.test.mjs scripts/rebuild-needed.test.mjs`; the site build is `npm run build` from the root (npm workspace). Node 22.12+.
 - Default content types are News (key `post`), Event and Announcement. Keys, not labels, decide where entries are stored, so don't rename a key once a client has entries of it.

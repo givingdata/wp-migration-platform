@@ -4,8 +4,9 @@ name: Rebuild Site on Content Change
 
 on:
   workflow_dispatch: # manual trigger for testing
-  # Daily, so date-based content moves on without a commit: events go from upcoming to
+  # Nightly, so date-based content moves on without a commit: events go from upcoming to
   # past and announcements appear and expire on their dates (06:00 UTC ≈ overnight in North America).
+  # Skipped on nights when nothing changes by date (the check job below).
   schedule:
     - cron: "0 6 * * *"
   push:
@@ -14,9 +15,31 @@ on:
       - content.json
 
 jobs:
-  site:
-    # Only in client repos (scripts/deploy.sh sets this variable); the template never deploys.
+  # The nightly run builds only when something changes by date (scripts/rebuild-needed.mjs:
+  # an event ending, an announcement starting or ending, January, and every Monday). Content
+  # pushes and manual runs always build.
+  check:
     if: vars.CLOUDFLARE_PAGES_PROJECT != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            content.json
+            config/design-specs.json
+            scripts/rebuild-needed.mjs
+          sparse-checkout-cone-mode: false
+      - id: check
+        run: node scripts/rebuild-needed.mjs
+
+  site:
+    needs: check
+    # Only in client repos (scripts/deploy.sh sets this variable); the template never deploys.
+    if: vars.CLOUDFLARE_PAGES_PROJECT != '' && needs.check.outputs.build != 'false'
     permissions:
       contents: read
       id-token: write # _site.yml reports the deploy to the Worker
