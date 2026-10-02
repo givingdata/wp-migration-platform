@@ -2,7 +2,7 @@
 // Requests are signed with the same v0 HMAC Slack uses; fetch is faked for the API calls.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verifySlackSignature, handleSlackRoute, slackApi, postMessage, userEmail, SlackError } from "../src/slack.js";
+import { verifySlackSignature, handleSlackRoute, slackApi, postMessage, updateMessage, userEmail, SlackError } from "../src/slack.js";
 import { toHex } from "../src/auth.js";
 
 const SECRET = "shh";
@@ -274,4 +274,24 @@ test("deletedFromEvent: people's top-level messages only", async () => {
   assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "1.1", previous_message: { bot_id: "B1", ts: "1.1" } }), null, "the bot's own message");
   assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "2.2", previous_message: { user: "U1", ts: "2.2", thread_ts: "1.1" } }), null, "a thread reply");
   assert.equal(deletedFromEvent({ type: "message", subtype: "message_deleted", channel: "C1", deleted_ts: "x", previous_message: prev }), null);
+});
+
+test("updateMessage retries with image links when Slack can't load an image", async () => {
+  const orig = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    seen.push(body);
+    const ok = !body.blocks.some((b) => b.type === "image");
+    return new Response(JSON.stringify(ok ? { ok: true } : { ok: false, error: "invalid_blocks" }));
+  };
+  try {
+    const blocks = [{ type: "section", text: { type: "mrkdwn", text: "Hi" } }, { type: "image", image_url: "https://x/a.jpg", alt_text: "A dog", title: { type: "plain_text", text: "1" } }];
+    await updateMessage({ SLACK_BOT_TOKEN: "xoxb-1" }, { channel: "C", ts: "1.1", text: "t", blocks });
+    assert.equal(seen.length, 2);
+    assert.deepEqual(seen[1].blocks[0], blocks[0]);
+    assert.equal(seen[1].blocks[1].text.text, "🖼 <https://x/a.jpg|1>: A dog");
+  } finally {
+    globalThis.fetch = orig;
+  }
 });
