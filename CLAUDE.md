@@ -35,6 +35,9 @@ Slack can change their text too. `rebuild.yml` also rebuilds daily so announceme
 
 ### Changing the platform
 
+When a feature ships or changes what staff can do, update `docs/FEATURES.md` (the feature list used
+for tracking and marketing) in the same commit, and its shared copy, the SiteFlo Features doc.
+
 Make generic fixes in the platform repo and push; then in each client folder run
 `git pull --no-rebase --no-edit upstream main && git push` to roll them out (client repos have their own commits, so it's a merge; `--no-edit` stops git opening an editor for the message). Client-only changes go straight in the client repo.
 In a client repo, pushing redeploys whatever changed:
