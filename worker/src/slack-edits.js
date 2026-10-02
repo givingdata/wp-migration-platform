@@ -195,7 +195,7 @@ function imageSchema() {
     additionalProperties: false,
     required: ["action", "collection", "id", "slot", "typeKey", "imageAlt", "reply", "summary"],
     properties: {
-      action: { type: "string", enum: ["setImage", "shareImage", "create", "reply"], description: "setImage = use the photo on an existing entry or designed-page image; shareImage = make it a page's share image (only when they ask for that); create = a new entry with this photo; reply = anything else" },
+      action: { type: "string", enum: ["setImage", "shareImage", "create", "notAboutPhoto", "reply"], description: "setImage = use the photo on an existing entry or designed-page image; shareImage = make it a page's share image (only when they ask for that); create = a new entry with this photo; reply = anything else; notAboutPhoto = the message asks for something that isn't about this photo (handled without it)" },
       collection: nullable("For setImage or shareImage: the collection from the index (\"designed\" for a designed page)"),
       id: nullable("For setImage or shareImage: the entry's id from the index"),
       slot: nullable("For setImage on a designed page: the image slot id from that page's images; else null"),
@@ -692,6 +692,7 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
       "or a new entry of a content type with this photo (create). Use 'reply' when it isn't clear where the photo goes (for example no message, or several possible places), " +
       "when they ask to remove a photo or put it inside a page's text, or when it isn't a website change; ask or explain briefly. " +
       "Use 'shareImage' (collection and id from the pages that can get a share image) only when they ask for it to be the share image: the picture shown when someone shares a link to the page (social media, link previews), not a photo on the page itself. " +
+      "Use 'notAboutPhoto' when the message (or the answer at its end) is a request or question that has nothing to do with this photo, e.g. how a page looks on Google, a text change, a question about the site: it is then handled as if no photo came with it. " +
       "Also describe the photo for screen readers." + (image.preview ? "" : " (The photo itself couldn't be shown to you; describe it from the message and file name, or say 'Photo' if unknown.)"),
     user: `Places a photo can go (collection, id, title, path; designed pages list their image slots):\n${JSON.stringify(index)}\n\nContent types that can be added with a photo:\n${JSON.stringify(types)}\n\n` +
       (share ? `Pages that can get a share image (collection, id, title, path):\n${JSON.stringify(share)}\n\n` : "") +
@@ -702,6 +703,9 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
     maxTokens: 2000,
     image: image.preview,
   });
+  // A request that only came with a photo (e.g. an answer that inherited one): drop the photo,
+  // so it isn't carried into the next question either (photoDropped, see slack-flow.js).
+  if (choice.action === "notAboutPhoto") return { ...(await proposeEdit(env, editor, { text: message, by, requestedBy, progress })), photoDropped: true };
   const alt = String(choice.imageAlt || "").trim().slice(0, TEXT_LIMITS.imageAlt) || "Photo";
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
 

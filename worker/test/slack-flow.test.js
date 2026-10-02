@@ -449,6 +449,28 @@ test("photo without a message: the bot asks where; the answer in the thread reus
   assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
 });
 
+test("photo: a follow-up that isn't about the photo drops it, so the next message isn't stuck on it", async () => {
+  const { env, slack, claude, infos } = photoSetup();
+  claude.push(choice({ action: "reply", collection: null, id: null, reply: "Which event or page is this photo for?" }));
+  await photoMessage(env, { text: "Use this somewhere" });
+  assert.equal(slack.at(-1).text, "Which event or page is this photo for?");
+
+  // The next channel message answers the question, so it comes with the photo; it's about something else.
+  claude.push(choice({ action: "notAboutPhoto", collection: null, id: null }), { ...QUESTION, reply: "Which page should I show on Google?" });
+  const asked = recordClaude();
+  await say(env, "Show how the About page looks on Google", { ts: "100.9" });
+  assert.equal(asked.length, 2, "the photo step, then the request on its own");
+  assert.doesNotMatch(JSON.parse(asked[1]).system ?? "", /posted a photo/);
+  assert.equal(slack.at(-1).text, "Which page should I show on Google?");
+
+  // Answering that question no longer brings the photo back.
+  claude.push({ ...QUESTION, reply: "Done" });
+  await say(env, "About", { ts: "101.5" });
+  assert.equal(infos.length, 2, "the photo was fetched for the first two messages only");
+  assert.equal(asked.length, 3);
+  assert.doesNotMatch(asked[2], /posted a photo/);
+});
+
 // A link instead of an upload: the image at it is fetched and used like a posted photo.
 function linkSetup() {
   const ctx = photoSetup();

@@ -161,7 +161,7 @@ export function slackHandlers(env, getEditor) {
         const view = result.kind === "proposal" ? proposalBlocks(result.proposal, { siteUrl: siteUrl(env) }) : { text: result.text };
         await updateMessage(env, { channel, ts: working, ...view });
         if (result.kind === "proposal" && result.proposal.descriptions) await quietly(rememberCard(env, { channel, thread, ts: working, proposalId: result.proposal.id }));
-        if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text, photo }));
+        if (result.kind === "reply") await quietly(saveQuestion(env, { channel, user, thread, request, question: result.text, photo: result.photoDropped ? null : photo }));
       } catch (e) {
         console.error("Slack draft failed", e.message);
         await updateMessage(env, { channel, ts: working, text: `⚠️ Couldn't draft that change: ${friendly(e)}` });
