@@ -31,3 +31,31 @@ const { sections } = Astro.props;
   : s.type === "scenes" ? <Scenes s={s} />
   : s.type === "cta" ? <Cta s={s} />
   : <Posts s={s} />)}
+
+<script>
+  // Parallax for browsers without CSS scroll-driven animations (e.g. Firefox): the same movement
+  // as the CSS in global.css, driven from scroll events.
+  if (!CSS.supports("animation-timeline: view()") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const panels = [...document.querySelectorAll<HTMLElement>(".s-parallax")];
+    if (panels.length) {
+      document.documentElement.classList.add("s-parallax-js");
+      let queued = false;
+      const update = () => {
+        queued = false;
+        const vh = innerHeight;
+        for (const el of panels) {
+          const r = el.getBoundingClientRect();
+          if (r.bottom < 0 || r.top > vh) continue;
+          const progress = (vh - r.top) / (vh + r.height); // 0 entering at the bottom, 1 leaving at the top
+          const amount = parseFloat(getComputedStyle(el).getPropertyValue("--parallax")) || 0;
+          const img = el.querySelector<HTMLElement>(".s-parallax-img");
+          if (img) img.style.transform = `translateY(${((progress * 2 - 1) * amount).toFixed(2)}%)`;
+        }
+      };
+      const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+      addEventListener("scroll", queue, { passive: true });
+      addEventListener("resize", queue);
+      update();
+    }
+  }
+</script>

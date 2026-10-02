@@ -340,8 +340,8 @@ h3 { font-size: 1.25rem; }
 
 /* Split hero: text beside a framed photo, on the band colour */
 /* Parallax (hero, scenes): the photo is taller than its panel and drifts down as the panel scrolls
-   up, so it moves more slowly than the text. Gentler on phones; off for reduced motion and in
-   browsers without scroll-driven animations. Longhands only: the minifier folds a timeline into
+   up, so it moves more slowly than the text. Gentler on phones; off for reduced motion. Browsers
+   without scroll-driven animations (Firefox) get the same movement from a script in Sections.astro. Longhands only: the minifier folds a timeline into
    the animation shorthand, which browsers then reject. */
 .s-parallax { view-timeline-name: --s-parallax; --parallax: 10%; }
 @media (max-width: 40rem) { .s-parallax { --parallax: 5%; } }
@@ -350,6 +350,8 @@ h3 { font-size: 1.25rem; }
     .s-parallax .s-parallax-img { inset: -15% 0 auto; height: 130%; animation-name: s-parallax; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: --s-parallax; animation-range: cover; will-change: transform; }
   }
 }
+/* The same sizing when the script in Sections.astro moves the photo instead (no CSS support). */
+.s-parallax-js .s-parallax .s-parallax-img { inset: -15% 0 auto; height: 130%; will-change: transform; }
 @keyframes s-parallax { from { transform: translateY(calc(-1 * var(--parallax))); } to { transform: translateY(var(--parallax)); } }
 
 /* Scenes: full-width photo panels, a text card over each, alternating sides on wide screens. */
