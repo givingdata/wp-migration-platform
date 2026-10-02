@@ -320,6 +320,19 @@ How to choose them:
 Possible first step: summarise past assessor scans by client type to decide which three
 templates to find first.
 
+**Define each section type once (do alongside the template work, since it adds section types).**
+Each type is described in two places today: `site/src/lib/sections.ts` (field types and build
+checks) and `lib/edit/sections.js` (which slots staff can edit through the form and Slack).
+Headless WordPress would add a third (block definitions). Move to one definition per type
+(fields, which are editable, labels) that generates or drives all of them. Rules for new types:
+
+- **Flat, simple fields:** text, image, buttons, lists of items. They map cleanly to WordPress
+  block attributes and ACF/Pods fields; avoid deep nesting.
+- **Formatted text policy:** section text is plain today, but WordPress text arrives with bold,
+  links and so on. Pick one rule (e.g. allow basic inline formatting, strip the rest).
+- **Namespaced names outside the platform:** `siteflo/hero`, so our quote section never clashes
+  with WordPress's `core/quote`.
+
 ## Uptime monitoring (planned 2026-09-29)
 
 Cloudflare's own uptime checks (Health Checks, Load Balancing monitors) need a paid plan on
@@ -378,6 +391,16 @@ headless if it meets their requirements. Default clients stay on the JSON + Slac
    Same pattern as `components/sections/Sections.astro`; when that file next grows, move it
    from its ternary chain to a typed lookup map (keeps the per-type prop checks) so both use one
    approach.
+8. **Sections stay sections; core blocks don't become them.** Sections are whole page bands
+   with fixed slots; core blocks are small, freely nested pieces. Only a few look alike (cover
+   ≈ hero, media & text ≈ split), so converting core blocks into sections would be fragile.
+   Core blocks (item 7) style body content only. For designed pages edited in wp-admin,
+   register our section types as **custom blocks** (`siteflo/hero`, `siteflo/stats`…) with the
+   same fields, generated from the single section definitions (Template designs above), and
+   rendered by the same components. One vocabulary, two editors: form/Slack for standard
+   clients, WordPress for headless ones. Only needed when a headless client wants to build
+   designed pages themselves; a first headless client (VWF) can keep its homepage and landing
+   pages as sections we manage while staff use WordPress for events, authors and news.
 
 Later, for clients who want an admin screen without WordPress: a git-based CMS (Keystatic,
 TinaCMS or Sveltia) that edits the same JSON files, so the Edit module, Slack and the build keep
