@@ -184,7 +184,8 @@ export async function siteHealth(editor, { today, siteUrl = null, siteName = "",
   }
   for (const same of byTitle.values()) {
     if (same.length < 2) continue;
-    const others = same.slice(1).map((l) => l.title);
+    // Same-named pages need their address to tell them apart ("Boutique Day 2018 (/post/…/)").
+    const others = same.slice(1).map((l) => (l.title.trim().toLowerCase() === same[0].title.trim().toLowerCase() ? `${l.title} (${l.path})` : l.title));
     const named = others.length > 3 ? `${others.slice(0, 3).join(", ")} and ${others.length - 3} more` : joinAnd(others);
     add("title", `Has the same search title as ${named}: “${same[0].searchTitle}”`, { title: same[0].title, path: same[0].path, pages: same.length });
   }

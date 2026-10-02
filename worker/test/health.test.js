@@ -119,7 +119,7 @@ test("photo descriptions inside the text, missing summaries, and search titles a
 
   assert.deepEqual(by("alt"), ["About: The main photo and 3 photos in the text have no description"], "one line per page; quoted, unquoted and capitalised alts count");
   assert.deepEqual(by("title"), [
-    "Contact: Has the same search title as Contact and Visit: “Contact | Acme”",
+    "Contact: Has the same search title as Contact (/contact-us/) and Visit: “Contact | Acme”",
     "Our long history of community programming and volunteering: Search title is 65 characters; Google shows about 60: “Our long history of community programming and volunteering | Acme”",
     "Pool: Search title is 71 characters; Google shows about 60: “The new pool is open all week long for families, seniors and swim clubs”",
   ], "a search title counts as written; long news headlines without one are fine; the homepage is the site name");

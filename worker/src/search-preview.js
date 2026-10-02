@@ -57,7 +57,8 @@ export function searchWarnings(page, pages) {
   if (description == null) {
     // The tagline isn't known here: nothing to measure.
   } else if (!description.trim()) out.push("There's no description, so Google will pick some text from the page itself (often not the best bit).");
-  else if (description.length > SEARCH_DESCRIPTION_FITS) out.push(`The description is ${description.length} characters; Google usually shows about ${SEARCH_DESCRIPTION_FITS}, so the end will likely be cut off.`);
+  // Taken from the page's text, the site trims it itself: only a written one can run long.
+  else if (description.length > SEARCH_DESCRIPTION_FITS && !["text", "sections"].includes(page.descriptionFrom)) out.push(`The description is ${description.length} characters; Google usually shows about ${SEARCH_DESCRIPTION_FITS}, so the end will likely be cut off.`);
   else if (description.length < SHORT_DESCRIPTION) out.push(`The description is short (${description.length} characters), so Google may show other text from the page instead. Around 120–155 characters works best.`);
   const sameTitle = others.filter((p) => same(p.shownTitle, title));
   if (title && sameTitle.length) out.push(`The title is the same as on ${names(sameTitle)}. Each page should have its own, so people can tell them apart in the results.`);
