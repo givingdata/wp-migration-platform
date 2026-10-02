@@ -34,7 +34,7 @@ and the bot reports when the change is live, usually within a few minutes. Detai
 | Change text | "Change the Contact page hours to 9 to 5" | Update any page, news item or event in a sentence |
 | Designed pages | "Change the homepage heading to …" | Edit the words on designed pages without breaking the layout |
 | Add news, events, pages | "Post this as news" + pasted text or a link | Turn an email, newsletter or web page into a post |
-| Photos | Post a photo: "use this on the Gala event" | New photos in seconds, resized automatically |
+| Photos | Post a photo, or paste a link to an image (from the web or already on the site): "use this on the Gala event" | New photos in seconds, resized automatically |
 | Change everywhere | "Our phone number is now 604-555-0199" | Fix a detail on every page at once |
 | Menu links | "Add Volunteer under About" | Keep the menu current without a developer |
 | Remove and undo | "Take down the Spring Gala", "undo that" | Nothing is ever lost: removed items can be put back |
@@ -66,7 +66,7 @@ language, with no jargon or plugins.
 | --- | --- | --- |
 | Google preview | "How does the About page look on Google?" | See exactly what searchers see, with warnings for titles and descriptions that get cut off or repeat |
 | Search title and description | "Make the search description for About mention free prom dresses" | Better search results without touching code |
-| Share image | Post a photo: "use this as the share image for Events" | Control the picture shown when a page is shared on social media |
+| Share image | Post a photo or an image link: "use this as the share image for Events" | Control the picture shown when a page is shared on social media |
 | Photo descriptions | "Describe the photos on the About page" | AI writes a description for every photo missing one, a page at a time, for staff to approve |
 | View and correct descriptions | "Show the photo descriptions on About", "change photo 2's description to …", "rewrite the photo descriptions on About" | Check and fix what screen readers and Google read |
 | Built-in search basics | Sitemap, structured data, clean addresses, redirects from every old WordPress address | Keeps the search rankings the old site earned |
