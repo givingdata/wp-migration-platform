@@ -314,7 +314,7 @@ test("designed page: a request that needs a new section gets a reply, not a chan
   );
   const out = await proposeEdit(ctx.env, ctx.editor, { text: "Add a new testimonials section to the homepage" });
   assert.equal(out.kind, "reply");
-  assert.match(out.text, /not the layout or images/);
+  assert.match(out.text, /not the layout\. To change a photo, post it with your message or paste a link/);
 });
 
 // ---- photos ------------------------------------------------------------------------------------

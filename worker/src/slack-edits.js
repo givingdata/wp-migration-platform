@@ -34,7 +34,7 @@ import { recordUsage } from "./usage.js";
 import { EditError, DESIGNED, redirectSource, redirectTarget } from "../../lib/edit/index.js";
 import { checkSlotChanges } from "../../lib/edit/sections.js";
 import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
-import { firstLink, fetchLinkedPage } from "./linked-page.js";
+import { allLinks, fetchLinkedPage } from "./linked-page.js";
 import { siteHealth, healthReport } from "./health.js";
 
 export const APPROVE_ACTION = "1wp_approve";
@@ -64,7 +64,7 @@ const WHAT_I_CAN_DO = [
   "*What I can do*",
   "• *Change text:* titles, summaries, body text, dates, times, places and links on pages, news and events. On designed pages like the homepage, the words and links (not the layout). A blank line in your text starts a new paragraph.",
   "• *Add:* a news item, event, announcement or new page. Paste a link and I'll write the entry from that page.",
-  "• *Photos:* post a photo with a message to use it on a news item, event, designed page or new entry.",
+  "• *Photos:* post a photo, or paste a link to an image (from the web or already on the site), with a message saying where it goes: a news item, event, designed page or new entry.",
   "• *Change everywhere:* e.g. a new phone number or someone's new title.",
   "• *Remove and undo:* news, events and pages go to the trash, so I can put them back. I can also undo a recent change made here.",
   "• *Menu:* add, rename, reorder or take out links inside its dropdowns.",
@@ -551,12 +551,13 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
 }
 
 // A new entry or page from the request: its fields, checked, as an unsaved proposal (no base fields).
+// `photo` is true when a photo comes with it, or the image link it came from (not a page to read).
 async function draftNew(env, editor, { choice, message, progress, photo = false }) {
   const isPage = choice.action === "createPage" || choice.typeKey === "page";
   const type = isPage ? { key: "page", label: "Page", fields: [] } : editor.types?.[choice.typeKey];
   if (!isPage && (!type?.enabled || type.key === "page")) return reply(`I can't add that kind of entry.\n\n${WHAT_I_CAN_DO}`);
   // A link in the request (an article, an event page): read it so the entry can be written from it.
-  const link = firstLink(message);
+  const link = allLinks(message).find((url) => url !== photo) ?? null;
   let linked = null;
   if (link) {
     await progress?.("Reading the linked page…");
@@ -642,7 +643,9 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
       "when they ask to remove a photo or put it inside a page's text, or when it isn't a website change; ask or explain briefly. " +
       "Also describe the photo for screen readers." + (image.preview ? "" : " (The photo itself couldn't be shown to you; describe it from the message and file name, or say 'Photo' if unknown.)"),
     user: `Places a photo can go (collection, id, title, path; designed pages list their image slots):\n${JSON.stringify(index)}\n\nContent types that can be added with a photo:\n${JSON.stringify(types)}\n\n` +
-      `Photo file name: ${JSON.stringify(String(image.name || "photo").slice(0, 200))}\n\nMessage from Slack:\n${slackMessage(message || "(no message)")}`,
+      `Photo file name: ${JSON.stringify(String(image.name || "photo").slice(0, 200))}` +
+      (image.url ? `\nThe photo is the image at this link in the message (not a page to read): ${image.url}` : "") +
+      `\n\nMessage from Slack:\n${slackMessage(message || "(no message)")}`,
     schema: imageSchema(),
     maxTokens: 2000,
     image: image.preview,
@@ -704,7 +707,7 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
   }
 
   if (choice.action === "create") {
-    const drafted = await draftNew(env, editor, { choice, message, progress, photo: true });
+    const drafted = await draftNew(env, editor, { choice, message, progress, photo: image.url ?? true });
     if (drafted.kind === "reply") return drafted;
     if (!drafted.type.fields?.includes("image")) return reply(`A new ${drafted.type.label.toLowerCase()} can't have a photo on this site.`);
     await progress?.("Preparing the photo…");
@@ -739,7 +742,7 @@ async function proposeDesigned(env, { choice, opened, message, base, progress })
     const current = bySlot.get(slot);
     if (current && typeof value === "string" && value.trim() !== current.value.trim()) changes[slot] = value.trim();
   }
-  if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout or images.\n\n${WHAT_I_CAN_DO}`);
+  if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout. To change a photo, post it with your message or paste a link to the image (a direct link to a JPG, PNG or WebP).\n\n${WHAT_I_CAN_DO}`);
   const { errors } = checkSlotChanges(slots, changes);
   if (Object.keys(errors).length) return reply(`I couldn't draft that: ${Object.entries(errors).map(([slot, e]) => `${bySlot.get(slot)?.label ?? slot}: ${e}`).join("; ")}.`);
 

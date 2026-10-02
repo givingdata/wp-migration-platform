@@ -30,6 +30,7 @@
 import specs from "../../config/design-specs.json" with { type: "json" };
 import { postMessage, updateMessage, slackApi, userEmail, downloadFile, IMAGE_TYPES, MAX_FILE_BYTES } from "./slack.js";
 import { storeImage, previewForClaude } from "./cloudflare.js";
+import { fetchImageLink, findLinkedImage } from "./linked-page.js";
 import { channelAllowed, isStaff, takeRateLimit } from "./slack-access.js";
 import { rememberDeploy } from "./deploys.js";
 import {
@@ -85,6 +86,7 @@ function photoProblem(e) {
   if (/unsupported_type|not_an_image/.test(code)) return `I can only use photos (${TYPE_NAMES}).`;
   if (/too_large/.test(code)) return `That photo is too big; the limit is ${MAX_FILE_BYTES / 1048576} MB.`;
   if (/not_your_file|file_not_found|bad_file/.test(code)) return "I couldn't find that photo any more. Please post it again.";
+  if (/link_failed/.test(code)) return "I couldn't download the image at that link any more. Please post the link again, or upload the photo.";
   return "I couldn't download that photo. Please try posting it again.";
 }
 
@@ -125,7 +127,8 @@ export function slackHandlers(env, getEditor) {
       const picked = pickPhoto(files);
       if (picked.problem) return void (await reply(picked.problem));
       // A new photo wins; otherwise an answer keeps the photo from the question it answers.
-      const photo = picked.photo ?? asked?.photo ?? null;
+      // A link to an image (from the web or the site) counts as a photo when none is posted.
+      let photo = picked.photo ?? asked?.photo ?? null;
       const rate = await takeRateLimit(env, user);
       if (!rate.ok) return void (await reply(`You've reached ${rate.limit} requests this hour. Try again later.`));
 
@@ -133,16 +136,19 @@ export function slackHandlers(env, getEditor) {
       const working = await reply("Working on it… reading the site (this can take up to a minute).");
       const progress = (message) => quietly(updateMessage(env, { channel, ts: working, text: message }));
       try {
-        let image, store;
-        if (photo) {
-          let file;
-          try {
-            file = await downloadFile(env, photo);
-          } catch (e) {
-            console.error("Slack photo download failed", e.message);
-            return void (await updateMessage(env, { channel, ts: working, text: `⚠️ ${photoProblem(e)}` }));
-          }
-          image = { name: file.name, preview: await previewForClaude(env, file.bytes, file.type) };
+        let image, store, file;
+        try {
+          if (photo?.link) {
+            file = await fetchImageLink(photo.link);
+            if (!file) throw new Error("link_failed");
+          } else if (photo) file = await downloadFile(env, photo);
+          else if ((file = await findLinkedImage(request))) photo = { link: file.url, name: file.name };
+        } catch (e) {
+          console.error("Slack photo download failed", e.message);
+          return void (await updateMessage(env, { channel, ts: working, text: `⚠️ ${photoProblem(e)}` }));
+        }
+        if (file) {
+          image = { name: file.name, ...(photo.link ? { url: photo.link } : {}), preview: await previewForClaude(env, file.bytes, file.type) };
           const upload = new File([file.bytes], file.name, { type: file.type });
           store = (typeSpec, contentId) => storeImage(env, specs, typeSpec, `slack-${contentId}`, upload);
         }

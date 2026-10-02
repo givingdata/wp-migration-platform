@@ -449,6 +449,80 @@ test("photo without a message: the bot asks where; the answer in the thread reus
   assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
 });
 
+// A link instead of an upload: the image at it is fetched and used like a posted photo.
+function linkSetup() {
+  const ctx = photoSetup();
+  const fetched = [];
+  const inner = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u.startsWith("https://img.example/")) {
+      fetched.push(u);
+      if (u.endsWith(".gif")) return new Response("GIF89a", { headers: { "content-type": "image/gif" } });
+      return new Response(PHOTO_BYTES, { headers: { "content-type": "image/jpeg" } });
+    }
+    if (u.startsWith("https://news.example/")) {
+      fetched.push(u);
+      return new Response("<title>News</title><p>Story</p>", { headers: { "content-type": "text/html" } });
+    }
+    return inner(url, init);
+  };
+  return { ...ctx, fetched };
+}
+
+const linkMessage = (env, text, { id = "EvL1", thread } = {}) =>
+  send(env, "/slack/events", JSON.stringify({ type: "event_callback", event_id: id, team_id: "T1", event: {
+    type: "message", channel: "C1", user: "U1", text, ts: thread ? "101.1" : "100.1", ...(thread ? { thread_ts: thread } : {}),
+  } }), "application/json");
+
+test("image link: a link to an image works like a posted photo, and Claude is told where it came from", async () => {
+  const { gh, env, slack, claude, stored, fetched, infos } = linkSetup();
+  claude.push(choice());
+  const prompts = [];
+  const inner = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith("https://api.anthropic.com/")) prompts.push(init.body);
+    return inner(url, init);
+  };
+  await linkMessage(env, "Use this for Grad Night <https://img.example/media/2023/05/IMG_1759.jpg>");
+
+  assert.deepEqual(fetched, ["https://img.example/media/2023/05/IMG_1759.jpg"]);
+  assert.equal(infos.length, 0, "nothing downloaded from Slack");
+  assert.match(prompts[0], /Photo file name: \\"IMG_1759.jpg\\"/);
+  assert.match(prompts[0], /The photo is the image at this link in the message \(not a page to read\): https:\/\/img.example\/media\/2023\/05\/IMG_1759.jpg/);
+  assert.match([...stored.keys()][0], /^media\/uploads\/slack-[0-9a-f-]{36}\/original\.jpg$/);
+  const draft = slack.find((m) => m.method === "chat.update" && m.blocks);
+  await click(env, "1wp_approve", buttons(draft)[0].value);
+  assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
+});
+
+test("image link: a web page link stays a normal request, and an unusable image gets a polite no", async () => {
+  const { env, slack, claude, fetched } = linkSetup();
+  claude.length = 0;
+  claude.push({ action: "reply", collection: null, id: null, typeKey: null, trashId: null, changeId: null, terms: [], from: null, to: null, when: null, days: null, reply: "Which page?", summary: "Question" });
+  await linkMessage(env, "Thoughts on https://news.example/story");
+  assert.deepEqual(fetched, ["https://news.example/story"]);
+  assert.match(slack.at(-1).text, /Which page\?/);
+
+  await linkMessage(env, "Use https://img.example/anim.gif on Grad Night", { id: "EvL2" });
+  assert.match(slack.at(-1).text, /I can only use photos/);
+  assert.equal(claude.length, 0);
+});
+
+test("image link: when the bot asks where it goes, the answer in the thread uses the same image", async () => {
+  const { gh, env, slack, claude, fetched } = linkSetup();
+  claude.push(choice({ action: "reply", collection: null, id: null, reply: "Which event is this photo for?" }));
+  await linkMessage(env, "https://img.example/party.jpg");
+  assert.equal(slack.at(-1).text, "Which event is this photo for?");
+
+  claude.push(choice());
+  await linkMessage(env, "Grad Night", { id: "EvL3", thread: "100.1" });
+  assert.deepEqual(fetched, ["https://img.example/party.jpg", "https://img.example/party.jpg"]);
+  const draft = slack.findLast((m) => m.method === "chat.update" && m.blocks);
+  await click(env, "1wp_approve", buttons(draft)[0].value);
+  assert.ok(JSON.parse(gh.files()["content.json"]).events[0].image.startsWith("https://media.example/media/uploads/slack-"));
+});
+
 test("deleting a request deletes the bot's thread replies and cancels its proposal", async () => {
   const { gh, env, slack } = setup();
   await message(env);
