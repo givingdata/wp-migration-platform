@@ -19,7 +19,9 @@ export interface Img { src: string; alt?: string }
 interface Base { type: string; id?: string; tone?: "light" | "alt" | "band"; eyebrow?: string; title?: string; accent?: string }
 
 // Hero layouts: "photo" (default) = full-width photo behind the text; "split" = text beside a framed photo.
-export interface Hero extends Base { type: "hero"; layout?: "photo" | "split"; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
+// shade (photo layout): "tint" (default) fades the photo into the band colour; "neutral" keeps
+// the photo's own colours under a soft dark gradient behind the text.
+export interface Hero extends Base { type: "hero"; layout?: "photo" | "split"; shade?: "tint" | "neutral"; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
 export interface Stats extends Base { type: "stats"; intro?: string; items: { value: string; label: string }[]; highlight?: { value: string; label: string; text?: string } }
 export interface Split extends Base { type: "split"; paragraphs?: string[]; tags?: string[]; image?: Img; quote?: { text: string; by?: string }; reverse?: boolean; buttons?: Button[] }
 export interface Cards extends Base { type: "cards"; intro?: string; items: { title: string; text: string; href?: string; linkLabel?: string; icon?: string }[]; contacts?: { label: string; email: string }[] }
@@ -58,6 +60,8 @@ function load(): SectionsFile {
     if (!Array.isArray(page?.sections)) throw new Error(`sections.json: pages["${key}"].sections must be a list`);
     page.sections.forEach((s, i) => {
       if (!SECTION_TYPES.includes(s?.type as never)) throw new Error(`sections.json: pages["${key}"].sections[${i}] has unknown type "${s?.type}" (use ${SECTION_TYPES.join(", ")})`);
+      const shade = (s as { shade?: string }).shade;
+      if (s.type === "hero" && shade !== undefined && !["tint", "neutral"].includes(shade)) throw new Error(`sections.json: pages["${key}"].sections[${i}] has unknown shade "${shade}" (use tint or neutral)`);
     });
   }
   cache = data;

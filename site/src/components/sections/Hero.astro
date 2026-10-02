@@ -1,6 +1,7 @@
 ---
 // Hero. "photo" (default): full-width photo behind the text, stats bottom-right.
 // "split": text beside a framed photo on the band colour (no overlay on the photo).
+// shade "neutral" (photo layout): the photo keeps its colours, darkened only behind the text.
 import type { Hero } from "../../lib/sections";
 import Paras from "./Paras.astro";
 import Buttons from "./Buttons.astro";
@@ -31,7 +32,7 @@ const Title = first ? "h1" : "h2";
     </div>
   </section>
 ) : (
-  <section class="s-hero" id={s.id}>
+  <section class:list={["s-hero", s.shade === "neutral" && "s-hero-neutral"]} id={s.id}>
     {s.image && <img class="s-hero-img" src={s.image.src} alt={s.image.alt ?? ""} loading={first ? "eager" : "lazy"} fetchpriority={first ? "high" : undefined} decoding="async" />}
     <div class="s-hero-shade"></div>
     <div class="wrap s-hero-inner">
