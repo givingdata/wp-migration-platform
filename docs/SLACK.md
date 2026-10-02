@@ -72,7 +72,7 @@ description", never SEO, meta or alt text.
 `TIMEZONE`, the bot posts a short summary of the same check in the site's channel (the first of
 `SLACK_CHANNEL_IDS`): how many things could use a look, a line per group with the first three
 pages, and an invitation to ask "is anything out of date?" for the full list. Nothing is posted
-when the check finds nothing. Outside links are left out (they're slow; asking the bot checks
+when the check finds fewer than three things. Outside links are left out (they're slow; asking the bot checks
 them). It runs on the router's 10-minute tick (`worker/src/checkup.js`), and a KV marker per month
 (`slack:checkup:YYYY-MM`) makes it post once; a check that fails is tried again on the next tick.
 On by default; `SLACK_CHECKUP = "off"` in the client's `worker/wrangler.toml` turns it off. Router
@@ -91,8 +91,8 @@ when the request is about Google, search or shared links. They're stored in the 
 designed page's) `seo` object; a search title is used exactly as written. Post a photo with
 *"use this as the share image for the Events page"* to set the picture shown when someone shares
 a link (`seo.image`, cropped to 1.91:1). The homepage's tagline fallback is only shown if the
-Worker has `SITE_TAGLINE` (same value as the site's `SITE_TAGLINE` variable); otherwise the preview
-says "your site's tagline". Staff never see the words SEO or meta.
+Worker has `SITE_TAGLINE` (Deploy Worker copies the GitHub variable `SITE_TAGLINE` into it);
+otherwise the preview says "your site's tagline". Staff never see the words SEO or meta.
 
 **Redirects.** When something is removed, its old address sends visitors to its listing page
 (`/news/`, `/events/`…, or the homepage for pages) instead of "page not found", or to the page

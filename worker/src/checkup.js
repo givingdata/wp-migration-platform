@@ -54,9 +54,12 @@ export function checkupDue(w) {
 // Slack mrkdwn needs &, < and > escaped.
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** The monthly post (Slack mrkdwn), or null when there's nothing to say. */
+// Fewer findings than this aren't worth a post of their own; staff see them when they ask.
+export const MIN_FINDINGS = 3;
+
+/** The monthly post (Slack mrkdwn), or null when there's not enough to say. */
 export function checkupMessage({ findings }, { siteUrl = null } = {}) {
-  if (!findings.length) return null;
+  if (findings.length < MIN_FINDINGS) return null;
   const base = siteUrl ? String(siteUrl).replace(/\/+$/, "") : null;
   const groups = groupFindings(findings);
   const lines = [`🩺 *Monthly website check-up*: ${findings.length === 1 ? "1 thing" : `${findings.length} things`} could use a look.`];

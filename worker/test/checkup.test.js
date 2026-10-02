@@ -100,6 +100,9 @@ test("a tidy site gets no post (but the month counts as done); SLACK_CHECKUP = o
   assert.deepEqual(await runCheckup(e, () => editorWith({ "content.json": tidy() }), { now: FIRST, post }), { posted: false, findings: 0 });
   assert.equal(e.CONTENT.map.get(checkupKey("2026-10")), "nothing to report");
   assert.equal(checkupMessage({ findings: [] }), null);
+  const two = [{ kind: "alt", text: "No description", title: "A", path: "/a/" }, { kind: "alt", text: "No description", title: "B", path: "/b/" }];
+  assert.equal(checkupMessage({ findings: two }), null, "two findings aren't worth a post");
+  assert.match(checkupMessage({ findings: [...two, { kind: "alt", text: "No description", title: "C", path: "/c/" }] }), /3 things could use a look/);
 
   const off = env({ SLACK_CHECKUP: "off" });
   assert.deepEqual(await runCheckup(off, () => editorWith({ "content.json": messy() }), { now: FIRST, post }), { skipped: "off" });
