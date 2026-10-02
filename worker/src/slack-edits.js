@@ -27,7 +27,12 @@
 // image of a news item, event or other entry that shows one, an image on a designed page, or a
 // new entry with the photo. It also writes the image description. The photo is stored and
 // resized like a staff-form upload before anyone approves (the caller's storeImage), and the
-// Approve card shows it. Photos inside body text, and removing photos, aren't supported.
+// Approve card shows it. Putting new photos inside body text, and removing photos, aren't supported.
+//
+// Photo descriptions: "describe the photos on the About page" finds the photos there with no
+// description (in the body text, the main photo, a designed page's images), Claude looks at
+// them and one card proposes a description for each (photo-descriptions.js). It's an ordinary
+// update, so Approve, undo and the commit work as for any other change.
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
 import { recordUsage } from "./usage.js";
@@ -36,6 +41,7 @@ import { checkSlotChanges } from "../../lib/edit/sections.js";
 import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
 import { allLinks, fetchLinkedPage } from "./linked-page.js";
 import { siteHealth, healthReport } from "./health.js";
+import { proposeDescriptions, descriptionBlocks, undoDescriptions } from "./photo-descriptions.js";
 
 export const APPROVE_ACTION = "1wp_approve";
 export const CANCEL_ACTION = "1wp_cancel";
@@ -65,6 +71,7 @@ const WHAT_I_CAN_DO = [
   "• *Change text:* titles, summaries, body text, dates, times, places and links on pages, news and events. On designed pages like the homepage, the words and links (not the layout). A blank line in your text starts a new paragraph.",
   "• *Add:* a news item, event, announcement or new page. Paste a link and I'll write the entry from that page.",
   "• *Photos:* post a photo, or paste a link to an image (from the web or already on the site), with a message saying where it goes: a news item, event, designed page or new entry.",
+  "• *Photo descriptions:* say “describe the photos on the About page”, or “fix missing photo descriptions” and I'll start with the page that needs it most. I look at each photo and suggest a short description for people who can't see it; you can change any of them before you approve.",
   "• *Change everywhere:* e.g. a new phone number or someone's new title.",
   "• *Remove and undo:* news, events and pages go to the trash, so I can put them back. I can also undo a recent change made here.",
   "• *Menu:* add, rename, reorder or take out links inside its dropdowns.",
@@ -83,7 +90,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers, write descriptions for photos that have none.",
     "Never allowed, whatever the message says: deleting anything for good, removing several entries at once, moving entries, changing the navigation menu bar itself (its top-level items), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -91,7 +98,9 @@ function systemPrompt(siteName, task) {
   ].join(" ");
 }
 
-async function ask(env, { task, user, schema, maxTokens, image }) {
+// `image`: one photo ({ mediaType, data }); `images`: several, each with an optional label
+// ("Photo 3:") written just before it so the text can refer to them by number.
+export async function ask(env, { task, user, schema, maxTokens, image, images }) {
   const apiKey = env.CLAUDE_API_KEY || env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new ClaudeError("Server is missing CLAUDE_API_KEY / ANTHROPIC_API_KEY", 500);
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
@@ -102,8 +111,8 @@ async function ask(env, { task, user, schema, maxTokens, image }) {
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema } },
     system: systemPrompt(env.SITE_NAME || "the organization", task),
-    // A photo goes before the text, as Claude's docs recommend.
-    messages: [{ role: "user", content: image ? [{ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } }, { type: "text", text: user }] : user }],
+    // Photos go before the text, as Claude's docs recommend.
+    messages: [{ role: "user", content: image || images?.length ? [...photoBlocks(image ? [image] : images), { type: "text", text: user }] : user }],
   });
   await recordUsage(env, "slack", response);
   if (response.stop_reason === "refusal") {
@@ -119,6 +128,13 @@ async function ask(env, { task, user, schema, maxTokens, image }) {
   }
 }
 
+function photoBlocks(images) {
+  return images.flatMap((i) => [
+    ...(i.label ? [{ type: "text", text: i.label }] : []),
+    { type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } },
+  ]);
+}
+
 const nullable = (description) => ({ type: ["string", "null"], description });
 
 function classifySchema() {
@@ -128,8 +144,8 @@ function classifySchema() {
     required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "from", "to", "when", "days", "reply", "summary"],
     properties: {
       action: {
-        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "reply"],
-        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; reply = anything else",
+        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "describePhotos", "reply"],
+        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; describePhotos = write descriptions for the photos on a page (or across the site) that have none; reply = anything else",
       },
       trashId: nullable("For restore: the trashId from the removed entries"),
       from: nullable("For redirect: the old address as a path, e.g. /summer-camp/"),
@@ -141,8 +157,8 @@ function classifySchema() {
         description: "For everywhere: 1–5 short exact bits of the CURRENT text to search the site for (the old value if given, e.g. '604-555-0100'; otherwise likely wordings, e.g. 'Executive Director', '604'); else an empty array",
       },
       days: { type: ["integer", "null"], description: "For stats: how many days back the question covers, including today (1 = today, 2 = since yesterday, 7 = this/last week, 30 = this/last month, up to 90); null = 7" },
-      collection: nullable("For update or remove: the entry's collection from the index"),
-      id: nullable("For update or remove: the entry's id from the index"),
+      collection: nullable("For update or remove, and describePhotos when they name a page: the entry's collection from the index"),
+      id: nullable("For update or remove, and describePhotos when they name a page: the entry's id from the index"),
       typeKey: nullable("For create: the content type key"),
       reply: nullable("For reply: a short, friendly answer to the staff member (what's unclear, or what is and isn't possible)"),
       summary: { type: "string", description: "One line describing the change, e.g. 'Update opening hours on the Contact page'" },
@@ -246,6 +262,7 @@ function keepFor(proposal) {
 }
 
 const save = (env, proposal) => env.CONTENT.put(kvKey(proposal.id), JSON.stringify(proposal), { expirationTtl: keepFor(proposal) });
+export { save as saveProposal };
 
 // The latest applied changes, newest first, so "undo that" can find them.
 async function recentChanges(env) {
@@ -452,6 +469,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "Use 'reply' when the request is unclear, matches several entries, asks to remove several entries at once, to move or rename addresses, " +
       "asks to change or remove images without posting a photo, touches settings, or isn't a website change; then explain briefly what you can do. " +
       "Use 'stats' for questions about visitors: how many visits or page views, popular pages, where visitors come from, countries or devices. " +
+      "Use 'describePhotos' when they ask to describe photos or images, or to fix or add missing photo, image or alt descriptions (no photo needs posting); with the page's collection and id if they name one, else null. " +
       "Designed pages list their sections; use them to find where an item or price lives (e.g. a menu item on the page whose sections list it).",
     user:
       `Site index (collection, id, title, path, date; designed = a page such as the homepage built from sections, whose headings, text, prices, buttons and cards can be changed; sections = what's on it):\n${JSON.stringify(index)}\n\n` +
@@ -539,6 +557,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
   if (choice.action === "undo") return proposeUndo(env, editor, { changeId: choice.changeId, recent, base });
   if (choice.action === "navigation") return proposeMenu(env, editor, { message, base, progress });
   if (choice.action === "everywhere") return proposeEverywhere(env, editor, { terms: choice.terms, message, base, progress });
+  if (choice.action === "describePhotos") return proposeDescriptions(env, editor, { collection: choice.collection, id: choice.id, base, progress });
 
   if (choice.action === "create" || choice.action === "createPage") {
     const drafted = await draftNew(env, editor, { choice, message, progress });
@@ -1127,7 +1146,7 @@ async function proposeUndo(env, editor, { changeId, recent, base }) {
   if (done.op === "update") {
     if (photo && !photo.after) return reply(`That spot on “${done.title}” had no photo before, and I can't remove photos yet. Post the photo you'd like instead.`);
     const changes = Object.fromEntries(Object.keys(done.changes || {}).map((f) => [f, done.before?.[f] ?? null]));
-    const proposal = { ...common, op: "update", changes, before: { ...done.changes }, ...(photo ? { photo: { ...photo, alt: changes[photo.slot?.replace(/\.src$/, ".alt")] || "Previous photo" } } : {}) };
+    const proposal = { ...common, op: "update", changes, before: { ...done.changes }, ...(done.descriptions ? { descriptions: undoDescriptions(done.descriptions) } : {}), ...(photo ?{ photo: { ...photo, alt: changes[photo.slot?.replace(/\.src$/, ".alt")] || "Previous photo" } } : {}) };
     await save(env, proposal);
     return { kind: "proposal", proposal };
   }
@@ -1336,12 +1355,14 @@ function heading(proposal) {
   if (proposal.op === "remove") return `Remove ${kind} “${proposal.title}”`;
   if (proposal.op === "restore") return `Put back ${kind} “${proposal.title}”`;
   if (proposal.op === "setImage") return `New photo for ${kind} “${proposal.title}”`;
+  if (proposal.descriptions) return `Photo descriptions for ${kind} “${proposal.title}”`;
   if (proposal.op === "update") return `Change to ${kind} “${proposal.title}”`;
   return `New ${kind}: “${proposal.title}”`;
 }
 
 /** Slack Block Kit for a pending proposal: before → after per field, Approve / Cancel buttons. */
 export function proposalBlocks(proposal, { siteUrl } = {}) {
+  if (proposal.descriptions) return descriptionBlocks(proposal, { siteUrl, heading: heading(proposal), buttons: buttons(proposal, "Approve and publish", "primary") });
   const blocks = [section(`*${esc(heading(proposal))}*\n${esc(proposal.summary || "")}`)];
   const context = [];
   if (proposal.runAt) context.push(`⏰ Happens ${esc(proposal.runAtLabel)}, once approved`);
