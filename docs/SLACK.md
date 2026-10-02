@@ -25,8 +25,20 @@ photo of a news item, event or other entry that shows one, an image on a designe
 entry) and writes the image description for screen readers. The photo is stored and resized like a
 staff-form upload, and the Approve card shows it (before and after). Post a photo without a message
 and the bot asks where it goes; answer in the thread, no need to post the photo again. One photo
-per message. Not yet: photos inside a page's text, and removing photos. Needs the `files:read`
+per message. Not yet: putting new photos inside a page's text, and removing photos. Needs the `files:read`
 scope (see below).
+
+**Photo descriptions.** *"Describe the photos on the About page"* or *"fix missing photo
+descriptions"* (no page: the one with the most goes first): the bot finds photos with no
+description (`<img>` in the body text with no or empty `alt`, a main photo without `imageAlt`, a
+designed page's image whose description is empty), downloads up to 10 (shrunk for Claude; ones it
+can't open are left out and counted), and Claude describes them from what it sees plus the page
+title and nearby text (one sentence under 150 characters, no names of people). One card shows each
+photo numbered with its description and says how many are left on that page and how many other
+pages need them. Before Approve, a reply in the card's thread changes it: *"#3: Volunteers sorting
+donations"* or *"skip #3"*; the card updates in place. Approve is an ordinary update (only the
+`alt` of those tags changes; other attributes stay as they were), so undo works. Code:
+`worker/src/photo-descriptions.js`.
 
 **Removing and undoing.** *"Take down the Spring Gala event"* gives a **Remove** card (red
 button). On Approve the entry comes off the site and goes to `trash.json` with who removed it and
