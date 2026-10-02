@@ -12,6 +12,7 @@ import Posts from "./Posts.astro";
 import Menu from "./Menu.astro";
 import Features from "./Features.astro";
 import Tiles from "./Tiles.astro";
+import Scenes from "./Scenes.astro";
 import Cta from "./Cta.astro";
 interface Props { sections: Section[] }
 const { sections } = Astro.props;
@@ -27,5 +28,6 @@ const { sections } = Astro.props;
   : s.type === "menu" ? <Menu s={s} />
   : s.type === "features" ? <Features s={s} />
   : s.type === "tiles" ? <Tiles s={s} />
+  : s.type === "scenes" ? <Scenes s={s} />
   : s.type === "cta" ? <Cta s={s} />
   : <Posts s={s} />)}

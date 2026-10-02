@@ -21,7 +21,8 @@ interface Base { type: string; id?: string; tone?: "light" | "alt" | "band"; eye
 // Hero layouts: "photo" (default) = full-width photo behind the text; "split" = text beside a framed photo.
 // shade (photo layout): "tint" (default) fades the photo into the band colour; "neutral" keeps
 // the photo's own colours under a soft dark gradient behind the text.
-export interface Hero extends Base { type: "hero"; layout?: "photo" | "split"; shade?: "tint" | "neutral"; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
+// parallax (photo layout): the photo scrolls more slowly than the text.
+export interface Hero extends Base { type: "hero"; layout?: "photo" | "split"; shade?: "tint" | "neutral"; parallax?: boolean; text?: string; buttons?: Button[]; image?: Img; stats?: { value: string; label: string }[] }
 export interface Stats extends Base { type: "stats"; intro?: string; items: { value: string; label: string }[]; highlight?: { value: string; label: string; text?: string } }
 export interface Split extends Base { type: "split"; paragraphs?: string[]; tags?: string[]; image?: Img; quote?: { text: string; by?: string }; reverse?: boolean; buttons?: Button[] }
 export interface Cards extends Base { type: "cards"; intro?: string; items: { title: string; text: string; href?: string; linkLabel?: string; icon?: string }[]; contacts?: { label: string; email: string }[] }
@@ -38,8 +39,11 @@ export interface Tiles extends Base { type: "tiles"; intro?: string; items: { ti
 // A centred call to action: heading, a line of text, buttons.
 export interface Cta extends Base { type: "cta"; text?: string; buttons?: Button[] }
 
-export type Section = Hero | Stats | Split | Cards | Quote | Stories | Text | Posts | Menu | Features | Tiles | Cta;
-export const SECTION_TYPES = ["hero", "stats", "split", "cards", "quote", "stories", "text", "posts", "menu", "features", "tiles", "cta"] as const;
+export type Section = Hero | Stats | Split | Cards | Quote | Stories | Text | Posts | Menu | Features | Tiles | Scenes | Cta;
+// Full-width photo panels, each with a text card over it; the photos scroll more slowly than the
+// cards (parallax) unless parallax is false.
+export interface Scenes extends Base { type: "scenes"; intro?: string; parallax?: boolean; items: { image: Img; eyebrow?: string; title: string; text?: string; href?: string; linkLabel?: string }[] }
+export const SECTION_TYPES = ["hero", "stats", "split", "cards", "quote", "stories", "text", "posts", "menu", "features", "tiles", "scenes", "cta"] as const;
 
 export interface SiteSettings {
   header?: { style?: "default" | "band"; button?: Button };
@@ -62,6 +66,10 @@ function load(): SectionsFile {
       if (!SECTION_TYPES.includes(s?.type as never)) throw new Error(`sections.json: pages["${key}"].sections[${i}] has unknown type "${s?.type}" (use ${SECTION_TYPES.join(", ")})`);
       const shade = (s as { shade?: string }).shade;
       if (s.type === "hero" && shade !== undefined && !["tint", "neutral"].includes(shade)) throw new Error(`sections.json: pages["${key}"].sections[${i}] has unknown shade "${shade}" (use tint or neutral)`);
+      const parallax = (s as { parallax?: unknown }).parallax;
+      if ((s.type === "hero" || s.type === "scenes") && parallax !== undefined && typeof parallax !== "boolean") throw new Error(`sections.json: pages["${key}"].sections[${i}] parallax must be true or false`);
+      if (s.type === "hero" && parallax === true && (s as { layout?: string }).layout === "split") throw new Error(`sections.json: pages["${key}"].sections[${i}] parallax only works with the photo layout`);
+      if (s.type === "scenes" && (!Array.isArray((s as Scenes).items) || (s as Scenes).items.some((it) => !it?.image?.src || !it.title))) throw new Error(`sections.json: pages["${key}"].sections[${i}] scenes need items, each with an image and a title`);
     });
   }
   cache = data;

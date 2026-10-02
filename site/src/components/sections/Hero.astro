@@ -2,6 +2,7 @@
 // Hero. "photo" (default): full-width photo behind the text, stats bottom-right.
 // "split": text beside a framed photo on the band colour (no overlay on the photo).
 // shade "neutral" (photo layout): the photo keeps its colours, darkened only behind the text.
+// parallax (photo layout): the photo scrolls more slowly than the text (CSS only; static where unsupported).
 import type { Hero } from "../../lib/sections";
 import Paras from "./Paras.astro";
 import Buttons from "./Buttons.astro";
@@ -32,8 +33,8 @@ const Title = first ? "h1" : "h2";
     </div>
   </section>
 ) : (
-  <section class:list={["s-hero", s.shade === "neutral" && "s-hero-neutral"]} id={s.id}>
-    {s.image && <img class="s-hero-img" src={s.image.src} alt={s.image.alt ?? ""} loading={first ? "eager" : "lazy"} fetchpriority={first ? "high" : undefined} decoding="async" />}
+  <section class:list={["s-hero", s.shade === "neutral" && "s-hero-neutral", s.parallax && "s-parallax"]} id={s.id}>
+    {s.image && <img class:list={["s-hero-img", s.parallax && "s-parallax-img"]} src={s.image.src} alt={s.image.alt ?? ""} loading={first ? "eager" : "lazy"} fetchpriority={first ? "high" : undefined} decoding="async" />}
     <div class="s-hero-shade"></div>
     <div class="wrap s-hero-inner">
       <div class="s-hero-main">
