@@ -78,6 +78,22 @@ them). It runs on the router's 10-minute tick (`worker/src/checkup.js`), and a K
 On by default; `SLACK_CHECKUP = "off"` in the client's `worker/wrangler.toml` turns it off. Router
 mode only.
 
+**How it looks on Google.** *"How does the About page look on Google?"* (or *"search preview for
+the homepage"*) replies with a mock search result (`worker/src/search-preview.js`, read-only): the
+title and description exactly as the site renders them (`lib/edit` `searchPages()`, which follows
+`BaseLayout.astro`), the address, where each comes from when the page has no search title or
+description of its own (title + site name; its summary, the start of its text, or the site's
+tagline), and its share image. Warnings in plain words: a title over ~60 or a description over
+~155 characters (likely cut off), a missing or short description, and a title or description
+another page also uses. *"Make the search description for About mention free prom dresses"* is an
+ordinary change (Approve, undo); the drafting prompt only touches the search title/description
+when the request is about Google, search or shared links. They're stored in the entry's (or
+designed page's) `seo` object; a search title is used exactly as written. Post a photo with
+*"use this as the share image for the Events page"* to set the picture shown when someone shares
+a link (`seo.image`, cropped to 1.91:1). The homepage's tagline fallback is only shown if the
+Worker has `SITE_TAGLINE` (same value as the site's `SITE_TAGLINE` variable); otherwise the preview
+says "your site's tagline". Staff never see the words SEO or meta.
+
 **Redirects.** When something is removed, its old address sends visitors to its listing page
 (`/news/`, `/events/`…, or the homepage for pages) instead of "page not found", or to the page
 staff name (*"take down the gala and send people to the events page"*). The address and where it

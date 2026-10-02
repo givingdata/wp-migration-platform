@@ -110,7 +110,7 @@ test("update: only changed fields, before captured, version stored, untouched HT
   assert.match(ctx.requests[0].messages[0].content, /<slack_message>/);
   assert.ok(ctx.requests[0].messages[0].content.includes('"id":"p2"'), "the site index is sent");
   // Pages only offer the always-editable fields.
-  assert.deepEqual(Object.keys(ctx.requests[1].output_config.format.schema.properties).sort(), ["contentEdits", "description", "imageAlt", "summary", "title"]);
+  assert.deepEqual(Object.keys(ctx.requests[1].output_config.format.schema.properties).sort(), ["contentEdits", "description", "imageAlt", "searchDescription", "searchTitle", "summary", "title"]);
   // Nothing written yet.
   assert.equal(ctx.store.files()["content.json"].pages[1].content, CONTACT_HTML);
 });

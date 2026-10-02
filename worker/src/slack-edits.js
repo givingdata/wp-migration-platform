@@ -33,6 +33,10 @@
 // description (in the body text, the main photo, a designed page's images), Claude looks at
 // them and one card proposes a description for each (photo-descriptions.js). It's an ordinary
 // update, so Approve, undo and the commit work as for any other change.
+//
+// Google: "how does About look on Google?" replies with a mock search result (search-preview.js).
+// The search title and description are ordinary update fields (entry.seo; extra values next to a
+// designed page's sections), and a photo can become a page's share image (seo.image).
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, ClaudeError } from "./claude.js";
 import { recordUsage } from "./usage.js";
@@ -42,6 +46,8 @@ import { visitorStats, analyticsSource, AnalyticsError } from "./analytics.js";
 import { allLinks, fetchLinkedPage } from "./linked-page.js";
 import { siteHealth, healthReport } from "./health.js";
 import { proposeDescriptions, descriptionBlocks, undoDescriptions } from "./photo-descriptions.js";
+import { searchPreview, SEARCH_FIELDS_HINT, DESIGNED_SEARCH_HINT, searchSlots, mentionsShareImage, shareImageTargets, shareImageProposal } from "./search-preview.js";
+import { checkSearchChanges } from "../../lib/edit/search.js";
 
 export const APPROVE_ACTION = "1wp_approve";
 export const CANCEL_ACTION = "1wp_cancel";
@@ -59,11 +65,15 @@ const MAX_PER_COLLECTION = 150;
 
 // Mirrors lib/edit (ALWAYS_EDITABLE / EDITABLE): what an update may touch. The Edit module
 // enforces this again when the change is applied.
-const ALWAYS_EDITABLE = ["title", "description", "content", "imageAlt"];
+const ALWAYS_EDITABLE = ["title", "description", "content", "imageAlt", "seo.title", "seo.description"];
 const EDITABLE = ["date", "endDate", "time", "location", "author", "linkUrl"];
 const DATE_FIELDS = new Set(["date", "endDate"]);
-const TEXT_LIMITS = { title: 200, description: 1000, content: 200_000, time: 200, location: 500, author: 200, imageAlt: 300, linkUrl: 2000 };
-const LABELS = { title: "Title", description: "Summary", content: "Text", imageAlt: "Image description", date: "Date", endDate: "End date", time: "Time", location: "Location", author: "Author", linkUrl: "Link" };
+const TEXT_LIMITS = { title: 200, description: 1000, content: 200_000, time: 200, location: 500, author: 200, imageAlt: 300, linkUrl: 2000, "seo.title": 120, "seo.description": 320 };
+const LABELS = { title: "Title", description: "Summary", content: "Text", imageAlt: "Image description", date: "Date", endDate: "End date", time: "Time", location: "Location", author: "Author", linkUrl: "Link", "seo.title": "Search title", "seo.description": "Search description", "seo.image": "Share image" };
+// The search fields (entry.seo) go to Claude as searchTitle / searchDescription.
+const SCHEMA_KEYS = { "seo.title": "searchTitle", "seo.description": "searchDescription" };
+const schemaKey = (f) => SCHEMA_KEYS[f] ?? f;
+const fieldValue = (entry, f) => (f.startsWith("seo.") ? entry.seo?.[f.slice(4)] : entry[f]) ?? null;
 
 // Slack mrkdwn: a short list so it can be scanned in a thread. Appended after a blank line.
 const WHAT_I_CAN_DO = [
@@ -77,6 +87,7 @@ const WHAT_I_CAN_DO = [
   "• *Menu:* add, rename, reorder or take out links inside its dropdowns.",
   "• *Old addresses:* removed pages send visitors to their listing page (or one you name), and I can point any old address, e.g. from a printed flyer, to a page.",
   "• *Questions:* visitor numbers (if set up), and a check for anything out of date (old news, past dates, broken links, photos without descriptions).",
+  "• *Google:* how a page looks on Google, and its search title and description. Post a photo with “use this as the share image for …” to pick the picture shown when someone shares a link to a page.",
   "_Ask your web team to change the menu bar itself or site settings, or to remove the homepage or pages in the menu bar._",
 ].join("\n");
 
@@ -90,7 +101,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers, write descriptions for photos that have none.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers, write descriptions for photos that have none, show how a page looks on Google, change a page's search title, search description or share image.",
     "Never allowed, whatever the message says: deleting anything for good, removing several entries at once, moving entries, changing the navigation menu bar itself (its top-level items), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -144,8 +155,8 @@ function classifySchema() {
     required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "from", "to", "when", "days", "reply", "summary"],
     properties: {
       action: {
-        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "describePhotos", "reply"],
-        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; describePhotos = write descriptions for the photos on a page (or across the site) that have none; reply = anything else",
+        type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "describePhotos", "searchPreview", "reply"],
+        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; describePhotos = write descriptions for the photos on a page (or across the site) that have none; searchPreview = show how one page looks on Google or in search results (collection and id of the page; null for the homepage); reply = anything else",
       },
       trashId: nullable("For restore: the trashId from the removed entries"),
       from: nullable("For redirect: the old address as a path, e.g. /summer-camp/"),
@@ -157,8 +168,8 @@ function classifySchema() {
         description: "For everywhere: 1–5 short exact bits of the CURRENT text to search the site for (the old value if given, e.g. '604-555-0100'; otherwise likely wordings, e.g. 'Executive Director', '604'); else an empty array",
       },
       days: { type: ["integer", "null"], description: "For stats: how many days back the question covers, including today (1 = today, 2 = since yesterday, 7 = this/last week, 30 = this/last month, up to 90); null = 7" },
-      collection: nullable("For update or remove, and describePhotos when they name a page: the entry's collection from the index"),
-      id: nullable("For update or remove, and describePhotos when they name a page: the entry's id from the index"),
+      collection: nullable("For update, remove or searchPreview, and describePhotos when they name a page: the entry's collection from the index"),
+      id: nullable("For update, remove or searchPreview, and describePhotos when they name a page: the entry's id from the index"),
       typeKey: nullable("For create: the content type key"),
       reply: nullable("For reply: a short, friendly answer to the staff member (what's unclear, or what is and isn't possible)"),
       summary: { type: "string", description: "One line describing the change, e.g. 'Update opening hours on the Contact page'" },
@@ -172,9 +183,9 @@ function imageSchema() {
     additionalProperties: false,
     required: ["action", "collection", "id", "slot", "typeKey", "imageAlt", "reply", "summary"],
     properties: {
-      action: { type: "string", enum: ["setImage", "create", "reply"], description: "setImage = use the photo on an existing entry or designed-page image; create = a new entry with this photo; reply = anything else" },
-      collection: nullable("For setImage: the collection from the index (\"designed\" for a designed page)"),
-      id: nullable("For setImage: the entry's id from the index"),
+      action: { type: "string", enum: ["setImage", "shareImage", "create", "reply"], description: "setImage = use the photo on an existing entry or designed-page image; shareImage = make it a page's share image (only when they ask for that); create = a new entry with this photo; reply = anything else" },
+      collection: nullable("For setImage or shareImage: the collection from the index (\"designed\" for a designed page)"),
+      id: nullable("For setImage or shareImage: the entry's id from the index"),
       slot: nullable("For setImage on a designed page: the image slot id from that page's images; else null"),
       typeKey: nullable("For create: the content type key"),
       imageAlt: { type: "string", description: "What the photo shows, for people using screen readers: one plain sentence under 150 characters, no 'image of' or 'photo of'" },
@@ -193,7 +204,10 @@ function updateSchema(fields) {
   const props = {};
   for (const f of fields) {
     if (f === "content") continue;
-    props[f] = nullable(DATE_FIELDS.has(f) ? `New ${f} as YYYY-MM-DD, or null to leave it unchanged` : `New ${f} (plain text), or null to leave it unchanged`);
+    props[schemaKey(f)] = nullable(
+      f.startsWith("seo.") ? `New ${LABELS[f].toLowerCase()} (plain text, shown only on Google and in shared links), or null to leave it unchanged`
+        : DATE_FIELDS.has(f) ? `New ${f} as YYYY-MM-DD, or null to leave it unchanged` : `New ${f} (plain text), or null to leave it unchanged`,
+    );
   }
   props.contentEdits = {
     type: "array",
@@ -470,6 +484,8 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "asks to change or remove images without posting a photo, touches settings, or isn't a website change; then explain briefly what you can do. " +
       "Use 'stats' for questions about visitors: how many visits or page views, popular pages, where visitors come from, countries or devices. " +
       "Use 'describePhotos' when they ask to describe photos or images, or to fix or add missing photo, image or alt descriptions (no photo needs posting); with the page's collection and id if they name one, else null. " +
+      "Use 'searchPreview' when they ask how a page looks on Google or in search results, or for a search preview of a page (no change). " +
+      "A request to change a page's search title or search description, or what Google shows for it, is an 'update' of that page. " +
       "Designed pages list their sections; use them to find where an item or price lives (e.g. a menu item on the page whose sections list it).",
     user:
       `Site index (collection, id, title, path, date; designed = a page such as the homepage built from sections, whose headings, text, prices, buttons and cards can be changed; sections = what's on it):\n${JSON.stringify(index)}\n\n` +
@@ -487,6 +503,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
     const result = await siteHealth(editor, { today: localNow(env).split(" ")[1].slice(0, 10), siteUrl: env.SITE_URL || null, siteName: env.SITE_NAME });
     return { kind: "reply", text: healthReport(result, { siteUrl: env.SITE_URL || null }) };
   }
+  if (choice.action === "searchPreview") return searchPreview(env, editor, { collection: choice.collection, id: choice.id, progress });
   if (choice.action === "stats") return answerStats(env, { message, days: choice.days, pages: index.map((e) => ({ path: e.path, title: e.title })), progress });
 
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
@@ -513,13 +530,13 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
     if (opened.designed) return proposeDesigned(env, { choice, opened, message, base, progress });
     const { entry, type, version, path } = opened;
     const fields = allowedFields(type.key, type.fields);
-    const current = Object.fromEntries(fields.map((f) => [f, entry[f] ?? null]));
+    const current = Object.fromEntries(fields.map((f) => [schemaKey(f), fieldValue(entry, f)]));
     const contentLength = String(current.content ?? "").length;
     await progress?.(`Found “${String(entry.title ?? "").slice(0, 120)}”. Drafting the change…`);
     const draft = await ask(env, {
       task:
         "Second step: draft the change to this entry. Change only what the request asks for. For the body, return small find/replace edits " +
-        "that copy the current HTML exactly; keep its structure and every untouched paragraph as it is. Use null for fields that don't change.",
+        "that copy the current HTML exactly; keep its structure and every untouched paragraph as it is. Use null for fields that don't change. " + SEARCH_FIELDS_HINT,
       user: `Entry (${type.label ?? type.key}, current values):\n${JSON.stringify(current)}\n\nRequest from Slack:\n${slackMessage(message)}`,
       schema: updateSchema(fields),
       maxTokens: Math.min(32_000, 2000 + Math.ceil(Math.min(contentLength, 40_000) / 2)),
@@ -528,9 +545,9 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
     const changes = {};
     for (const f of fields) {
       if (f === "content") continue;
-      const v = draft[f];
+      const v = draft[schemaKey(f)];
       if (typeof v !== "string" || !v.trim()) continue;
-      if (v.trim() !== String(current[f] ?? "").trim()) changes[f] = v.trim();
+      if (v.trim() !== String(current[schemaKey(f)] ?? "").trim()) changes[f] = v.trim();
     }
     if (fields.includes("content") && draft.contentEdits?.length) {
       const edited = applyContentEdits(current.content, draft.contentEdits);
@@ -544,7 +561,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
     const proposal = {
       id: crypto.randomUUID(), op: "update", collection: choice.collection, entryId: String(entry.id ?? entry.slug), typeKey: type.key,
       typeLabel: type.label ?? type.key, fieldLabels: { ...(type.fieldLabels ?? {}), ...(type.dateLabel ? { date: type.dateLabel } : {}) },
-      version, changes, before: Object.fromEntries(Object.keys(changes).map((f) => [f, entry[f] ?? null])),
+      version, changes, before: Object.fromEntries(Object.keys(changes).map((f) => [f, fieldValue(entry, f)])),
       title: entry.title, path, summary: draft.summary || choice.summary, ...base,
     };
     await save(env, proposal);
@@ -653,6 +670,8 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
   if (typeof storeImage !== "function") throw new ClaudeError("Photos can't be stored on this site", 500);
   const index = await photoIndex(editor);
   const types = creatableTypes(editor).filter((t) => t.fields?.includes("image"));
+  // Any page can have a share image; the list is only offered when the message is about sharing.
+  const share = mentionsShareImage(message) ? await shareImageTargets(editor) : null;
   await progress?.("Looking at the photo…");
   const choice = await ask(env, {
     task:
@@ -660,8 +679,10 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
       "the main photo of one existing entry in the index (setImage with its collection and id), an image on a designed page (setImage with collection \"designed\", the page id and one image slot from its list), " +
       "or a new entry of a content type with this photo (create). Use 'reply' when it isn't clear where the photo goes (for example no message, or several possible places), " +
       "when they ask to remove a photo or put it inside a page's text, or when it isn't a website change; ask or explain briefly. " +
+      "Use 'shareImage' (collection and id from the pages that can get a share image) only when they ask for it to be the share image: the picture shown when someone shares a link to the page (social media, link previews), not a photo on the page itself. " +
       "Also describe the photo for screen readers." + (image.preview ? "" : " (The photo itself couldn't be shown to you; describe it from the message and file name, or say 'Photo' if unknown.)"),
     user: `Places a photo can go (collection, id, title, path; designed pages list their image slots):\n${JSON.stringify(index)}\n\nContent types that can be added with a photo:\n${JSON.stringify(types)}\n\n` +
+      (share ? `Pages that can get a share image (collection, id, title, path):\n${JSON.stringify(share)}\n\n` : "") +
       `Photo file name: ${JSON.stringify(String(image.name || "photo").slice(0, 200))}` +
       (image.url ? `\nThe photo is the image at this link in the message (not a page to read): ${image.url}` : "") +
       `\n\nMessage from Slack:\n${slackMessage(message || "(no message)")}`,
@@ -671,6 +692,14 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
   });
   const alt = String(choice.imageAlt || "").trim().slice(0, TEXT_LIMITS.imageAlt) || "Photo";
   const base = { requestedBy: requestedBy ?? by ?? null, text: message, status: "pending", createdAt: new Date().toISOString() };
+
+  if (choice.action === "shareImage") {
+    const drafted = await shareImageProposal(editor, { collection: choice.collection, id: choice.id, summary: choice.summary, alt, storeImage, progress });
+    if (drafted.kind === "reply") return drafted;
+    const proposal = { ...drafted.proposal, ...base };
+    await save(env, proposal);
+    return { kind: "proposal", proposal };
+  }
 
   if (choice.action === "setImage" && choice.collection === DESIGNED) {
     let opened;
@@ -743,14 +772,13 @@ async function proposePhoto(env, editor, { message, by, requestedBy, progress, i
 // text; the page's sections and images stay as they are.
 async function proposeDesigned(env, { choice, opened, message, base, progress }) {
   const { entry, version, path } = opened;
-  const slots = entry.sections.flatMap((s) => s.slots.filter((x) => x.kind !== "image").map((x) => ({ ...x, section: s.label })));
-  if (!slots.length) return reply(`That page has no text I can change.\n\n${WHAT_I_CAN_DO}`);
+  const slots = [...entry.sections.flatMap((s) => s.slots.filter((x) => x.kind !== "image").map((x) => ({ ...x, section: s.label }))), ...searchSlots(entry.seo)];
   await progress?.(`Found “${String(entry.title ?? "").slice(0, 120)}”. Drafting the change…`);
   const draft = await ask(env, {
     task:
       "Second step: this page is built from designed sections. Change only the text values the request is about, returning the complete new text for each. " +
       "Sections, their order, and images can't change here; if the request needs that, return no edits. " +
-        "Values are plain text: in longer text values a blank line (\\n\\n) starts a new paragraph and a single \\n is a line break; never write HTML tags such as <p> or <br>.",
+        "Values are plain text: in longer text values a blank line (\\n\\n) starts a new paragraph and a single \\n is a line break; never write HTML tags such as <p> or <br>. " + DESIGNED_SEARCH_HINT,
     user: `Designed page “${entry.title}” (${path}); its text values (slot, section, label, value):\n${JSON.stringify(slots.map((x) => ({ slot: x.slot, section: x.section, label: x.label, value: x.value })))}\n\nRequest from Slack:\n${slackMessage(message)}`,
     schema: designedSchema(slots),
     maxTokens: 6000,
@@ -762,7 +790,7 @@ async function proposeDesigned(env, { choice, opened, message, base, progress })
     if (current && typeof value === "string" && value.trim() !== current.value.trim()) changes[slot] = value.trim();
   }
   if (!Object.keys(changes).length) return reply(`That already matches what's on the site, or I couldn't tell what to change. On designed pages I can change the words and links, not the layout. To change a photo, post it with your message or paste a link to the image (a direct link to a JPG, PNG or WebP).\n\n${WHAT_I_CAN_DO}`);
-  const { errors } = checkSlotChanges(slots, changes);
+  const errors = { ...checkSlotChanges(slots, changes).errors, ...checkSearchChanges(changes).errors };
   if (Object.keys(errors).length) return reply(`I couldn't draft that: ${Object.entries(errors).map(([slot, e]) => `${bySlot.get(slot)?.label ?? slot}: ${e}`).join("; ")}.`);
 
   const proposal = {
@@ -1132,7 +1160,7 @@ async function proposeUndo(env, editor, { changeId, recent, base }) {
     id: crypto.randomUUID(), collection: done.collection, entryId: done.entryId, typeKey: done.typeKey, typeLabel: done.typeLabel, fieldLabels: done.fieldLabels ?? {},
     version: opened.version, title: opened.entry.title ?? done.title, path: opened.path ?? done.path, summary, undoOf, ...base,
   };
-  const photo = done.photo ? { before: done.photo.after, after: done.photo.before, alt: null, slot: done.photo.slot } : undefined;
+  const photo = done.photo ? { before: done.photo.after, after: done.photo.before, alt: null, slot: done.photo.slot, ...(done.photo.share ? { share: true } : {}) } : undefined;
 
   if (done.op === "setImage") {
     if (!done.beforeMedia) return reply(`“${done.title}” had no photo before, and I can't remove photos yet. Post the photo you'd like instead, or ask your web team.`);
@@ -1144,9 +1172,10 @@ async function proposeUndo(env, editor, { changeId, recent, base }) {
     return { kind: "proposal", proposal };
   }
   if (done.op === "update") {
-    if (photo && !photo.after) return reply(`That spot on “${done.title}” had no photo before, and I can't remove photos yet. Post the photo you'd like instead.`);
+    // A share image can always go: the page's own photo (or the site's default) is used again.
+    if (photo && !photo.after && !photo.share) return reply(`That spot on “${done.title}” had no photo before, and I can't remove photos yet. Post the photo you'd like instead.`);
     const changes = Object.fromEntries(Object.keys(done.changes || {}).map((f) => [f, done.before?.[f] ?? null]));
-    const proposal = { ...common, op: "update", changes, before: { ...done.changes }, ...(done.descriptions ? { descriptions: undoDescriptions(done.descriptions) } : {}), ...(photo ?{ photo: { ...photo, alt: changes[photo.slot?.replace(/\.src$/, ".alt")] || "Previous photo" } } : {}) };
+    const proposal = { ...common, op: "update", changes, before: { ...done.changes }, ...(done.descriptions ? { descriptions: undoDescriptions(done.descriptions) } : {}), ...(photo ? { photo: { ...photo, alt: (photo.share ? null : changes[photo.slot?.replace(/\.src$/, ".alt")]) || "Previous photo" } } : {}) };
     await save(env, proposal);
     return { kind: "proposal", proposal };
   }
@@ -1366,6 +1395,7 @@ export function proposalBlocks(proposal, { siteUrl } = {}) {
   const blocks = [section(`*${esc(heading(proposal))}*\n${esc(proposal.summary || "")}`)];
   const context = [];
   if (proposal.runAt) context.push(`⏰ Happens ${esc(proposal.runAtLabel)}, once approved`);
+  if (proposal.photo?.share) context.push("🔗 The share image is the picture shown when someone shares a link to this page (Facebook, LinkedIn, Slack…); the page itself doesn't change");
   if (proposal.photoTip && !proposal.photo) context.push(`📷 To add a photo once it's published, post one here with “use this for ${esc(cut(String(proposal.title), 60))}”`);
   if (proposal.requestedBy) context.push(`Requested by ${who(proposal.requestedBy)}`);
   const link = pageLink(siteUrl, proposal.path);

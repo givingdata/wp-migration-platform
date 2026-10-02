@@ -372,6 +372,22 @@
           <label for="e-imageAlt">Image description <span class="optional">(for screen readers)</span></label>
           <input type="text" id="e-imageAlt" name="imageAlt" maxlength="300">
         </div>
+
+        <fieldset class="designed-section" data-edit-field="search" hidden>
+          <legend>How it looks on Google</legend>
+          <div class="field">
+            <label for="e-seo.title">Search title <span class="optional">(optional)</span></label>
+            <input type="text" id="e-seo.title" name="seo.title" maxlength="120" aria-describedby="e-seo.title-hint e-seo.title-error">
+            <p class="hint" id="e-seo.title-hint">The title in Google results and when a link is shared, used exactly as written. Leave empty to use the title plus the site name. Best under 60 characters.</p>
+            <p class="error-text" id="e-seo.title-error"></p>
+          </div>
+          <div class="field">
+            <label for="e-seo.description">Search description <span class="optional">(optional)</span></label>
+            <textarea id="e-seo.description" name="seo.description" maxlength="320" rows="2" class="short" aria-describedby="e-seo.description-hint e-seo.description-error"></textarea>
+            <p class="hint" id="e-seo.description-hint">The text under the title in Google results. Leave empty to use the summary. Best 120–155 characters.</p>
+            <p class="error-text" id="e-seo.description-error"></p>
+          </div>
+        </fieldset>
         </div>
 
         <div class="actions spread">

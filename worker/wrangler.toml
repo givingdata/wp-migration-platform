@@ -8,6 +8,9 @@ enabled = true
 
 [vars]
 SITE_NAME = "Your Organization"
+# The site's tagline (GitHub variable SITE_TAGLINE), for the Slack bot's "how does it look on Google?"
+# on a homepage with no description of its own. Unset = the bot says "your site's tagline".
+# SITE_TAGLINE = ""
 GITHUB_REPO = "OWNER/CLIENT-site"
 GITHUB_BRANCH = "main"
 CONTENT_PATH = "content.json"
