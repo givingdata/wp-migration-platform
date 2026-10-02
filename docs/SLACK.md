@@ -37,8 +37,16 @@ title and nearby text (one sentence under 150 characters, no names of people). O
 photo numbered with its description and says how many are left on that page and how many other
 pages need them. Before Approve, a reply in the card's thread changes it: *"#3: Volunteers sorting
 donations"* or *"skip #3"*; the card updates in place. Approve is an ordinary update (only the
-`alt` of those tags changes; other attributes stay as they were), so undo works. Code:
-`worker/src/photo-descriptions.js`.
+`alt` of those tags changes; other attributes stay as they were), so undo works. *"Show the photo
+descriptions on About"* lists every photo on the page, numbered, with what it says now (no card).
+*"Change photo 2's description on About to …"* proposes the staff member's own wording (no Claude;
+the number is from that list, not needed when the page has one photo), and *"rewrite the photo
+descriptions on About"* has Claude write new ones for all of them; both cards show what each
+says now. Code: `worker/src/photo-descriptions.js`.
+
+**Seeing search settings.** *"What's the search description for About?"*, *"show the SEO tags on
+the homepage"* and the like get the Google preview (search title, search description, share
+image, hidden from search or not), not a refusal.
 
 **Removing and undoing.** *"Take down the Spring Gala event"* gives a **Remove** card (red
 button). On Approve the entry comes off the site and goes to `trash.json` with who removed it and

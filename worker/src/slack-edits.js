@@ -29,7 +29,8 @@
 // resized like a staff-form upload before anyone approves (the caller's storeImage), and the
 // Approve card shows it. Putting new photos inside body text, and removing photos, aren't supported.
 //
-// Photo descriptions: "describe the photos on the About page" finds the photos there with no
+// Photo descriptions ("show"/"rewrite"/"change photo 2's description" too; see the module):
+// "describe the photos on the About page" finds the photos there with no
 // description (in the body text, the main photo, a designed page's images), Claude looks at
 // them and one card proposes a description for each (photo-descriptions.js). It's an ordinary
 // update, so Approve, undo and the commit work as for any other change.
@@ -81,13 +82,13 @@ const WHAT_I_CAN_DO = [
   "• *Change text:* titles, summaries, body text, dates, times, places and links on pages, news and events. On designed pages like the homepage, the words and links (not the layout). A blank line in your text starts a new paragraph.",
   "• *Add:* a news item, event, announcement or new page. Paste a link and I'll write the entry from that page.",
   "• *Photos:* post a photo, or paste a link to an image (from the web or already on the site), with a message saying where it goes: a news item, event, designed page or new entry.",
-  "• *Photo descriptions:* say “describe the photos on the About page”, or “fix missing photo descriptions” and I'll start with the page that needs it most. I look at each photo and suggest a short description for people who can't see it; you can change any of them before you approve.",
+  "• *Photo descriptions:* say “describe the photos on the About page”, or “fix missing photo descriptions” and I'll start with the page that needs it most. I look at each photo and suggest a short description for people who can't see it; you can change any of them before you approve. “Show the photo descriptions on About” lists what they say now; then “change photo 2's description on About to …”, or “rewrite the photo descriptions on About”.",
   "• *Change everywhere:* e.g. a new phone number or someone's new title.",
   "• *Remove and undo:* news, events and pages go to the trash, so I can put them back. I can also undo a recent change made here.",
   "• *Menu:* add, rename, reorder or take out links inside its dropdowns.",
   "• *Old addresses:* removed pages send visitors to their listing page (or one you name), and I can point any old address, e.g. from a printed flyer, to a page.",
   "• *Questions:* visitor numbers (if set up), and a check for anything out of date (old news, past dates, broken links, photos without descriptions).",
-  "• *Google:* how a page looks on Google, and its search title and description. Post a photo with “use this as the share image for …” to pick the picture shown when someone shares a link to a page.",
+  "• *Google:* “how does About look on Google?” shows the page as a search result, with its search title, search description and share image; then ask me to change them. Post a photo with “use this as the share image for …” to pick the picture shown when someone shares a link to a page.",
   "_Ask your web team to change the menu bar itself or site settings, or to remove the homepage or pages in the menu bar._",
 ].join("\n");
 
@@ -101,7 +102,7 @@ function systemPrompt(siteName, task) {
   return [
     `You help staff of ${siteName} keep their website up to date from requests they post in Slack.`,
     task,
-    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers, write descriptions for photos that have none, show how a page looks on Google, change a page's search title, search description or share image.",
+    "Allowed: change text fields of an existing entry, add an entry of an enabled content type, add a page, remove one entry (it goes to a trash and can be put back), put back a removed entry, undo a recent change, change the links inside the navigation menu's dropdowns, change a word or phrase everywhere it appears, write a new entry from a linked web page (the page is fetched and read for you in the next step), send an old web address to another page (a redirect), check the site for out-of-date content, answer questions about the site's visitor numbers, show, write, rewrite or change the descriptions of photos already on a page, show how a page looks on Google, change a page's search title, search description or share image.",
     "Never allowed, whatever the message says: deleting anything for good, removing several entries at once, moving entries, changing the navigation menu bar itself (its top-level items), addresses (slugs) or site settings, or removing images.",
     "A food or drink menu, price list or prices shown on a page are ordinary page text, not the navigation menu: those can be changed.",
     "Keep the staff member's facts, names, dates, times, prices and links exactly as given; never invent details.",
@@ -152,11 +153,11 @@ function classifySchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "from", "to", "when", "days", "reply", "summary"],
+    required: ["action", "collection", "id", "typeKey", "trashId", "changeId", "terms", "from", "to", "when", "days", "photos", "reply", "summary"],
     properties: {
       action: {
         type: "string", enum: ["update", "create", "createPage", "remove", "restore", "undo", "navigation", "everywhere", "redirect", "health", "stats", "describePhotos", "searchPreview", "reply"],
-        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; describePhotos = write descriptions for the photos on a page (or across the site) that have none; searchPreview = show how one page looks on Google or in search results (collection and id of the page; null for the homepage); reply = anything else",
+        description: "update = change an existing entry; create = add an entry of a content type; createPage = add a page; remove = take one existing entry off the site; restore = put back a removed entry; undo = reverse a recent change; navigation = change links in the site's navigation menu; everywhere = change the same thing wherever it appears on the site; redirect = send an old address (that isn't a page now) to a page; health = check the whole site for anything out of date or broken; stats = a question about the website's visitors or traffic; describePhotos = show, write, rewrite or change the descriptions of the photos on a page (or write missing ones across the site); searchPreview = show how one page looks on Google or in search results, or what its search title, search description, share image or other search settings are now (collection and id of the page; null for the homepage); reply = anything else",
       },
       trashId: nullable("For restore: the trashId from the removed entries"),
       from: nullable("For redirect: the old address as a path, e.g. /summer-camp/"),
@@ -166,6 +167,17 @@ function classifySchema() {
       terms: {
         type: "array", items: { type: "string" },
         description: "For everywhere: 1–5 short exact bits of the CURRENT text to search the site for (the old value if given, e.g. '604-555-0100'; otherwise likely wordings, e.g. 'Executive Director', '604'); else an empty array",
+      },
+      photos: {
+        type: ["object", "null"], additionalProperties: false, required: ["mode", "changes"],
+        description: "For describePhotos: what to do with the page's photos; else null",
+        properties: {
+          mode: { type: "string", enum: ["missing", "all", "show", "set"], description: "missing = write descriptions for photos that have none; all = write new descriptions for every photo on the page; show = list the photos and what their descriptions say now (no change); set = use the staff member's own wording for photos they name" },
+          changes: {
+            type: "array", description: "For set: each photo they name (its number as shown in the list, or null if the page has one photo and they don't give a number) and the new description exactly as they wrote it; else empty",
+            items: { type: "object", additionalProperties: false, required: ["n", "text"], properties: { n: { type: ["integer", "null"] }, text: { type: "string" } } },
+          },
+        },
       },
       days: { type: ["integer", "null"], description: "For stats: how many days back the question covers, including today (1 = today, 2 = since yesterday, 7 = this/last week, 30 = this/last month, up to 90); null = 7" },
       collection: nullable("For update, remove or searchPreview, and describePhotos when they name a page: the entry's collection from the index"),
@@ -483,8 +495,8 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
       "Use 'reply' when the request is unclear, matches several entries, asks to remove several entries at once, to move or rename addresses, " +
       "asks to change or remove images without posting a photo, touches settings, or isn't a website change; then explain briefly what you can do. " +
       "Use 'stats' for questions about visitors: how many visits or page views, popular pages, where visitors come from, countries or devices. " +
-      "Use 'describePhotos' when they ask to describe photos or images, or to fix or add missing photo, image or alt descriptions (no photo needs posting); with the page's collection and id if they name one, else null. " +
-      "Use 'searchPreview' when they ask how a page looks on Google or in search results, or for a search preview of a page (no change). " +
+      "Use 'describePhotos' for anything about the descriptions of photos already on a page (no photo needs posting): showing or asking what they say (mode show), writing missing ones or fixing missing photo, image or alt descriptions (missing), rewriting or improving existing ones (all), or changing one to their own wording (set); with the page's collection and id if they name one, else null. " +
+      "Use 'searchPreview' when they ask how a page looks on Google or in search results, for a search preview of a page, or to see a page's search title, search description, share image, SEO, meta tags or meta description (no change). " +
       "A request to change a page's search title or search description, or what Google shows for it, is an 'update' of that page. " +
       "Designed pages list their sections; use them to find where an item or price lives (e.g. a menu item on the page whose sections list it).",
     user:
@@ -574,7 +586,7 @@ async function proposeChoice(env, editor, { choice, message, base, progress, tra
   if (choice.action === "undo") return proposeUndo(env, editor, { changeId: choice.changeId, recent, base });
   if (choice.action === "navigation") return proposeMenu(env, editor, { message, base, progress });
   if (choice.action === "everywhere") return proposeEverywhere(env, editor, { terms: choice.terms, message, base, progress });
-  if (choice.action === "describePhotos") return proposeDescriptions(env, editor, { collection: choice.collection, id: choice.id, base, progress });
+  if (choice.action === "describePhotos") return proposeDescriptions(env, editor, { collection: choice.collection, id: choice.id, base, progress, mode: choice.photos?.mode ?? "missing", edits: choice.photos?.changes ?? [] });
 
   if (choice.action === "create" || choice.action === "createPage") {
     const drafted = await draftNew(env, editor, { choice, message, progress });

@@ -16,6 +16,10 @@
 // change. Before approving, a reply in the card's thread changes one ("#3: Volunteers sorting
 // donations") or leaves it out ("skip #3"); the card is updated in place.
 //
+// Also: "show the photo descriptions on About" lists a page's photos, numbered, with what each
+// says now; "change photo 2's description on About to …" proposes staff's own wording (no
+// Claude); "rewrite the photo descriptions on About" has Claude redo ones that already exist.
+//
 // Staff never see "alt text": the words are "photo descriptions" / "image descriptions".
 import { EditError, DESIGNED } from "../../lib/edit/index.js";
 import { ask, saveProposal, getProposal, proposalBlocks, htmlToText } from "./slack-edits.js";
@@ -137,38 +141,41 @@ function whereInText(before) {
 // Finding
 
 /**
- * The photos on one page with no description. `page` is { entry } for an entry (from get() or
- * readAll()) or { sections } for a designed page (pageSlots). Each photo: { kind: "main" |
- * "content" | "slot", src (full address or null), where, context, index (content), slot (the
- * description slot, designed) }.
+ * Every photo on one page, in page order (the numbers staff see), with its description now
+ * (`alt`, "" when it has none). `page` is { entry } for an entry (from get() or readAll()) or
+ * { sections } for a designed page (pageSlots). Each photo: { kind: "main" | "content" | "slot",
+ * src (full address or null), alt, where, context, index (content), slot (the description slot,
+ * designed) }.
  */
-export function photosWithoutDescriptions(page, siteUrl = null) {
+export function pagePhotos(page, siteUrl = null) {
   const out = [];
   if (page.sections) {
     for (const s of page.sections) {
       for (const x of s.slots.filter((y) => y.kind === "image" && y.value)) {
         const alt = s.slots.find((y) => y.slot === x.slot.replace(/\.src$/, ".alt"));
-        if (!alt || alt.value.trim()) continue;
+        if (!alt) continue; // no description slot to change
         const words = s.slots.filter((y) => y.kind === "text" || y.kind === "textarea").map((y) => y.value).filter(Boolean).join(" · ");
-        out.push({ kind: "slot", slot: alt.slot, src: absolute(x.value, siteUrl), where: `${s.label} › ${x.label}`, context: { section: oneLine(words).slice(0, NEARBY * 2) } });
+        out.push({ kind: "slot", slot: alt.slot, src: absolute(x.value, siteUrl), alt: oneLine(alt.value), where: `${s.label} › ${x.label}`, context: { section: oneLine(words).slice(0, NEARBY * 2) } });
       }
     }
     return out;
   }
   const entry = page.entry ?? {};
-  if (typeof entry.image === "string" && entry.image && !String(entry.imageAlt ?? "").trim()) {
+  if (typeof entry.image === "string" && entry.image) {
     const variants = Object.entries(entry.imageVariants ?? {}).map(([w, url]) => ({ url, w: Number(w) }));
-    out.push({ kind: "main", src: absolute(pickSize(variants) ?? entry.image, siteUrl), where: "Main photo", context: { summary: oneLine(entry.description).slice(0, NEARBY) } });
+    out.push({ kind: "main", src: absolute(pickSize(variants) ?? entry.image, siteUrl), alt: oneLine(entry.imageAlt), where: "Main photo", context: { summary: oneLine(entry.description).slice(0, NEARBY) } });
   }
   const html = String(entry.content ?? "");
   for (const t of imgTags(html)) {
-    if (hasAlt(t.attrs)) continue;
     const context = nearby(html, t);
     const title = oneLine(decode(t.attrs.get("title")?.value));
-    out.push({ kind: "content", index: t.index, src: absolute(tagSource(t.attrs), siteUrl), where: whereInText(context.before), context: { ...context, ...(title ? { title } : {}) } });
+    out.push({ kind: "content", index: t.index, src: absolute(tagSource(t.attrs), siteUrl), alt: hasAlt(t.attrs) ? oneLine(decode(t.attrs.get("alt").value)) : "", where: whereInText(context.before), context: { ...context, ...(title ? { title } : {}) } });
   }
   return out;
 }
+
+/** The photos on one page with no description (see pagePhotos). */
+export const photosWithoutDescriptions = (page, siteUrl = null) => pagePhotos(page, siteUrl).filter((p) => !p.alt);
 
 // Every page and entry with photos that need a description, most first.
 async function pagesNeedingDescriptions(editor, siteUrl) {
@@ -256,11 +263,17 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * none (up to MAX_PER_CARD), or a reply. Without `collection`/`id`, the page that needs it most.
  * `base` = the proposal's common fields (requestedBy, text, status, createdAt) from proposeEdit.
  */
-export async function proposeDescriptions(env, editor, { collection, id, base, progress }) {
+export async function proposeDescriptions(env, editor, { collection, id, base, progress, mode = "missing", edits = [] }) {
   const reply = (text) => ({ kind: "reply", text });
-  await progress?.("Looking for photos without descriptions…");
+  if (mode === "show" || mode === "set" || mode === "all") {
+    if (!collection || !id) return reply("Which page's photos do you mean?");
+    if (mode === "show") return showDescriptions(env, editor, { collection, id });
+    if (mode === "set") return proposeOwnDescriptions(env, editor, { collection, id, edits, base });
+  }
+  await progress?.(mode === "all" ? "Looking at the photos…" : "Looking for photos without descriptions…");
   const { site, pages } = await pagesNeedingDescriptions(editor, env.SITE_URL || null);
   const named = !!(collection && id);
+  const redo = mode === "all"; // rewrite every photo's description, not just the missing ones
   if (!named && !pages.length) return reply("Every photo I can find on the site already has a description.");
   const targets = named ? [{ collection, id }] : pages.slice(0, MAX_PAGES_TRIED);
   const others = (t) => pages.filter((p) => !(p.collection === t.collection && String(p.id) === String(t.id)));
@@ -280,10 +293,10 @@ export async function proposeDescriptions(env, editor, { collection, id, base, p
     }
     const { entry, type, version, path } = opened;
     const title = String(entry.title ?? "").slice(0, 120);
-    const photos = photosWithoutDescriptions(opened.designed ? { sections: entry.sections } : { entry }, site);
-    if (!photos.length) return reply(`Every photo on “${title}” already has a description. ${othersNote(target)}`.trim());
+    const photos = (redo ? pagePhotos : photosWithoutDescriptions)(opened.designed ? { sections: entry.sections } : { entry }, site);
+    if (!photos.length) return reply(redo ? `I couldn't find any photos on “${title}”.` : `Every photo on “${title}” already has a description. To see them, say “show the photo descriptions on ${title}”. ${othersNote(target)}`.trim());
 
-    await progress?.(`Found ${plural(photos.length, "photo")} without a description on “${title}”. Looking at them… (this can take a minute)`);
+    await progress?.(`Found ${plural(photos.length, "photo")}${redo ? "" : " without a description"} on “${title}”. Looking at them… (this can take a minute)`);
     const { ready, failed, tried } = await downloadBatch(env, photos);
     if (!ready.length) {
       lastProblem = `I couldn't open the photos on “${title}” that need a description (they may be missing from the site). Ask your web team to check them.`;
@@ -310,26 +323,87 @@ export async function proposeDescriptions(env, editor, { collection, id, base, p
     const items = [];
     ready.forEach((p, i) => {
       const alt = said.get(i + 1);
-      if (alt) items.push({ n: items.length + 1, kind: p.kind, ...(p.kind === "content" ? { index: p.index } : {}), ...(p.kind === "slot" ? { slot: p.slot } : {}), src: p.src, where: p.where, alt, before: "" });
+      if (alt) items.push(item(items.length + 1, p, alt));
     });
     if (!items.length) return reply(`I couldn't describe the photos on “${title}”. Try again in a minute.`);
 
-    const before = {};
-    if (items.some((d) => d.kind === "content")) before.content = entry.content;
-    if (items.some((d) => d.kind === "main")) before.imageAlt = entry.imageAlt ?? null;
-    for (const d of items.filter((x) => x.kind === "slot")) before[d.slot] = "";
-    const proposal = {
-      id: crypto.randomUUID(), op: "update", collection: opened.designed ? DESIGNED : target.collection, entryId: String(entry.id ?? entry.slug),
-      typeKey: type.key, typeLabel: type.label ?? type.key, fieldLabels: {}, version, before, title: entry.title, path,
-      summary: `Describe ${plural(items.length, "photo")} on “${title}”`, descriptions: items,
-      // For the card: what's left after this one.
-      remaining: photos.length - items.length, failed, untried: photos.length - tried, otherPages: others(target).length, ...base,
-    };
-    proposal.changes = describedChanges(proposal);
-    await saveProposal(env, proposal);
-    return { kind: "proposal", proposal };
+    const summary = `${redo ? "Rewrite the descriptions of" : "Describe"} ${plural(items.length, "photo")} on “${title}”`;
+    // For the card: what's left after this one.
+    const extra = { remaining: photos.length - items.length, failed, untried: photos.length - tried, otherPages: redo ? 0 : others(target).length };
+    return saveDescriptions(env, opened, target.collection, items, { summary, base, extra });
   }
   return reply(lastProblem);
+}
+
+// One photo on the card: where it is, its new description and what it said before.
+const item = (n, p, alt) => ({ n, kind: p.kind, ...(p.kind === "content" ? { index: p.index } : {}), ...(p.kind === "slot" ? { slot: p.slot } : {}), src: p.src, where: p.where, alt, before: p.alt ?? "" });
+
+// Save a descriptions proposal for an opened page.
+async function saveDescriptions(env, opened, collection, items, { summary, base, extra = {} }) {
+  const { entry, type, version, path } = opened;
+  const before = {};
+  if (items.some((d) => d.kind === "content")) before.content = entry.content;
+  if (items.some((d) => d.kind === "main")) before.imageAlt = entry.imageAlt ?? null;
+  for (const d of items.filter((x) => x.kind === "slot")) before[d.slot] = d.before;
+  const proposal = {
+    id: crypto.randomUUID(), op: "update", collection: opened.designed ? DESIGNED : collection, entryId: String(entry.id ?? entry.slug),
+    typeKey: type.key, typeLabel: type.label ?? type.key, fieldLabels: {}, version, before, title: entry.title, path,
+    summary, descriptions: items, ...extra, ...base,
+  };
+  proposal.changes = describedChanges(proposal);
+  await saveProposal(env, proposal);
+  return { kind: "proposal", proposal };
+}
+
+const MAX_LISTED = 25;
+
+/** "Show the photo descriptions on …": every photo on the page, numbered, with what it says now. */
+async function showDescriptions(env, editor, { collection, id }) {
+  let opened;
+  try {
+    opened = await editor.get(collection, id);
+  } catch (e) {
+    if (e instanceof EditError) return { kind: "reply", text: "I couldn't find the page you mean. Which page's photos should I show?" };
+    throw e;
+  }
+  const title = String(opened.entry.title ?? "").slice(0, 120);
+  const photos = pagePhotos(opened.designed ? { sections: opened.entry.sections } : { entry: opened.entry }, env.SITE_URL || null);
+  if (!photos.length) return { kind: "reply", text: `I couldn't find any photos on “${title}”.` };
+  const missing = photos.filter((p) => !p.alt).length;
+  const lines = [`*Photo descriptions on “${esc(title)}”*: ${plural(photos.length, "photo")}${missing ? `, ${missing} without a description` : ""}`];
+  photos.slice(0, MAX_LISTED).forEach((p, i) => {
+    const where = esc(cut(p.where, 80));
+    lines.push(`${i + 1}. ${p.src ? `<${p.src}|${where}>` : where}: ${p.alt ? `“${esc(p.alt)}”` : "_no description yet_"}`);
+  });
+  if (photos.length > MAX_LISTED) lines.push(`…and ${photos.length - MAX_LISTED} more`);
+  const n = photos.length > 1 ? " 2" : "";
+  lines.push("", `_To change one, say “change photo${n}'s description on ${esc(title)} to …”. ${missing ? `“Describe the photos on ${esc(title)}” writes the missing ones; ` : ""}“rewrite the photo descriptions on ${esc(title)}” has me write new ones for all of them._`);
+  return { kind: "reply", text: lines.join("\n") };
+}
+
+/** "Change photo 2's description on … to …": staff's own wording for numbered photos (as listed by showDescriptions). */
+async function proposeOwnDescriptions(env, editor, { collection, id, edits, base }) {
+  const reply = (text) => ({ kind: "reply", text });
+  let opened;
+  try {
+    opened = await editor.get(collection, id);
+  } catch (e) {
+    if (e instanceof EditError) return reply("I couldn't find the page you mean. Which page's photo should I change?");
+    throw e;
+  }
+  const title = String(opened.entry.title ?? "").slice(0, 120);
+  const photos = pagePhotos(opened.designed ? { sections: opened.entry.sections } : { entry: opened.entry }, env.SITE_URL || null);
+  if (!photos.length) return reply(`I couldn't find any photos on “${title}”.`);
+  const items = [];
+  for (const e of edits || []) {
+    const n = e?.n ?? (photos.length === 1 ? 1 : null);
+    const text = cut(oneLine(String(e?.text ?? "").replace(/<[^>]*>/g, "")), MAX_STAFF_DESCRIPTION);
+    if (!n || !photos[n - 1]) return reply(`“${title}” has ${plural(photos.length, "photo")}. Which one do you mean? Say “show the photo descriptions on ${title}” to see them numbered.`);
+    if (!text) return reply("What should the new description say?");
+    items.push({ ...item(n, photos[n - 1], text), edited: true });
+  }
+  if (!items.length) return reply(`What should the description say, and for which photo? Say “show the photo descriptions on ${title}” to see them numbered.`);
+  return saveDescriptions(env, opened, collection, items, { summary: `Change the description of ${items.length === 1 ? `photo ${items[0].n}` : plural(items.length, "photo")} on “${title}”`, base });
 }
 
 /** The proposal's changes from its descriptions: alts set in the original body text, imageAlt, designed slots. */
@@ -372,7 +446,8 @@ export function descriptionBlocks(proposal, { siteUrl, heading, buttons }) {
     // Slack loads the photo from its address, as for a posted photo's before/after.
     if (d.src) blocks.push({ type: "image", image_url: d.src, alt_text: cut(d.alt || "Photo", 1900), title: { type: "plain_text", text: cut(`#${d.n} · ${d.where}`, 1900) } });
     const text = d.alt ? `>${esc(d.alt)}` : ">_(no description)_";
-    blocks.push(section(`*#${d.n}*${d.edited ? " _(changed by you)_" : ""}\n${text}`));
+    const was = d.before && !proposal.undoOf ? `\n_Now: “${esc(d.before)}”_` : "";
+    blocks.push(section(`*#${d.n}*${d.edited ? " _(changed by you)_" : ""}\n${text}${was}`));
   }
 
   const notes = [];

@@ -267,3 +267,50 @@ test("a reply in the card's thread updates the proposal and the card; unknown nu
   await reviseFromThread(ctx.env, { channel: "C1", user: "U1", text: "#1: Too late", threadTs: "100.1" });
   assert.match(ctx.slack.at(-1).text, /already been approved/);
 });
+
+test("show: every photo on the page, numbered, with what it says now (no card, no change)", async () => {
+  const ctx = setup();
+  ctx.claude({ ...choose("pages", "p2"), photos: { mode: "show", changes: [] } });
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "Show me the photo descriptions on About", by: "Sam" });
+  assert.equal(out.kind, "reply");
+  assert.match(out.text, /3 photos, 2 without a description/);
+  assert.match(out.text, /1\. <https:\/\/site\.test\/wp-content\/uploads\/basement\.jpg\|In the text[^>]*>: _no description yet_/);
+  assert.match(out.text, /3\. <https:\/\/site\.test\/board\.jpg\|[^>]*>: “The board at the 2024 AGM”/);
+  assert.match(out.text, /change photo 2's description on About to/);
+  assert.equal(ctx.requests.length, 1, "no photos sent to Claude");
+});
+
+test("set: staff's own wording for a numbered photo, even one that has a description; Approve and undo", async () => {
+  const ctx = setup();
+  ctx.claude({ ...choose("pages", "p2"), photos: { mode: "set", changes: [{ n: 3, text: "Board members at the AGM, 2024" }] } });
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "change photo 3's description on About to Board members at the AGM, 2024", by: "Sam" });
+  assert.equal(out.kind, "proposal");
+  const p = out.proposal;
+  assert.deepEqual(p.descriptions.map((d) => [d.n, d.alt, d.before]), [[3, "Board members at the AGM, 2024", "The board at the 2024 AGM"]]);
+  assert.ok(p.changes.content.includes('<img alt="Board members at the AGM, 2024" src="https://site.test/board.jpg">'));
+  assert.match(JSON.stringify(proposalBlocks(p).blocks), /Now: “The board at the 2024 AGM”/);
+  assert.equal(ctx.requests.length, 1, "no photos sent to Claude");
+  await applyProposal(ctx.env, ctx.editor, p.id, { by: "sam@example.org" });
+  assert.ok(ctx.store.files()["content.json"].pages[1].content.includes("Board members at the AGM, 2024"));
+
+  // A number that isn't on the page gets a question, not a card.
+  ctx.claude({ ...choose("pages", "p2"), photos: { mode: "set", changes: [{ n: 9, text: "X" }] } });
+  const wrong = await proposeEdit(ctx.env, ctx.editor, { text: "change photo 9 on About to X", by: "Sam" });
+  assert.equal(wrong.kind, "reply");
+  assert.match(wrong.text, /has 3 photos\. Which one/);
+  // One photo on the page: no number needed.
+  ctx.claude({ ...choose("pages", "p3"), photos: { mode: "set", changes: [{ n: null, text: "Map of the food bank" }] } });
+  const one = await proposeEdit(ctx.env, ctx.editor, { text: "change the photo description on Contact to Map of the food bank", by: "Sam" });
+  assert.equal(one.kind, "proposal");
+  assert.equal(one.proposal.descriptions[0].alt, "Map of the food bank");
+});
+
+test("all: Claude rewrites every photo's description, including ones that have one", async () => {
+  const ctx = setup();
+  ctx.claude({ ...choose("pages", "p2"), photos: { mode: "all", changes: [] } }, described("A church basement", "A market stall", "Board members around a table"));
+  const out = await proposeEdit(ctx.env, ctx.editor, { text: "rewrite the photo descriptions on About", by: "Sam" });
+  assert.equal(out.kind, "proposal");
+  assert.deepEqual(out.proposal.descriptions.map((d) => [d.alt, d.before]), [["A church basement", ""], ["A market stall", ""], ["Board members around a table", "The board at the 2024 AGM"]]);
+  assert.match(out.proposal.summary, /^Rewrite the descriptions of 3 photos/);
+  assert.equal(out.proposal.otherPages, 0);
+});
