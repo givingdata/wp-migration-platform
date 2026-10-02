@@ -55,7 +55,7 @@ missing descriptions. Each problem comes with the exact words to ask the bot to 
 | Site check | Ask "is anything out of date?" in Slack | A full check of the site in under a minute |
 | What it finds | Stale news and events, old years, placeholder text, broken links, photos without descriptions, search titles and descriptions that are missing, too long or repeated | Catches what visitors and Google notice first |
 | Monthly check-up | Posted in the channel on the first weekday of the month, only when three or more things need attention | A gentle nudge, never noise |
-| Automatic tidy-up | Announcements expire and events move to "past" on their own; the site refreshes itself overnight when a date passes | The site stays current without anyone remembering |
+| Automatic tidy-up | Announcements expire and events move to "past" on their own; the site refreshes itself early each morning (around 5 a.m. Pacific) when a date passes | The site stays current without anyone remembering |
 
 ## Get found on Google
 
