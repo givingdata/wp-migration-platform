@@ -56,6 +56,11 @@ await editor.update("designed", "index", { "0.title": "Welcome", "2.items.1.href
   Each save is one commit to `sections.json`.
 - **Only known fields change**: title, summary, body, image description, and the date/time/
   location/author/link fields the entry's content type has (`config/design-specs.json`).
+- **Search fields** (`search.js`): `"seo.title"`, `"seo.description"` and `"seo.image"` in
+  `update()` changes set the entry's (or designed page's) search title, search description and
+  share image in its `seo` object; plain text, at most 120/320 characters, an empty value clears
+  it. `noindex` and `canonical` stay with the web team. `searchPages()` lists how every page shows
+  up in search results, worked out like `BaseLayout.astro`.
 - **HTML is cleaned** of scripts, event handlers and `javascript:` links (`sanitize.js`). It's a
   blocklist so WordPress galleries and embeds survive an edit; it protects against pasted
   scripts and mistakes by logged-in staff, not against arbitrary hostile HTML.
