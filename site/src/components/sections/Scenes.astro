@@ -1,12 +1,12 @@
 ---
 // Full-width photo panels, each with a text card over it (alternating sides on wide screens).
-// The photos scroll more slowly than the cards unless parallax is false.
-import type { Scenes } from "../../lib/sections";
+// The photos scroll more slowly than the cards: parallax "subtle", "medium" (default) or "strong"; false = off.
+import { parallaxClass, type Scenes } from "../../lib/sections";
 import Paras from "./Paras.astro";
 import Heading from "./Heading.astro";
 interface Props { s: Scenes }
 const { s } = Astro.props;
-const parallax = s.parallax !== false;
+const parallax = parallaxClass(s.parallax, true);
 ---
 <section class="s-scenes-wrap" id={s.id}>
   {(s.title || s.eyebrow || s.intro) && (
@@ -19,7 +19,7 @@ const parallax = s.parallax !== false;
   )}
   <ul class="s-scenes">
     {s.items.map((it) => (
-      <li class:list={["s-scene", parallax && "s-parallax"]}>
+      <li class:list={["s-scene", parallax]}>
         <img class:list={["s-scene-img", parallax && "s-parallax-img"]} src={it.image.src} alt={it.image.alt ?? ""} loading="lazy" decoding="async" />
         <div class="wrap s-scene-inner">
           <div class="s-scene-card">

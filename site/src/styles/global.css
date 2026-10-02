@@ -343,15 +343,24 @@ h3 { font-size: 1.25rem; }
    up, so it moves more slowly than the text. Gentler on phones; off for reduced motion. Browsers
    without scroll-driven animations (Firefox) get the same movement from a script in Sections.astro. Longhands only: the minifier folds a timeline into
    the animation shorthand, which browsers then reject. */
-.s-parallax { view-timeline-name: --s-parallax; --parallax: 10%; }
-@media (max-width: 40rem) { .s-parallax { --parallax: 5%; } }
+/* --parallax: how far the photo drifts each way (share of its height); --parallax-size: the photo's
+   height against its panel, tall enough that the drift never shows an edge (size ≥ 1 / (1 − 2 × drift)). */
+.s-parallax { view-timeline-name: --s-parallax; }
+.s-parallax-subtle { --parallax: 5%; --parallax-size: 115%; }
+.s-parallax-medium { --parallax: 10%; --parallax-size: 130%; }
+.s-parallax-strong { --parallax: 18%; --parallax-size: 160%; }
+@media (max-width: 40rem) {
+  .s-parallax-subtle { --parallax: 3%; }
+  .s-parallax-medium { --parallax: 5%; }
+  .s-parallax-strong { --parallax: 8%; }
+}
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .s-parallax .s-parallax-img { inset: -15% 0 auto; height: 130%; animation-name: s-parallax; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: --s-parallax; animation-range: cover; will-change: transform; }
+    .s-parallax .s-parallax-img { inset: calc((100% - var(--parallax-size)) / 2) 0 auto; height: var(--parallax-size); animation-name: s-parallax; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: --s-parallax; animation-range: cover; will-change: transform; }
   }
 }
 /* The same sizing when the script in Sections.astro moves the photo instead (no CSS support). */
-.s-parallax-js .s-parallax .s-parallax-img { inset: -15% 0 auto; height: 130%; will-change: transform; }
+.s-parallax-js .s-parallax .s-parallax-img { inset: calc((100% - var(--parallax-size)) / 2) 0 auto; height: var(--parallax-size); will-change: transform; }
 @keyframes s-parallax { from { transform: translateY(calc(-1 * var(--parallax))); } to { transform: translateY(var(--parallax)); } }
 
 /* Scenes: full-width photo panels, a text card over each, alternating sides on wide screens. */

@@ -103,12 +103,13 @@ those ratios, or ask for a different ratio for this client before launch: staff-
 cropped to it automatically, and photos already uploaded keep the old shape.
 
 Pages can also be built from **sections** (`sections.json`), in any order: `hero` (photo behind the
-text, optionally with a slow-scrolling parallax photo, or beside it), `split` (text beside a photo), `cards`, `tiles` (photos with titles), `scenes`
+text, or beside it), `split` (text beside a photo), `cards`, `tiles` (photos with titles), `scenes`
 (full-width photo panels with a text card over each, photos scrolling slowly behind), `features`
 (icons), `stats`, `quote`, `stories`, `text`, `posts` (latest news or events), `menu` (a price list)
 and `cta`. Each section can use the page background, an alternate fill or the band colours. Section
 photos have their own shapes (hero 4:5 beside the text, split 5:4, tiles 5:7); a preset can change
-them. Show which sections each designed page uses, in order.
+them. A hero's photo and scenes can scroll more slowly than the text (parallax), set per section:
+subtle, medium or strong. Show which sections each designed page uses, in order.
 
 ## 4. Accessibility (required)
 
