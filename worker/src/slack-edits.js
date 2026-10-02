@@ -466,7 +466,7 @@ export async function proposeEdit(env, editor, { text, by, requestedBy, progress
 
   if (choice.action === "health") {
     await progress?.("Checking the whole site… (outside links can take a few seconds)");
-    const result = await siteHealth(editor, { today: localNow(env).split(" ")[1].slice(0, 10), siteUrl: env.SITE_URL || null });
+    const result = await siteHealth(editor, { today: localNow(env).split(" ")[1].slice(0, 10), siteUrl: env.SITE_URL || null, siteName: env.SITE_NAME });
     return { kind: "reply", text: healthReport(result, { siteUrl: env.SITE_URL || null }) };
   }
   if (choice.action === "stats") return answerStats(env, { message, days: choice.days, pages: index.map((e) => ({ path: e.path, title: e.title })), progress });
